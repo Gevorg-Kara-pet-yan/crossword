@@ -1,0 +1,1359 @@
+<!DOCTYPE html>
+<html lang="hy">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ title }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .cell input.keyword-cell {
+            box-sizing: border-box !important;
+            background-color: #ffed99 !important;
+            border: 2px dashed #ff8c00 !important;
+            box-shadow: 0 0 5px rgba(255, 140, 0, 0.5) !important;
+            font-weight: bold !important;
+            color: #333 !important;
+        }
+
+        .found-keyword input.correct {
+            background-color: mediumorchid !important;
+            color: white !important;
+            border: 3px solid #ffeb3b !important;
+            box-shadow: 0 0 10px #ffeb3b !important;
+        }
+
+        .cell input.keyword-cell.wrong {
+            background-color: #d50000aa !important;
+            color: white !important;
+            border: 3px solid #d50000 !important;
+            box-shadow: 0 0 10px #d50000 !important;
+            animation: wrongShake 0.4s ease-in-out;
+        }
+
+        body {
+            {% if bg %}
+            background-image: url("/static/{{ bg }}");
+            {% set size_mode = crossword.bg_size_mode | default('fixed') %}
+            {% set width = crossword.bg_width | default('400') | replace('px', '') %}
+            {% set height = crossword.bg_height | default('200') | replace('px', '') %}
+            {% if size_mode == 'cover' %}
+                background-size: cover;
+            {% else %}
+                background-size: {{ width }}px {{ height }}px;
+            {% endif %}
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            min-height: 100vh;
+            {% else %}
+            background-color: #f0f4f8;
+            min-height: 100vh;
+            {% endif %}
+            font-family: 'Segoe UI', sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+
+        h2 {
+            margin-top: 20px;
+            color: #000;
+            text-shadow: 1px 1px 4px rgba(0,0,0,0.5);
+        }
+
+        #rotation-select {
+            margin: 10px;
+            padding: 6px 12px;
+            font-size: 16px;
+            border-radius: 6px;
+        }
+
+        #checkBtn {
+            font-size: 20px;
+            padding: 12px 25px;
+            background-color: #27ae60;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            transition: all 0.3s ease;
+            margin: 15px 0;
+        }
+
+        #checkBtn:hover {
+            background-color: #2ecc71;
+            transform: scale(1.05);
+            box-shadow: 0 6px 15px rgba(0,0,0,0.3);
+        }
+
+        #hintBtn {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background-color: #f39c12;
+            color: white;
+            padding: 8px 14px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        #hintPopup {
+            display: none;
+            position: fixed;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255,255,255,0.95);
+            padding: 20px;
+            border: 2px solid #555;
+            border-radius: 10px;
+            z-index: 1000;
+            max-width: 90%;
+            width: 400px;
+            box-shadow: 0 0 12px rgba(0,0,0,0.4);
+            text-align: center;
+        }
+
+        #hintPopup button {
+            margin-top: 15px;
+            background-color: #3498db;
+        }
+
+        .grid {
+            display: grid;
+            gap: 4px;
+            justify-content: center;
+            align-items: center;
+            margin: 40px auto;
+            border: none;
+            border-radius: 0;
+            padding: 10px;
+            background: none;
+            box-shadow: none;
+            transition: transform 0.4s ease;
+            transform-origin: center center;
+        }
+
+        .cell {
+            width: 30px;
+            height: 30px;
+            background-color: white;
+            border: 1px solid #000;
+            position: relative;
+        }
+
+        .cell input {
+            width: 100%;
+            height: 100%;
+            border: none;
+            text-align: center;
+            font-weight: bold;
+            font-size: 16px;
+            text-transform: uppercase;
+            background: transparent;
+        }
+
+        .number {
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            font-size: 10px;
+            color: darkblue;
+            background: rgba(255,255,255,0.7);
+            padding: 1px 3px;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+
+        .correct {
+            background-color: #00c853aa !important;
+            color: #fff;
+            animation: correctFlash 0.4s ease-in-out;
+        }
+
+        .wrong {
+            background-color: #d50000aa !important;
+            color: #fff;
+            animation: wrongShake 0.4s ease-in-out;
+        }
+
+        /* ================= QUESTION POPUP ================= */
+        #questionPopup {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 900px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.4);
+            z-index: 2000;
+            animation: popupFade 0.25s ease;
+            overflow: hidden;
+        }
+
+        #popupHeader {
+            background: linear-gradient(90deg, #3498db, #1a6fa8);
+            color: white;
+            padding: 10px 16px;
+            cursor: grab;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-weight: bold;
+            font-size: 14px;
+            user-select: none;
+        }
+
+        #popupHeader:active {
+            cursor: grabbing;
+        }
+
+        #popupHeader .drag-hint {
+            font-size: 12px;
+            opacity: 0.75;
+            font-weight: normal;
+        }
+
+        #popupBody {
+            padding: 20px;
+            text-align: center;
+        }
+
+        @keyframes popupFade {
+            from {
+                opacity: 0;
+                transform: translate(-50%, -60%) scale(0.9);
+            }
+            to {
+                opacity: 1;
+                transform: translate(-50%, -50%) scale(1);
+            }
+        }
+
+        #link-container {
+            background: rgba(255,255,255,0.85);
+            padding: 10px 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+
+        #qrcode {
+            margin: 10px auto;
+            width: 128px;
+            height: 128px;
+        }
+
+        @media (max-width: 600px) {
+            .cell { width: 24px; height: 24px; }
+            .cell input { font-size: 12px; }
+        }
+
+        .gradient-btn {
+            background: linear-gradient(90deg, #ff00ff, #ff9800);
+            border: none;
+            color: white;
+            font-size: 18px;
+            padding: 12px 25px;
+            border-radius: 25px;
+            cursor: pointer;
+            margin: 10px 0;
+            transition: all 0.3s;
+        }
+
+        .gradient-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px #fff;
+        }
+
+        button {
+            background: linear-gradient(90deg, #ff00ff, #ff9800);
+            border: none;
+            color: white;
+            font-size: 18px;
+            padding: 12px 25px;
+            border-radius: 25px;
+            cursor: pointer;
+            margin: 10px;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px #fff;
+        }
+
+        @keyframes correctFlash {
+            from { box-shadow: 0 0 0px #00c853; }
+            to   { box-shadow: 0 0 15px #00c853; }
+        }
+
+        @keyframes wrongShake {
+            0%, 100% { transform: translateX(0); }
+            25%       { transform: translateX(-4px); }
+            50%       { transform: translateX(4px); }
+            75%       { transform: translateX(-4px); }
+        }
+
+        #backBtn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 8px 16px;
+            background-color: #3498db;
+            color: white;
+            border-radius: 6px;
+            font-weight: bold;
+            text-decoration: none;
+            z-index: 2000;
+            transition: background-color 0.3s;
+        }
+
+        #backBtn:hover {
+            background-color: #2c80b4;
+        }
+
+        .number-menu button {
+            background: #f0f0f0;
+            color: #333;
+            border: 1px solid #ccc;
+            font-size: 14px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: background 0.2s;
+            box-shadow: none;
+        }
+
+        .number-menu button:hover {
+            background: #e0e0e0;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .letter-box[readonly] {
+            cursor: not-allowed;
+            background-color: #e8f5e9 !important;
+            color: #2e7d32 !important;
+        }
+
+        /* ================= KEYWORD MATERIAL POPUP ================= */
+        #keywordMaterialPopup {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            border-radius: 16px;
+            width: 90%;
+            max-width: 520px;
+            box-shadow: 0 0 30px rgba(0,0,0,0.5);
+            z-index: 4000;
+            overflow: hidden;
+            animation: popupFade 0.3s ease;
+        }
+
+        #keywordMaterialHeader {
+            background: linear-gradient(90deg, #9b59b6, #6c3483);
+            color: white;
+            padding: 14px 20px;
+            font-size: 18px;
+            font-weight: bold;
+            text-align: center;
+            letter-spacing: 1px;
+        }
+
+        #keywordMaterialBody {
+            padding: 25px 20px;
+            text-align: center;
+        }
+
+        #keywordMaterialBody img {
+            max-width: 100%;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+
+        #keywordMaterialBody a {
+            color: #3498db;
+            font-size: 16px;
+            word-break: break-all;
+            text-decoration: underline;
+        }
+
+        #keywordMaterialBody p {
+            font-size: 18px;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        #keywordMaterialCloseBtn {
+            background: linear-gradient(90deg, #9b59b6, #6c3483);
+            color: white;
+            border: none;
+            padding: 10px 28px;
+            border-radius: 25px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 15px;
+            transition: all 0.3s;
+        }
+
+        #keywordMaterialCloseBtn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px rgba(155, 89, 182, 0.6);
+        }
+
+        #keywordMaterialOverlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6);
+            z-index: 3999;
+        }
+    </style>
+</head>
+<body>
+    <a href="https://dshh.am/am" target="_blank">
+        <img src="{{ url_for('static', filename='dshh.png') }}" alt="Dshh.am" style="max-width:200px; display:block; margin:20px auto;">
+    </a>
+
+    <div id="startModal" style="
+        position: fixed; top: 0; left: 0;
+        width: 100%; height: 100%;
+        background: rgba(0,0,0,0.6);
+        display: flex; align-items: center; justify-content: center;
+        z-index: 2000;">
+        <div style="
+            background: white; padding: 30px 40px; border-radius: 12px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.3); text-align: center;
+            max-width: 600px; width: 90%;">
+            <h3 style="color:#34495e;">Խաչբառի մեկնարկ</h3>
+            {% if description %}
+            <p style="margin-bottom: 20px; font-size: 16px; color:#333; line-height:1.5;">{{ description }}</p>
+            {% else %}
+            <p style="margin-bottom: 20px; font-size: 16px; color:#333; line-height:1.5;">Նկարագրություն չկա</p>
+            {% endif %}
+            <div id="user-info-fields-modal" style="
+                display: flex; flex-wrap: wrap; gap: 10px; justify-content: center;
+                margin: 15px 0 25px 0; padding: 15px; border-radius: 8px; background: #ecf0f1;">
+                <input type="text" id="user-name-modal" placeholder="Անուն *" required
+                    style="padding: 8px; border: 1px solid #ccc; border-radius: 5px; flex-grow: 1; min-width: 120px;">
+                <input type="text" id="user-surname-modal" placeholder="Ազգանուն *" required
+                    style="padding: 8px; border: 1px solid #ccc; border-radius: 5px; flex-grow: 1; min-width: 120px;">
+                <select id="user-gender-modal" required
+                    style="padding: 8px; border: 1px solid #ccc; border-radius: 5px; min-width: 100px;">
+                    <option value="" disabled selected>Սեռ *</option>
+                    <option value="Արական">Արական</option>
+                    <option value="Իգական">Իգական</option>
+                </select>
+                <input type="text" id="user-school-modal" placeholder="Դպրոց (ոչ պարտադիր)"
+                    style="padding: 8px; border: 1px solid #ccc; border-radius: 5px; width: 100%; max-width: 250px;">
+                <input type="text" id="user-class-modal" placeholder="Դասարան (ոչ պարտադիր)"
+                    style="padding: 8px; border: 1px solid #ccc; border-radius: 5px; width: 100%; max-width: 150px;">
+            </div>
+            <button onclick="validateAndStart()" style="
+                padding: 10px 20px; font-size: 16px; background-color: #27ae60;
+                color: white; border: none; border-radius: 6px; cursor: pointer;">
+                Սկսել խաչբառի լուծումը
+            </button>
+        </div>
+    </div>
+
+    <div id="confirmModal" style="
+        display: none; position: fixed; top: 0; left: 0;
+        width: 100%; height: 100%;
+        background: rgba(0,0,0,0.7);
+        z-index: 3000; align-items: center; justify-content: center;">
+        <div style="background: white; padding: 30px; border-radius: 10px;
+                    text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
+            <h3 style="margin-top: 0; color: #333;">Համոզվա՞ծ եք, որ ցանկանում եք վերադառնալ գլխավոր էջ։</h3>
+            <button onclick="handleExitConfirmation(true)"
+                style="background: #e74c3c; padding: 10px 20px; font-size: 16px; margin-right: 15px;">Այո</button>
+            <button onclick="handleExitConfirmation(false)"
+                style="background: #3498db; padding: 10px 20px; font-size: 16px;">Ոչ</button>
+        </div>
+    </div>
+
+    <h2>{{ title }}</h2>
+
+    <div id="timer" style="
+        font-size: 18px; background: rgba(255,255,255,0.8);
+        padding: 8px 14px; border-radius: 8px; margin-top: 10px;
+        box-shadow: 0 0 6px rgba(0,0,0,0.2);">
+        ⏱️ Ժամանակ՝ <span id="timeDisplay">00:00</span>
+    </div>
+
+    {% set hint_type = crossword.get('hint_type') %}
+    {% set global_hint = crossword.get('global_hint') %}
+    {% set global_hint_media = crossword.get('global_hint_media') %}
+    {% set hint_value = global_hint or global_hint_media or crossword.get('hint_value') %}
+
+    {% if hint_type and hint_value %}
+    <button id="hintBtn" onclick="toggleHint()">💡 Հուշում</button>
+    <div id="hintPopup" style="display:none; position:fixed; top:20%; left:50%; transform:translateX(-50%);
+         background:white; padding:20px; border-radius:10px; box-shadow:0 0 10px rgba(0,0,0,0.3); z-index:999;">
+        {% if hint_type == 'text' %}
+            <p>{{ global_hint or crossword.get('hint_value') }}</p>
+        {% elif hint_type in ['audio', 'video', 'image'] %}
+            {% set media_file = global_hint_media or crossword.get('hint_value') %}
+            {% if media_file %}
+                {% set file_path = media_file if not media_file.startswith('static/') else media_file[7:] %}
+                {% if hint_type == 'audio' %}
+                    <audio controls><source src="{{ url_for('static', filename=file_path) }}"></audio>
+                {% elif hint_type == 'video' %}
+                    <video controls width="100%"><source src="{{ url_for('static', filename=file_path) }}"></video>
+                {% elif hint_type == 'image' %}
+                    <img src="{{ url_for('static', filename=file_path) }}"
+                         alt="Հուշում նկար" style="max-width:100%; border-radius:8px;">
+                {% endif %}
+            {% endif %}
+        {% endif %}
+        <button onclick="toggleHint()">Փակել</button>
+    </div>
+    {% endif %}
+
+    <div id="feedbackBox" style="display:none; margin-top:15px; padding:10px; border:1px solid #ccc; border-radius:8px; background:#f9f9f9;">
+        <span id="feedbackText"></span>
+    </div>
+
+    <div id="grid" class="grid"
+         style="grid-template-columns: repeat({{ cols }}, 30px); grid-template-rows: repeat({{ rows }}, 30px);"></div>
+
+    <button id="checkBtn" onclick="checkAnswers()">✔️ Ստուգել</button>
+
+    <!-- QUESTION POPUP -->
+    <div id="questionPopup">
+        <div id="popupHeader">
+            <span>❓ Հարց</span>
+            <span class="drag-hint">✥ Տեղաշարժել</span>
+        </div>
+        <div id="popupBody">
+            <p id="questionText"></p>
+        </div>
+    </div>
+
+    <!-- KEYWORD MATERIAL POPUP -->
+    <div id="keywordMaterialOverlay" onclick="closeKeywordMaterial()"></div>
+    <div id="keywordMaterialPopup">
+        <div id="keywordMaterialHeader">🔑 Բանալի բառի նյութ</div>
+        <div id="keywordMaterialBody">
+            <div id="keywordMaterialContent"></div>
+            <button id="keywordMaterialCloseBtn" onclick="closeKeywordMaterial()">Փակել</button>
+        </div>
+    </div>
+
+    <div id="share-and-qr" style="
+        display: flex; flex-direction: column; align-items: center;
+        gap: 10px; margin-top: 15px; text-align: center;">
+        <div style="display: flex; gap: 15px; flex-wrap: wrap; justify-content: center;">
+            <button onclick="copyLink()" class="gradient-btn">📎 Պատճենել խաչբառի հղումը</button>
+            <button onclick="shareCrossword()" class="gradient-btn">📤 Կիսվել խաչբառով</button>
+            <button id="downloadImageBtn" class="gradient-btn">⬇️ Ներբեռնել խաչբառը որպես նկար</button>
+        </div>
+        <div id="qrcode" style="margin-top:10px;"></div>
+    </div>
+
+    {% if is_creator %}
+    <a href="#" id="backBtn" onclick="confirmExit(event)">⬅️ Վերադառնալ գլխավոր էջ</a>
+    {% endif %}
+
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+    <script>
+
+    // ================= DRAGGABLE POPUP =================
+    (function () {
+        const popup  = document.getElementById('questionPopup');
+        const header = document.getElementById('popupHeader');
+
+        let isDragging = false;
+        let offsetX = 0;
+        let offsetY = 0;
+
+        function startDrag(clientX, clientY) {
+            isDragging = true;
+            const rect = popup.getBoundingClientRect();
+            if (popup.style.transform !== 'none') {
+                popup.style.left      = rect.left + 'px';
+                popup.style.top       = rect.top  + 'px';
+                popup.style.transform = 'none';
+            }
+            offsetX = clientX - popup.getBoundingClientRect().left;
+            offsetY = clientY - popup.getBoundingClientRect().top;
+            header.style.cursor = 'grabbing';
+        }
+
+        function doDrag(clientX, clientY) {
+            if (!isDragging) return;
+            const maxX = window.innerWidth  - popup.offsetWidth;
+            const maxY = window.innerHeight - popup.offsetHeight;
+            popup.style.left = Math.max(0, Math.min(clientX - offsetX, maxX)) + 'px';
+            popup.style.top  = Math.max(0, Math.min(clientY - offsetY, maxY)) + 'px';
+        }
+
+        function endDrag() {
+            isDragging = false;
+            header.style.cursor = 'grab';
+        }
+
+        header.addEventListener('mousedown', function (e) {
+            if (e.target.tagName === 'BUTTON') return;
+            startDrag(e.clientX, e.clientY);
+            e.preventDefault();
+        });
+        document.addEventListener('mousemove', function (e) { doDrag(e.clientX, e.clientY); });
+        document.addEventListener('mouseup',   endDrag);
+
+        header.addEventListener('touchstart', function (e) {
+            if (e.target.tagName === 'BUTTON') return;
+            startDrag(e.touches[0].clientX, e.touches[0].clientY);
+            e.preventDefault();
+        }, { passive: false });
+        document.addEventListener('touchmove', function (e) {
+            if (!isDragging) return;
+            doDrag(e.touches[0].clientX, e.touches[0].clientY);
+            e.preventDefault();
+        }, { passive: false });
+        document.addEventListener('touchend', endDrag);
+    })();
+    // ===================================================
+
+    function copyLink() {
+        const link = "{{ url_for('view_crossword', id=cw_id, _external=True) }}";
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(link).then(() => {
+                alert("Հղումը պատճենվեց ✅");
+            }).catch(err => {
+                console.error('Clipboard API սխալ:', err);
+                fallbackCopyTextToClipboard(link);
+            });
+        } else {
+            fallbackCopyTextToClipboard(link);
+        }
+    }
+
+    function fallbackCopyTextToClipboard(text) {
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        textArea.style.position = "fixed";
+        textArea.style.top = "0";
+        textArea.style.left = "0";
+        textArea.style.opacity = "0";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        try {
+            const successful = document.execCommand('copy');
+            if (successful) alert("Հղումը պատճենվեց ✅");
+            else alert("Սխալ՝ հնարավոր չէ պատճենել ❌");
+        } catch (err) {
+            console.error('Fallback copy սխալ', err);
+            alert("Սխալ՝ հնարավոր չէ պատճենել ❌");
+        }
+        document.body.removeChild(textArea);
+    }
+
+    document.getElementById('downloadImageBtn').addEventListener('click', () => {
+        const name      = document.getElementById('user-name-modal').value;
+        const surname   = document.getElementById('user-surname-modal').value;
+        const gender    = document.getElementById('user-gender-modal').value;
+        const school    = document.getElementById('user-school-modal').value;
+        const userClass = document.getElementById('user-class-modal').value;
+
+        const userInfo   = `Լրացնող՝ ${name} ${surname} (${gender || 'Սեռը անհայտ'})`;
+        const schoolInfo = `Դպրոց/Դասարան՝ ${school || '---'} / ${userClass || '---'}`;
+
+        const grid     = document.getElementById('grid');
+        const cellSize = 30;
+        const rows     = {{ crossword.rows }};
+        const cols     = {{ crossword.cols }};
+
+        const paddingRatio  = 0.2;
+        const paddingSides  = Math.round(cellSize * paddingRatio * cols / 2);
+        const paddingTop    = Math.round(cellSize * paddingRatio * rows / 2 + 80);
+        const paddingBottom = Math.round(cellSize * paddingRatio * rows / 2);
+
+        const canvasWidth = Math.max(
+            cols * cellSize + paddingSides * 2,
+            500 // մինիմում լայնություն
+        );
+        const questionBlockHeight = words.length * 20 + 40;
+        const canvasHeight = rows * cellSize + paddingTop + paddingBottom + questionBlockHeight;
+
+        const canvas = document.createElement('canvas');
+        canvas.width  = canvasWidth;
+        canvas.height = canvasHeight;
+        const ctx = canvas.getContext('2d');
+
+
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        ctx.fillStyle = '#333';
+        ctx.font = 'bold 18px Segoe UI';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        const minutes = String(Math.floor(secondsPassed / 60)).padStart(2, '0');
+        const seconds = String(secondsPassed % 60).padStart(2, '0');
+        ctx.fillText(`⏱️ Ժամանակ՝ ${minutes}:${seconds}`, canvasWidth / 2, 10);
+
+        ctx.fillStyle = '#555';
+        ctx.font = '14px Segoe UI';
+        ctx.fillText(userInfo,   canvasWidth / 2, 40);
+        ctx.fillText(schoolInfo, canvasWidth / 2, 60);
+
+        ctx.font = 'bold 16px Segoe UI';
+        for (let i = 0; i < rows; i++) {
+            for (let j = 0; j < cols; j++) {
+                const cell  = grid.children[i * cols + j];
+                const input = cell.querySelector('input');
+                const yOffset = paddingTop;
+                const xOffset = paddingSides;
+
+                if (input) {
+                    let cellColor = 'white';
+                    if (input.classList.contains('keyword-cell'))                  cellColor = '#ffed99';
+                    if (input.parentElement.classList.contains('found-keyword'))   cellColor = 'mediumorchid';
+                    if (input.classList.contains('correct'))                       cellColor = '#90ee90';
+                    if (input.classList.contains('wrong'))                         cellColor = '#f08080';
+
+                    ctx.fillStyle = cellColor;
+                    ctx.fillRect(j * cellSize + xOffset, i * cellSize + yOffset, cellSize, cellSize);
+                    ctx.strokeStyle = '#000';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(j * cellSize + xOffset, i * cellSize + yOffset, cellSize, cellSize);
+
+                    const letter = input.value.toUpperCase() || '';
+                    if (letter) {
+                        ctx.fillStyle = input.parentElement.classList.contains('found-keyword') ? 'white' : '#000';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText(letter, j * cellSize + xOffset + cellSize / 2, i * cellSize + yOffset + cellSize / 2);
+                    }
+
+                    const numberDiv = cell.querySelector('.number');
+                    if (numberDiv) {
+                        ctx.font = '10px Segoe UI';
+                        ctx.textAlign = 'left';
+                        ctx.textBaseline = 'top';
+                        ctx.fillStyle = 'darkblue';
+                        ctx.fillText(numberDiv.textContent, j * cellSize + xOffset + 2, i * cellSize + yOffset + 2);
+                        ctx.font = 'bold 16px Segoe UI';
+                    }
+                } else {
+                    ctx.fillStyle = '#ccc';
+                    ctx.fillRect(j * cellSize + xOffset, i * cellSize + yOffset, cellSize, cellSize);
+                    ctx.strokeStyle = '#000';
+                    ctx.strokeRect(j * cellSize + xOffset, i * cellSize + yOffset, cellSize, cellSize);
+                }
+            }
+        }
+          // ================= DRAW QUESTIONS =================
+        let yStart = rows * cellSize + paddingTop + 20;
+
+        ctx.fillStyle = '#000';
+        ctx.font = 'bold 16px Segoe UI';
+        ctx.textAlign = 'left';
+
+        ctx.fillText('Հարցեր՝', paddingSides, yStart);
+
+        ctx.font = '14px Segoe UI';
+
+        let lineY = yStart + 20;
+
+        words.forEach(word => {
+            if (word.question === 'Բանալի բառ') return;
+
+            const text = `${word.number}. (${word.dir === 'h' ? 'Հորիզոնական' : 'Ուղղահայաց'}) - ${word.question}`;
+
+            ctx.fillText(text, paddingSides, lineY);
+            lineY += 20;
+        });
+
+        const url = canvas.toDataURL('image/png');
+        const a   = document.createElement('a');
+        a.href     = url;
+        a.download = `crossword_${name}_${surname}_${Date.now()}.png`;
+        a.click();
+    });
+
+    // window.addEventListener('DOMContentLoaded', () => {
+    //     document.getElementById('grid').style.display = 'none';
+    //     document.querySelector('#hintBtn')?.style.setProperty('display', 'none');
+    //     document.querySelector('select#rotation-select')?.style.setProperty('display', 'none');
+    //     document.querySelector('button[onclick="checkAnswers()"]')?.style.setProperty('display', 'none');
+    //     document.querySelector('#share-and-qr')?.style.setProperty('display', 'none');
+    // });
+    window.addEventListener('DOMContentLoaded', () => {
+        startCrossword(); // անմիջապես սկսում է
+    });
+    function drawWrappedText(ctx, text, x, y, maxWidth, lineHeight) {
+        const words = text.split(' ');
+        let line = '';
+
+        for (let n = 0; n < words.length; n++) {
+            const testLine = line + words[n] + ' ';
+            const metrics = ctx.measureText(testLine);
+            const testWidth = metrics.width;
+
+            if (testWidth > maxWidth && n > 0) {
+                ctx.fillText(line, x, y);
+                line = words[n] + ' ';
+                y += lineHeight;
+            } else {
+                line = testLine;
+            }
+        }
+        ctx.fillText(line, x, y);
+        return y + lineHeight;
+    }
+
+    function validateAndStart() {
+        const name    = document.getElementById('user-name-modal').value.trim();
+        const surname = document.getElementById('user-surname-modal').value.trim();
+        const gender  = document.getElementById('user-gender-modal').value;
+        if (!name || !surname || !gender) {
+            alert('Խնդրում ենք լրացնել Անուն, Ազգանուն և Սեռ պարտադիր դաշտերը։');
+            return;
+        }
+        startCrossword();
+    }
+
+    function startCrossword() {
+        document.getElementById('startModal').style.display = 'none';
+        document.getElementById('grid').style.display = 'grid';
+        document.querySelector('#hintBtn')?.style.setProperty('display', '');
+        document.querySelector('select#rotation-select')?.style.setProperty('display', '');
+        document.querySelector('button[onclick="checkAnswers()"]')?.style.setProperty('display', '');
+        document.querySelector('#share-and-qr')?.style.setProperty('display', '');
+        secondsPassed = 0;
+        document.getElementById('timeDisplay').textContent = `00:00`;
+        startTimer();
+    }
+
+    const words        = {{ crossword.placed|tojson }};
+    const rows         = {{ crossword.rows }};
+    const cols         = {{ crossword.cols }};
+    const crosswordUrl = "{{ url_for('view_crossword', id=cw_id, _external=True) }}";
+    const grid         = document.getElementById('grid');
+
+    grid.style.gridTemplateRows    = `repeat(${rows}, 30px)`;
+    grid.style.gridTemplateColumns = `repeat(${cols}, 30px)`;
+
+    const cells = [];
+    for (let i = 0; i < rows; i++) {
+        cells[i] = [];
+        for (let j = 0; j < cols; j++) {
+            const cell = document.createElement('div');
+            cell.className = 'cell';
+            cells[i][j] = cell;
+            grid.appendChild(cell);
+        }
+    }
+
+    words.forEach(word => {
+        const len = word.word.length;
+        for (let k = 0; k < len; k++) {
+            const i = word.dir === 'v' ? word.y + k : word.y;
+            const j = word.dir === 'h' ? word.x + k : word.x;
+            const cell = cells[i][j];
+            if (!cell.querySelector('input')) {
+                const input = document.createElement('input');
+                input.setAttribute('type', 'text');
+                input.setAttribute('maxlength', '2');
+                input.setAttribute('data-i', i);
+                input.setAttribute('data-j', j);
+                input.setAttribute('data-letter', word.word[k]);
+                input.setAttribute('data-dir', word.dir);
+                if (word.question === 'Բանալի բառ') input.classList.add('keyword-cell');
+                cell.appendChild(input);
+            }
+            if (k === 0 && word.type !== 'keyword') {
+                let numberDiv = cell.querySelector('.number');
+                if (!numberDiv) {
+                    numberDiv = document.createElement('div');
+                    numberDiv.className = 'number';
+                    numberDiv.dataset.numbers = JSON.stringify([word.number]);
+                    numberDiv.textContent = String(word.number);
+                    numberDiv.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        showNumberMenu(numberDiv);
+                    });
+                    cell.appendChild(numberDiv);
+                } else {
+                    const arr = JSON.parse(numberDiv.dataset.numbers || '[]');
+                    if (!arr.includes(word.number)) {
+                        arr.push(word.number);
+                        arr.sort((a, b) => a - b);
+                        numberDiv.dataset.numbers = JSON.stringify(arr);
+                        numberDiv.textContent = arr.join(',');
+                    }
+                }
+            }
+        }
+    });
+
+    for (let i = 0; i < rows; i++) {
+        for (let j = 0; j < cols; j++) {
+            const cell = cells[i][j];
+            if (!cell.querySelector('input')) {
+                cell.style.visibility = 'hidden';
+                cell.style.width      = '0';
+                cell.style.height     = '0';
+                cell.style.padding    = '0';
+                cell.style.border     = 'none';
+            }
+        }
+    }
+
+    document.addEventListener('input', (e) => {
+        if (e.target.tagName === 'INPUT' && !timerInterval &&
+            document.getElementById('startModal').style.display === 'none') {
+            startTimer();
+        }
+    });
+
+    document.querySelectorAll('.cell input').forEach(input => {
+        input.addEventListener('keydown', (e) => {
+
+            const popup = document.getElementById('questionPopup');
+
+            if (popup.style.display !== 'block') {
+                e.preventDefault();
+                return;
+            }
+
+            if (/^[0-9]$/.test(e.key)) {
+                e.preventDefault();
+                return;
+            }
+
+            const i   = parseInt(input.dataset.i);
+            const j   = parseInt(input.dataset.j);
+            const dir = input.dataset.dir || 'h';
+
+            if (e.key === 'Backspace' && input.value === '') {
+                const prev = dir === 'h'
+                    ? document.querySelector(`.cell input[data-i="${i}"][data-j="${j - 1}"]`)
+                    : document.querySelector(`.cell input[data-i="${i - 1}"][data-j="${j}"]`);
+                if (prev) prev.focus();
+            }
+
+            if (/^[ա-ֆԱ-Ֆa-zA-Z]$/.test(e.key)) {
+                input.value = e.key.toUpperCase();
+                e.preventDefault();
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+                const next = dir === 'h'
+                    ? document.querySelector(`.cell input[data-i="${i}"][data-j="${j + 1}"]`)
+                    : document.querySelector(`.cell input[data-i="${i + 1}"][data-j="${j}"]`);
+                if (next) next.focus();
+            }
+        });
+    });
+
+    // ================= KEYWORD MATERIAL FUNCTIONS =================
+    function showKeywordMaterial() {
+        const matType  = "{{ crossword.get('keyword_material_type', '') }}";
+        const matValue = "{{ crossword.get('keyword_material_value', '') }}";
+
+        if (!matType || !matValue) return;
+
+        const content = document.getElementById('keywordMaterialContent');
+
+        if (matType === 'text') {
+            content.innerHTML = `<p>${matValue}</p>`;
+        } else if (matType === 'image') {
+            const filePath = matValue.startsWith('static/') ? matValue.slice(7) : matValue;
+            content.innerHTML = `<img src="/static/${filePath}" alt="Բանալի բառի նյութ">`;
+        } else if (matType === 'link') {
+            content.innerHTML = `
+                <p style="margin-bottom:10px;">Հղումով անցեք հետևյալ էջ՝</p>
+                <a href="${matValue}" target="_blank">${matValue}</a>`;
+        } else if (matType === 'animation') {
+            const filePath = matValue.startsWith('static/') ? matValue.slice(7) : matValue;
+            const ext = matValue.split('.').pop().toLowerCase();
+            if (['mp4', 'webm', 'ogg'].includes(ext)) {
+                content.innerHTML = `<video controls autoplay style="max-width:100%; border-radius:10px;">
+                    <source src="/static/${filePath}">
+                </video>`;
+            } else {
+                content.innerHTML = `<img src="/static/${filePath}" alt="Անիմացիա" style="max-width:100%; border-radius:10px;">`;
+            }
+        }
+
+        document.getElementById('keywordMaterialOverlay').style.display = 'block';
+        document.getElementById('keywordMaterialPopup').style.display = 'block';
+    }
+
+    function closeKeywordMaterial() {
+        document.getElementById('keywordMaterialOverlay').style.display = 'none';
+        document.getElementById('keywordMaterialPopup').style.display = 'none';
+        const video = document.querySelector('#keywordMaterialContent video');
+        if (video) { video.pause(); video.currentTime = 0; }
+    }
+    // ==============================================================
+
+    function checkAnswers() {
+        stopTimer();
+
+        let allCorrect = true;
+        let keywordComplete = true;
+        let correctCount = 0;
+        let totalWords   = 0;
+
+        words.forEach(w => { if (w.question !== 'Բանալի բառ') totalWords++; });
+
+        words.forEach(word => {
+            if (word.question === 'Բանալի բառ') return;
+            let wordCorrect = true;
+            for (let k = 0; k < word.word.length; k++) {
+                const i   = word.dir === 'v' ? word.y + k : word.y;
+                const j   = word.dir === 'h' ? word.x + k : word.x;
+                const inp = document.querySelector(`.cell input[data-i="${i}"][data-j="${j}"]`);
+                if (!inp || inp.value.toUpperCase() !== word.word[k]) wordCorrect = false;
+            }
+            if (wordCorrect) correctCount++;
+        });
+
+        document.querySelectorAll('.cell input').forEach(inp => {
+            const expected = inp.dataset.letter;
+            if (!expected) return;
+            const typed = inp.value.toUpperCase();
+            inp.classList.remove('correct', 'wrong');
+            if (typed === expected) {
+                inp.classList.add('correct');
+            } else {
+                inp.classList.add('wrong');
+                allCorrect = false;
+            }
+            if (inp.classList.contains('keyword-cell') && typed !== expected) keywordComplete = false;
+        });
+
+        if (keywordComplete) {
+            document.querySelectorAll('.keyword-cell').forEach(inp =>
+                inp.parentElement.classList.add('found-keyword'));
+            // ⬇️ Ցուցադրել բանալի բառի նյութը
+            showKeywordMaterial();
+        } else {
+            document.querySelectorAll('.keyword-cell').forEach(inp =>
+                inp.parentElement.classList.remove('found-keyword'));
+        }
+
+        const minutes = String(Math.floor(secondsPassed / 60)).padStart(2, '0');
+        const seconds = String(secondsPassed % 60).padStart(2, '0');
+
+        sendResults(secondsPassed, allCorrect ? 'completed' : 'checked', allCorrect, correctCount, totalWords);
+
+        const fb = document.getElementById('feedbackText');
+        if (allCorrect) {
+            fb.innerText = `Կեցցես 🎉 Բոլոր հարցերին ճիշտ պատասխանեցիր ${minutes}:${seconds} ժամանակում։`;
+        } else {
+            fb.innerText = `Ճիշտ բառեր՝ ${correctCount}/${totalWords} 🙃 Արդյունքները պահպանվեցին:`;
+        }
+        document.getElementById('feedbackBox').style.display = 'block';
+    }
+
+    let numberMenuEl = null;
+
+    function showNumberMenu(anchorEl) {
+        let nums = [];
+        try {
+            nums = JSON.parse(anchorEl.dataset.numbers);
+            if (!Array.isArray(nums)) nums = [nums];
+        } catch (e) {
+            nums = [Number(anchorEl.dataset.numbers)].filter(n => !isNaN(n));
+        }
+        if (nums.length === 0) return;
+        if (nums.length === 1) {
+            const word = words.find(w => Number(w.number) === nums[0]);
+            if (word) showQuestion(word.number);
+            return;
+        }
+        hideNumberMenu();
+        numberMenuEl = document.createElement('div');
+        numberMenuEl.className = 'number-menu';
+        numberMenuEl.style.cssText = 'position:absolute; z-index:2001; background:white; border:1px solid #999; border-radius:8px; padding:6px 8px; box-shadow:0 2px 10px rgba(0,0,0,0.2);';
+
+        const title = document.createElement('div');
+        title.textContent = 'Ընտրիր հարցը';
+        title.style.fontWeight = '600';
+        numberMenuEl.appendChild(title);
+
+        nums.forEach(n => {
+            const word = words.find(w => Number(w.number) === n);
+            if (!word || word.type === 'keyword') return;
+            const btn = document.createElement('button');
+            btn.textContent = `Հարց ${n} (${word.dir === 'h' ? 'Հ' : 'Ու'})`;
+            btn.style.cssText = 'display:block; width:100%; margin:4px 0; cursor:pointer; padding:6px;';
+            btn.onclick = (e) => { e.stopPropagation(); hideNumberMenu(); showQuestion(word.number); };
+            numberMenuEl.appendChild(btn);
+        });
+
+        const rect = anchorEl.getBoundingClientRect();
+        numberMenuEl.style.left = `${rect.left + window.scrollX}px`;
+        numberMenuEl.style.top  = `${rect.bottom + window.scrollY + 4}px`;
+        document.body.appendChild(numberMenuEl);
+
+        setTimeout(() => {
+            const onBodyClick = (ev) => {
+                if (numberMenuEl && !numberMenuEl.contains(ev.target)) {
+                    hideNumberMenu();
+                    document.body.removeEventListener('click', onBodyClick);
+                }
+            };
+            document.body.addEventListener('click', onBodyClick);
+        }, 0);
+    }
+
+    function hideNumberMenu() {
+        if (numberMenuEl) { numberMenuEl.remove(); numberMenuEl = null; }
+    }
+
+    let currentWord = null;
+
+    function showQuestion(number) {
+        const word = words.find(w => Number(w.number) === Number(number));
+        currentWord = word;
+        if (!word || word.type === 'keyword') return;
+
+        const popup        = document.getElementById('questionPopup');
+        const questionText = document.getElementById('questionText');
+
+        let inputsHTML = '<div style="display:flex; gap:5px; justify-content:center; margin:10px 0;">';
+
+        for (let k = 0; k < word.word.length; k++) {
+            const i = word.dir === 'v' ? word.y + k : word.y;
+            const j = word.dir === 'h' ? word.x + k : word.x;
+            const existingCell  = document.querySelector(`.cell input[data-i="${i}"][data-j="${j}"]`);
+            const existingValue = existingCell ? existingCell.value.toUpperCase() : '';
+            const isCorrect     = existingCell && existingValue === word.word[k];
+
+            inputsHTML += `<input type="text" maxlength="1" class="letter-box"
+                data-pos="${k}"
+                value="${existingValue}"
+                ${isCorrect ? 'readonly' : ''}
+                style="width:30px; height:40px; font-size:24px; text-align:center; text-transform:uppercase;">`;
+        }
+
+        inputsHTML += '</div>';
+
+        questionText.innerHTML = `
+            <div style="font-size:18px; margin-bottom:10px;">${word.question}</div>
+            ${inputsHTML}
+            <div style="margin-top:15px; display:flex; gap:10px; justify-content:center;">
+                <button onclick="submitAnswerBlocks()">Հաստատել</button>
+                <button onclick="closePopup()" style="background:#e74c3c;">Չեղարկել</button>
+            </div>`;
+
+        popup.style.transform = 'translate(-50%, -50%)';
+        popup.style.left      = '50%';
+        popup.style.top       = '50%';
+        popup.style.display   = 'block';
+
+        const letterInputs = Array.from(popup.querySelectorAll('.letter-box'));
+
+        const firstFocusable = letterInputs.find(inp => !inp.hasAttribute('readonly') && !inp.value)
+                            || letterInputs.find(inp => !inp.hasAttribute('readonly'));
+        if (firstFocusable) {
+            firstFocusable.focus();
+            firstFocusable.select();
+        }
+
+        function nextEditable(fromIdx) {
+            for (let n = fromIdx + 1; n < letterInputs.length; n++) {
+                if (!letterInputs[n].hasAttribute('readonly')) return letterInputs[n];
+            }
+            return null;
+        }
+
+        function prevEditable(fromIdx) {
+            for (let n = fromIdx - 1; n >= 0; n--) {
+                if (!letterInputs[n].hasAttribute('readonly')) return letterInputs[n];
+            }
+            return null;
+        }
+
+        letterInputs.forEach((inp, idx) => {
+
+            inp.addEventListener('input', () => {
+                inp.value = inp.value.toUpperCase();
+                if (inp.value.length === 1) {
+                    const next = nextEditable(idx);
+                    if (next) next.focus();
+                }
+            });
+
+            inp.addEventListener('keydown', (e) => {
+
+                if (inp.hasAttribute('readonly')) {
+                    e.preventDefault();
+                    return;
+                }
+
+                if (/^[ա-ֆԱ-Ֆa-zA-Z]$/.test(e.key)) {
+                    e.preventDefault();
+                    inp.value = e.key.toUpperCase();
+                    const next = nextEditable(idx);
+                    if (next) next.focus();
+                    return;
+                }
+
+                if (e.key === 'Enter') {
+                    submitAnswerBlocks();
+                    return;
+                }
+
+                if (e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    const next = nextEditable(idx);
+                    if (next) next.focus();
+                    return;
+                }
+
+                if (e.key === 'ArrowLeft') {
+                    e.preventDefault();
+                    const prev = prevEditable(idx);
+                    if (prev) prev.focus();
+                    return;
+                }
+
+                if (e.key === 'Backspace') {
+                    if (inp.value) {
+                        inp.value = '';
+                    } else {
+                        const prev = prevEditable(idx);
+                        if (prev) { prev.value = ''; prev.focus(); }
+                    }
+                    e.preventDefault();
+                    return;
+                }
+
+                if (!['Tab'].includes(e.key)) {
+                    e.preventDefault();
+                }
+            });
+        });
+    }
+
+    function submitAnswerBlocks() {
+        const popup        = document.getElementById('questionPopup');
+        const letterInputs = popup.querySelectorAll('.letter-box');
+        let answer = '';
+        letterInputs.forEach(inp => answer += inp.value.toUpperCase());
+        if (answer.length !== currentWord.word.length) { alert('Թերի պատասխան'); return; }
+
+        for (let k = 0; k < currentWord.word.length; k++) {
+            const i = currentWord.dir === 'v' ? currentWord.y + k : currentWord.y;
+            const j = currentWord.dir === 'h' ? currentWord.x + k : currentWord.x;
+            const cell = document.querySelector(`.cell input[data-i="${i}"][data-j="${j}"]`);
+            if (cell) { cell.value = answer[k]; cell.classList.remove('correct', 'wrong'); }
+        }
+        popup.style.display = 'none';
+        currentWord = null;
+    }
+
+    function closePopup() {
+        const popup = document.getElementById('questionPopup');
+        popup.style.display = 'none';
+        popup.style.transform = 'translate(-50%, -50%)';
+    }
+
+    function showHint() { document.getElementById('hintPopup').style.display = 'block'; }
+
+    function hideHint() {
+        const popup = document.getElementById('hintPopup');
+        popup.style.display = 'none';
+        const audio = popup.querySelector('audio');
+        const video = popup.querySelector('video');
+        if (audio) { audio.pause(); audio.currentTime = 0; }
+        if (video) { video.pause(); video.currentTime = 0; }
+    }
+
+    new QRCode(document.getElementById("qrcode"), {
+        text: crosswordUrl, width: 128, height: 128,
+        colorDark: "#000000", colorLight: "#ffffff",
+        correctLevel: QRCode.CorrectLevel.H
+    });
+
+    function shareCrossword() {
+        if (navigator.share) {
+            navigator.share({ title: "Խաչբառ", text: "Նայեք այս խաչբառը՝", url: crosswordUrl })
+                .catch(err => console.log(err));
+        } else {
+            alert('Բրաուզերը չի աջակցում share:');
+        }
+    }
+
+    function toggleHint() {
+        const popup = document.getElementById('hintPopup');
+        if (popup.style.display === 'block') {
+            hideHint();
+        } else {
+            popup.style.display = 'block';
+            const media = popup.querySelector('video, audio');
+            if (media) media.play().catch(e => console.log("Auto-play blocked"));
+        }
+    }
+
+    function sendResults(timeTaken, status, isCorrect, correctCount, totalWords) {
+        const cwId = typeof crosswordId !== 'undefined' ? crosswordId : window.location.pathname.split('/').pop();
+        const data = {
+            name:          document.getElementById('user-name-modal').value.trim(),
+            surname:       document.getElementById('user-surname-modal').value.trim(),
+            gender:        document.getElementById('user-gender-modal').value,
+            school:        document.getElementById('user-school-modal').value.trim(),
+            class:         document.getElementById('user-class-modal').value.trim(),
+            time_taken:    timeTaken,
+            status:        status,
+            is_correct:    isCorrect,
+            correct_count: correctCount,
+            total_words:   totalWords
+        };
+        fetch(`/save_result/${cwId}`, {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify(data)
+        }).then(res => res.json()).then(res => console.log(res)).catch(err => console.error(err));
+    }
+
+    let timerInterval = null;
+    let secondsPassed = 0;
+
+    function startTimer() {
+        if (timerInterval) return;
+        const display = document.getElementById('timeDisplay');
+        timerInterval = setInterval(() => {
+            secondsPassed++;
+            const minutes = String(Math.floor(secondsPassed / 60)).padStart(2, '0');
+            const seconds = String(secondsPassed % 60).padStart(2, '0');
+            display.textContent = `${minutes}:${seconds}`;
+        }, 1000);
+    }
+
+    function stopTimer() { clearInterval(timerInterval); timerInterval = null; }
+
+    function confirmExit(event) {
+        event.preventDefault();
+        stopTimer();
+        document.getElementById('confirmModal').style.display = 'flex';
+    }
+
+    function handleExitConfirmation(isConfirmed) {
+        document.getElementById('confirmModal').style.display = 'none';
+        if (isConfirmed) {
+            sendResults(secondsPassed, 'incomplete', false);
+            window.location.href = "{{ url_for('dashboard') }}";
+        } else {
+            startTimer();
+        }
+    }
+
+    </script>
+</body>
+</html>

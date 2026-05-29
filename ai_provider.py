@@ -1,0 +1,152 @@
+import os
+import json
+import asyncio
+import re
+import anthropic
+import requests
+from abc import ABC, abstractmethod
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# ─── Shared helpers ────────────────────────────────────────────────
+
+def normalize(text: str) -> str:
+    return text.strip().upper()
+
+def clean_json_response(raw: str) -> dict | list:
+    clean = raw.replace("```json", "").replace("```", "").replace("`", "").strip()
+    # Try object first
+    start = clean.find("{")
+    if start != -1:
+        end = clean.rfind("}") + 1
+        return json.loads(clean[start:end])
+    # Fallback to array
+    start = clean.find("[")
+    end = clean.rfind("]") + 1
+    return json.loads(clean[start:end])
+
+# ─── Abstract base ─────────────────────────────────────────────────
+
+class AIProvider(ABC):
+
+    @abstractmethod
+    async def ask_async(self, prompt: str) -> str:
+        """Վերադարձնում է raw string պատասխան"""
+        ...
+
+    def ask_sync(self, prompt: str) -> str:
+        return asyncio.get_event_loop().run_until_complete(self.ask_async(prompt))
+
+    async def generate_questions(self, topic: str, count: int, description: str = "") -> list[dict]:
+        prompt = f"""
+Ստեղծիր խաչբառ '{topic}' թեմայով։
+
+Լրացուցիչ նկարագրություն՝ {description}
+
+ՊԱՀԱՆՋՆԵՐ՝
+1. Գրիր կարճ ՆԿԱՐԱԳՐՈՒԹՅՈՒՆ (2-3 նախադասություն)
+2. Ստեղծիր {count} հարց և պատասխան
+
+ՀԱՐՑԵՐԻ ՊԱՀԱՆՋՆԵՐ՝
+- Պատասխանները մեկ բառով
+- Հայերեն
+- ՄԵԾԱՏԱՌ
+
+ՎԵՐԱԴԱՐՁՐՈՒ ՄԻԱՅՆ JSON՝
+{{
+  "description": "...",
+  "questions": [
+    {{"q": "հարց", "a": "ՊԱՏԱՍԽԱՆ"}}
+  ]
+}}
+"""
+        raw = await self.ask_async(prompt)
+        try:
+            parsed = clean_json_response(raw)
+            items = parsed.get("questions", []) if isinstance(parsed, dict) else parsed
+        except Exception as e:
+            print("❌ JSON parse սխալ:", e, "\nRAW:", raw[:300])
+            return []
+
+        return [
+            {"q": item["q"].strip(), "a": normalize(item["a"])}
+            for item in items
+            if len(item.get("a", "").strip()) >= 3
+        ]
+
+    def call_for_json(self, prompt: str) -> list | dict:
+        """Sync կանչ, JSON վերադարձ (spell-check route-ի համար)"""
+        raw = self.ask_sync(prompt)
+        try:
+            return clean_json_response(raw)
+        except Exception:
+            match = re.search(r"\[.*\]", raw, re.S)
+            if match:
+                return json.loads(match.group())
+            return []
+
+# ─── Claude (Anthropic SDK) ────────────────────────────────────────
+
+class ClaudeProvider(AIProvider):
+
+    def __init__(self):
+        api_key = os.environ.get("ANTHROPIC_API_KEY")
+        if not api_key:
+            raise RuntimeError("ANTHROPIC_API_KEY is not set")
+        self._client = anthropic.Anthropic(api_key=api_key)
+
+    async def ask_async(self, prompt: str) -> str:
+        message = await asyncio.to_thread(
+            self._client.messages.create,
+            model="claude-sonnet-4-20250514",
+            max_tokens=1500,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return message.content[0].text.strip()
+
+# ─── Custom / DSH AI ──────────────────────────────────────────────
+
+class CustomProvider(AIProvider):
+
+    def __init__(self):
+        self._url = os.getenv("API_URL", "http://localhost:5000/api/ask")
+        self._key = os.getenv("X_API_KEY", "")
+        if not self._key:
+            raise RuntimeError("X_API_KEY is not set in .env")
+
+    async def ask_async(self, prompt: str) -> str:
+        headers = {
+            "X-API-Key": self._key,
+            "Content-Type": "application/json; charset=utf-8",
+        }
+        payload = json.dumps({"message": prompt}, ensure_ascii=False).encode("utf-8")
+        response = await asyncio.to_thread(
+            requests.post, self._url, headers=headers, data=payload, timeout=100
+        )
+        response.encoding = "utf-8"
+        raw = response.text
+        print("🟢 Custom AI RAW:", raw[:200])
+        # Unwrap {"ok": true, "answer": "..."} եթե կա
+        try:
+            outer = json.loads(raw)
+            if isinstance(outer, dict) and "answer" in outer:
+                return outer["answer"]
+        except Exception:
+            pass
+        return raw
+
+# ─── Factory ───────────────────────────────────────────────────────
+
+def get_provider(choice: str = None) -> AIProvider:
+    if choice:
+        choice = choice.strip().lower()
+    else:
+        choice = os.getenv("AI_PROVIDER", "claude").strip().lower()
+
+    if choice == "claude":
+        return ClaudeProvider()
+    elif choice in ["custom", "dshh"]:
+        return CustomProvider()
+    else:
+        raise ValueError(f"Անհայտ AI_PROVIDER: '{choice}'")

@@ -1,0 +1,1464 @@
+<!DOCTYPE html>
+<html lang="hy">
+<head>
+    <meta charset="UTF-8">
+    <title>Խաչբառի հարցերի մուտքագրում</title>
+    <style>
+        .custom-file-upload {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 10px;
+            width: 100%;
+            justify-content: flex-start;
+            flex-wrap: wrap;
+        }
+
+        .upload-label {
+            background-color: #3498db;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            font-weight: bold;
+        }
+
+        .upload-label:hover {
+            background-color: #2c80b4;
+        }
+
+        .custom-file-upload input[type="file"] {
+            display: none;
+        }
+
+        #file-name {
+            font-size: 14px;
+            color: #555;
+        }
+
+        h2 {
+            text-align: center;
+            color: #4F2675;
+            margin-bottom: 30px;
+        }
+        .form-section {
+            background: #ffffff;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 0 12px rgba(0,0,0,0.1);
+            margin-bottom: 25px;
+        }
+        .qa-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+        .qa-row input {
+            text-transform: uppercase;
+        }
+        .qa-row label {
+            width: 30px;
+            text-align: center;
+            font-weight: bold;
+            color: #4F2675;
+        }
+        .qa-row input {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            white-space: nowrap;
+            overflow-x: auto;
+            min-width: 0;
+        }
+        .qa-row input[type="text"] {
+            width: auto;
+        }
+
+        textarea, select:not(#hint_type), input[type="file"], input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            margin-top: 5px;
+            margin-bottom: 15px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-sizing: border-box;
+            font-size: 14px;
+            font-family: 'Segoe UI', sans-serif;
+        }
+
+        #hint_type {
+            width: 100%;
+            padding: 10px;
+            margin-top: 5px;
+            margin-bottom: 15px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-sizing: border-box;
+            font-size: 14px;
+            font-family: 'Segoe UI', sans-serif;
+        }
+
+        textarea {
+            resize: vertical;
+        }
+        label {
+            font-weight: bold;
+            color: #34495e;
+            margin-top: 10px;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        button:hover {
+            background-color: #2c80b4;
+        }
+        .add-btn {
+            background-color: #2ecc71;
+            margin-bottom: 20px;
+        }
+        .add-btn:hover {
+            background-color: #27ae60;
+        }
+
+        .error-message {
+            color: #e74c3c;
+            font-size: 13px;
+            margin: 2px 0 10px 0;
+            display: block;
+        }
+
+        .bg-options {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+            gap: 15px;
+            margin: 10px 0 20px 0;
+            justify-items: center;
+        }
+
+        .bg-option {
+            border: 2px solid transparent;
+            border-radius: 10px;
+            cursor: pointer;
+            overflow: hidden;
+            width: 120px;
+            height: 80px;
+            transition: transform 0.2s ease, border-color 0.3s ease;
+            position: relative;
+        }
+        .form-section {
+            max-width: 1000px;
+            margin: auto;
+        }
+
+        .bg-option img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 8px;
+        }
+
+        .bg-option.selected {
+            border-color: #3498db;
+            box-shadow: 0 0 5px rgba(52, 152, 219, 0.7);
+        }
+
+        .bg-option:hover {
+            transform: scale(1.05);
+        }
+
+        input[type="radio"] {
+            display: none;
+        }
+        .delete-btn {
+            background-color: #e74c3c;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .delete-btn:hover {
+            background-color: #c0392b;
+        }
+
+        .custom-select-wrapper {
+            position: relative;
+            width: 100%;
+        }
+        .custom-select {
+            background: #fff;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            padding: 10px;
+            cursor: pointer;
+            user-select: none;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .custom-options {
+            display: none;
+            position: absolute;
+            background: #fff;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            margin-top: 5px;
+            width: 100%;
+            max-height: 200px;
+            overflow-y: auto;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            z-index: 100;
+        }
+        .custom-options label {
+            display: block;
+            padding: 8px 10px;
+            cursor: pointer;
+            font-weight: normal;
+        }
+        .custom-options label:hover {
+            background: #f1f1f1;
+        }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background-color: #f7f9fc;
+            padding: 40px 20px;
+            max-width: 1800px;
+            margin: auto;
+        }
+        .form-section {
+            width: 60% !important;
+            max-width: 1600px !important;
+            margin: 20px auto !important;
+        }
+
+        .size-mode-selector {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-top: 15px;
+        }
+
+        .mode-label {
+            padding: 10px 15px;
+            border: 2px solid #ccc;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: bold;
+            color: #34495e;
+            background-color: #f8f8f8;
+            text-align: center;
+            flex-grow: 1;
+        }
+
+        .size-mode-selector input[type="radio"]:checked + .mode-label {
+            background-color: #3498db;
+            color: white;
+            border-color: #2c80b4;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .mode-label:hover {
+            border-color: #3498db;
+        }
+
+        #bg-preview {
+            object-fit: contain;
+            transition: all 0.3s ease;
+        }
+
+        #bg-preview.full-screen-preview {
+            width: 90% !important;
+            max-width: 600px;
+            height: 300px !important;
+            object-fit: cover !important;
+        }
+
+        #bg-preview-container {
+            margin-top:10px;
+            text-align:center;
+            display:none;
+            position: relative;
+            padding: 20px 0;
+        }
+
+        #remove-bg-btn {
+            display: none;
+            position: absolute;
+            top: 5px;
+            right: 50%;
+            transform: translateX(300px);
+            background-color: #e74c3c;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            z-index: 10;
+            font-size: 14px;
+            font-weight: bold;
+            line-height: 1;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        #remove-bg-btn:hover {
+            background-color: #c0392b;
+        }
+
+        #bg-preview-container.cover-mode-active #remove-bg-btn {
+            top: 35px;
+        }
+
+        .format-list {
+            display: block;
+            margin-top: 5px;
+            font-size: 13px;
+            color: #7f8c8d;
+        }
+        .qa-row textarea {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            resize: none;
+            overflow-x: auto;
+            white-space: nowrap;
+        }
+
+        .ai-section {
+            background: #f0f8ff;
+            border: 1px solid #b0d4f1;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        .ai-section label {
+            color: #2c3e50;
+        }
+        .ai-section input[type="text"] {
+            margin-bottom: 10px;
+        }
+        .btn-ai {
+            background-color: #8e44ad;
+            margin-left: 10px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 160px;
+            justify-content: center;
+        }
+        .btn-ai:hover:not(:disabled) {
+            background-color: #6c3483;
+        }
+        .btn-ai:disabled {
+            background-color: #b39dbd;
+            cursor: not-allowed;
+        }
+
+        .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255,255,255,0.4);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+            display: none;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        #ai-status {
+            margin-top: 10px;
+            font-size: 14px;
+            color: #6c3483;
+            display: none;
+            align-items: center;
+            gap: 8px;
+        }
+        #ai-status .status-spinner {
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(108,52,131,0.3);
+            border-top-color: #6c3483;
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+        }
+
+        .confirm-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.35);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+        }
+        .confirm-overlay.active {
+            display: flex;
+        }
+        .confirm-box {
+            background: #fff;
+            border-radius: 12px;
+            padding: 28px 32px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+            max-width: 340px;
+            width: 90%;
+            text-align: center;
+            animation: popIn 0.18s ease;
+        }
+        @keyframes popIn {
+            from { transform: scale(0.85); opacity: 0; }
+            to   { transform: scale(1);    opacity: 1; }
+        }
+        .confirm-box p {
+            font-size: 16px;
+            color: #2c3e50;
+            margin: 0 0 22px 0;
+        }
+        .confirm-box .confirm-icon {
+            font-size: 36px;
+            margin-bottom: 12px;
+        }
+        .confirm-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
+        .confirm-actions button {
+            flex: 1;
+            padding: 10px 0;
+            border-radius: 7px;
+            font-size: 15px;
+            font-weight: bold;
+            border: none;
+            cursor: pointer;
+        }
+        .btn-confirm-yes {
+            background-color: #e74c3c;
+            color: white;
+        }
+        .btn-confirm-yes:hover {
+            background-color: #c0392b;
+        }
+        .btn-confirm-no {
+            background-color: #ecf0f1;
+            color: #2c3e50;
+        }
+        .btn-confirm-no:hover {
+            background-color: #d5dbdb;
+        }
+        .qa-row textarea {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            resize: vertical;
+            overflow-y: auto;
+            white-space: normal;
+            min-height: 38px;
+        }
+
+        /* ===== ԲԱՆԱԼԻ ԲԱՌԻ ՆՅՈՒԹ ===== */
+        .keyword-material-section {
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px solid #c39bd3;
+            border-radius: 10px;
+            background: #fdf4ff;
+        }
+        .keyword-material-section label {
+            color: #6c3483;
+        }
+        #keyword_material_type {
+            width: 100%;
+            padding: 10px;
+            margin-top: 5px;
+            margin-bottom: 15px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-sizing: border-box;
+            font-size: 14px;
+            font-family: 'Segoe UI', sans-serif;
+        }
+        #guideBtn {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: #4F2675;
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 10px;
+            font-size: 14px;
+            cursor: pointer;
+            z-index: 200;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            transition: 0.2s;
+        }
+
+        #guideBtn:hover {
+            background: #3b1d5c;
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+
+<body>
+<button id="guideBtn" onclick="openGuide()">📘 Օգտագործման ուղեցույց</button>
+<div class="confirm-overlay" id="guide-modal">
+    <div class="confirm-box" style="max-width:600px; text-align:left;">
+        <h3 style="text-align:center; margin-bottom:15px;">📘 Օգտագործման ուղեցույց</h3>
+
+        <div style="max-height:400px; overflow-y:auto; font-size:14px; line-height:1.6;">
+            <p><strong>1.</strong> Մուտքագրեք ստեղծողի անունը և ազգանունը</p>
+            <p><strong>2.</strong> Ընտրեք դասարան(ներ) և առարկա(ներ)</p>
+            <p><strong>3.</strong> Մուտքագրեք խաչբառի վերնագիրը</p>
+            <p><strong>4.</strong> Ավելացրեք հարցեր և պատասխաններ</p>
+            <p><strong>5.</strong> Կարող եք օգտագործել 🤖 AI՝ հարցեր գեներացնելու համար</p>
+            <p><strong>6.</strong> Ընտրեք կամ բեռնեք ֆոնային պատկեր</p>
+            <p><strong>7.</strong> Լրացրեք նկարագրությունը</p>
+            <p><strong>8.</strong> Ընտրեք հուշման տեսակը (տեքստ / նկար / աուդիո / վիդեո)</p>
+            <p><strong>9.</strong> (Եթե կա) մուտքագրեք բանալի բառը</p>
+            <p><strong>10.</strong> Սեղմեք «Ստեղծել խաչբառ»</p>
+
+            <hr>
+            <p style="color:#888;">💡 Խորհուրդ․ Պատասխանները գրեք ՄԵԾԱՏԱՌ</p>
+        </div>
+
+        <div class="confirm-actions" style="margin-top:15px;">
+            <button class="btn-confirm-no" onclick="closeGuide()">Փակել</button>
+        </div>
+    </div>
+</div>
+
+
+    <!-- Custom Confirm Modal -->
+    <div class="confirm-overlay" id="confirm-overlay">
+        <div class="confirm-box">
+            <div class="confirm-icon">&#x1F5D1;&#xFE0F;</div>
+            <p>Համոզված եք, որ ցանկանում եք ջնջել այս հարցը?</p>
+            <div class="confirm-actions">
+                <button class="btn-confirm-no" onclick="closeConfirm()">Չեղարկել</button>
+                <button class="btn-confirm-yes" onclick="confirmDelete()">Ջնջել</button>
+            </div>
+        </div>
+    </div>
+
+    <a href="https://dshh.am/am" target="_blank">
+        <img src="{{ url_for('static', filename='dshh.png') }}" alt="Dshh.am" style="max-width:200px; display:block; margin:20px auto;">
+    </a>
+
+<form method="post" enctype="multipart/form-data" class="form-section" novalidate onsubmit="return validateForm()">
+
+    <div class="creator-section" style="margin-bottom: 25px;">
+        <h3 style="text-align: center; color: #2c3e50; margin-bottom: 15px;">Խաչբառի ստեղծող</h3>
+        <label for="creator_name">Անուն, Ազգանուն</label>
+        <input type="text" id="creator_name" name="creator_name" placeholder="Օրինակ՝ Աննա Հարությունյան" required>
+        <span class="error-message"></span>
+    </div>
+
+    <div style="display:flex; justify-content:center; gap: 20px; align-items: flex-start; margin-bottom: 25px;">
+
+        <div style="flex: 1; max-width: 300px;">
+            <h3 style="text-align:center; margin-bottom: 10px;">Դասարան</h3>
+            <div class="custom-select-wrapper" style="width: 100%;">
+                <div class="custom-select" onclick="toggleDropdown()">
+                    Ընտրել դասարան(ներ)
+                    <span class="arrow">▼</span>
+                </div>
+                <div class="custom-options" id="grade-options">
+                    {% for g in range(1,13) %}
+                    <label>
+                        <input type="checkbox" name="grades" value="{{ g }}" onchange="updateSelection()">
+                        {{ g }}{% if g == 1 %}-ին{% else %}-րդ{% endif %} դասարան
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+            <span class="error-message" id="grade-error" style="margin-left: 0;"></span>
+        </div>
+
+        <div style="flex: 1; max-width: 300px;">
+            <h3 style="text-align:center; margin-bottom: 10px;">Առարկա</h3>
+            <div class="custom-select-wrapper" style="width: 100%;">
+                <div class="custom-select" id="subject-select-display" onclick="toggleSubjectDropdown()">
+                    Ընտրել առարկա(ներ)
+                    <span class="arrow">▼</span>
+                </div>
+                <div class="custom-options" id="subject-options">
+                    <label><input type="checkbox" name="subjects" value="native" onchange="updateSubjectSelection()"> Մայրենի</label>
+                    <label><input type="checkbox" name="subjects" value="armenian" onchange="updateSubjectSelection()"> Հայոց լեզու</label>
+                    <label><input type="checkbox" name="subjects" value="literature" onchange="updateSubjectSelection()"> Գրականություն</label>
+                    <label><input type="checkbox" name="subjects" value="armenian literature" onchange="updateSubjectSelection()"> Հայ գրականություն</label>
+                    <label><input type="checkbox" name="subjects" value="russian language" onchange="updateSubjectSelection()"> Ռուսաց լեզու</label>
+                    <label><input type="checkbox" name="subjects" value="foreign language" onchange="updateSubjectSelection()"> Օտար լեզու</label>
+                    <label><input type="checkbox" name="subjects" value="math" onchange="updateSubjectSelection()"> Մաթեմատիկա</label>
+                    <label><input type="checkbox" name="subjects" value="music" onchange="updateSubjectSelection()"> Երաժշտություն</label>
+                    <label><input type="checkbox" name="subjects" value="fine art" onchange="updateSubjectSelection()"> Կերպարվեստ</label>
+                    <label><input type="checkbox" name="subjects" value="me and the world around me" onchange="updateSubjectSelection()"> Ես և շրջակա աշխարհը</label>
+                    <label><input type="checkbox" name="subjects" value="patriotism" onchange="updateSubjectSelection()"> Հայրենագիտություն</label>
+                    <label><input type="checkbox" name="subjects" value="natural science" onchange="updateSubjectSelection()"> Բնագիտություն</label>
+                    <label><input type="checkbox" name="subjects" value="geography" onchange="updateSubjectSelection()"> Աշխարագրություն</label>
+                    <label><input type="checkbox" name="subjects" value="Geography of Armenia" onchange="updateSubjectSelection()"> Հայաստանի աշխարագրություն</label>
+                    <label><input type="checkbox" name="subjects" value="Armenian history" onchange="updateSubjectSelection()"> Հայոց պատմություն</label>
+                    <label><input type="checkbox" name="subjects" value="world history" onchange="updateSubjectSelection()"> Համաշխարհային պատմություն</label>
+                    <label><input type="checkbox" name="subjects" value="social science" onchange="updateSubjectSelection()"> Հասարակագիտություն</label>
+                    <label><input type="checkbox" name="subjects" value="algebra" onchange="updateSubjectSelection()"> Հանրահաշիվ</label>
+                    <label><input type="checkbox" name="subjects" value="geometry" onchange="updateSubjectSelection()"> Երկրաչափություն</label>
+                    <label><input type="checkbox" name="subjects" value="TGHG" onchange="updateSubjectSelection()"> ԹԳՀԳ</label>
+                    <label><input type="checkbox" name="subjects" value="physics" onchange="updateSubjectSelection()"> Ֆիզիկա</label>
+                    <label><input type="checkbox" name="subjects" value="chemistry" onchange="updateSubjectSelection()"> Քիմիա</label>
+                    <label><input type="checkbox" name="subjects" value="semiology" onchange="updateSubjectSelection()"> Կենսաբանություն</label>
+                    <label><input type="checkbox" name="subjects" value="technology" onchange="updateSubjectSelection()"> Տեխնոլոգիա</label>
+                    <label><input type="checkbox" name="subjects" value="NZP" onchange="updateSubjectSelection()"> ՆԶՊ</label>
+                    <label><input type="checkbox" name="subjects" value="physical education" onchange="updateSubjectSelection()"> Ֆիզկուլտուրա</label>
+                    <label><input type="checkbox" name="subjects" value="chess" onchange="updateSubjectSelection()"> Շախմատ</label>
+                </div>
+            </div>
+            <input type="hidden" name="selected_subjects" id="selected_subjects" required>
+            <span class="error-message" id="subject-error" style="margin-left: 0;"></span>
+        </div>
+    </div>
+
+    <div id="font-settings" style="margin-top:20px; display:none;">
+        <label>Տառաչափ</label>
+        <select id="font_size" name="font_size">
+            <option value="16px">Փոքր</option>
+            <option value="20px">Միջին</option>
+            <option value="24px">Մեծ</option>
+            <option value="28px">Շատ մեծ</option>
+        </select>
+
+        <label style="margin-top:10px; display:block;">Տառատեսակ</label>
+        <select id="font_family" name="font_family">
+            <option value="Arial">Arial</option>
+            <option value="Times New Roman">Times New Roman</option>
+            <option value="Segoe UI">Segoe UI</option>
+            <option value="Tahoma">Tahoma</option>
+        </select>
+    </div>
+
+    <h2>
+        <label>Խաչբառի վերնագիր</label>
+        <input type="text" name="title" placeholder="Օրինակ՝ Հայ գրականություն" required>
+        <span class="error-message"></span>
+    </h2>
+    <h3 style="text-align:center;">Խաչբառի հարցերի մուտքագրում</h3>
+
+    <input type="hidden" name="use_keyword" value="{{ use_keyword }}">
+
+    <div id="qa-container">
+        <div>
+            <div class="qa-row">
+                <label>1.</label>
+                <textarea name="question_1" placeholder="Հարց 1" required></textarea>
+                <textarea name="answer_1" placeholder="Պատասխան 1" required></textarea>
+                <button type="button" class="delete-btn" onclick="removeField(this)">❌</button>
+            </div>
+            <span class="error-message"></span>
+        </div>
+    </div>
+
+    <button type="button" class="add-btn" onclick="addField()">➕ Ավելացնել նոր հարց/պատասխան</button>
+
+    {% if use_keyword != 'yes' %}
+        <div class="ai-section">
+            <label for="ai_topic">🤖 ԱԲ-ի միջոցով հարցեր գեներացնել</label>
+            <input type="text" id="ai_topic" placeholder="Մուտքագրիր թեման (օրինակ՝ Հայ գրականություն, Գուրգեն Մահարի)">
+            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                <label for="ai_count" style="margin:0;">Հարցերի քանակ՝</label>
+                <input type="number" id="ai_count" value="3" min="1" max="20" style="width:70px; margin:0;">
+                <button type="button" class="btn-ai" id="ai-generate-btn" onclick="generateAIQuestions()">
+                    <span class="spinner" id="ai-spinner"></span>
+                    <span id="ai-btn-text">&#x1F916; Գեներացնել</span>
+                </button>
+            </div>
+            <div id="ai-status">
+                <div class="status-spinner"></div>
+                <span id="ai-status-text">Հարցերը գեներացվում են, խնդրում ենք սպասել...</span>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <hr>
+    <label>Ընտրել կամ բեռնել ֆոնային պատկեր</label>
+    <div class="bg-options">
+        {% for bg in bg_images %}
+        <label class="bg-option">
+            <input type="radio" name="bg_choice" value="{{ bg }}">
+            <img src="{{ url_for('static', filename='backgrounds/' ~ bg) }}" alt="Ֆոն">
+        </label>
+        {% endfor %}
+    </div>
+
+    <div id="bg-preview-container" style="margin-top:10px; text-align:center; display:none;">
+        <button type="button" id="remove-bg-btn" onclick="removeBackground()">✖</button>
+        <p>Ֆոնային նախադիտում</p>
+        <img id="bg-preview" src="" alt="Նախադիտում" style="width:400px; height:200px; border:1px solid #ccc; border-radius:6px;">
+
+        <div class="size-mode-selector">
+            <label class="mode-label">
+                <input type="radio" name="bg_size_mode" value="fixed" checked onchange="toggleSizeInputs(false)">
+                Ֆիքսված չափսեր
+            </label>
+            <label class="mode-label">
+                <input type="radio" name="bg_size_mode" value="cover" onchange="toggleSizeInputs(true)">
+                Ամբողջական էկրան
+            </label>
+        </div>
+
+        <div id="fixed-size-inputs">
+            <div style="margin-top:5px;">
+                <label>Լայնություն: <span id="width-val">400</span> px</label>
+                <input type="range" id="width-slider" min="100" max="800" value="400" oninput="resizeBg()">
+            </div>
+            <div>
+                <label>Բարձրություն: <span id="height-val">200</span> px</label>
+                <input type="range" id="height-slider" min="100" max="600" value="200" oninput="resizeBg()">
+            </div>
+        </div>
+    </div>
+
+    <input type="hidden" id="bg_width_input" name="bg_width" value="400">
+    <input type="hidden" id="bg_height_input" name="bg_height" value="200">
+    <input type="hidden" id="bg_size_mode_input" name="bg_size_mode" value="fixed">
+
+    <div class="custom-file-upload">
+        <label for="bg_upload" class="upload-label">📁 Ընտրել պատկեր</label>
+        <input type="file" id="bg_upload" name="bg_upload" accept="image/*" onchange="handleBgUpload(this)">
+        <span id="file-name">Ֆայլը չի ընտրված</span>
+    </div>
+
+    <label>Խաչբառի նկարագրություն (պարտադիր)</label>
+    <textarea name="description" rows="4" placeholder="Օրինակ՝ Խաչբառը կազմված է հայ գրականության հեղինակների և նրանց գործերի վերաբերյալ հարցերից։" required></textarea>
+    <span class="error-message"></span>
+
+    <div class="hint-section" style="margin-top:20px; padding:15px; border:1px solid #ddd; border-radius:10px;">
+        <label for="hint_type" style="display: block; margin-bottom: 5px;"><strong>💡 Ընտրեք հուշման տեսակը</strong></label>
+        <select name="hint_type" id="hint_type" onchange="toggleHintInput()">
+            <option value="text">Տեքստ</option>
+            <option value="image">Նկար</option>
+            <option value="audio">Աուդիո</option>
+            <option value="video">Վիդեո</option>
+        </select>
+
+        <div id="text_hint_input" style="margin-top:10px;">
+            <textarea name="global_hint_text" rows="3" placeholder="Մուտքագրեք հուշումը..." style="width:100%;"></textarea>
+        </div>
+
+        <div id="file_hint_input" style="margin-top:10px; display:none;">
+            <label style="margin-bottom: 5px; display:block;">Ներբեռնել ֆայլ</label>
+            <div class="custom-file-upload" style="margin-top: 0;">
+                <label for="global_hint_media" class="upload-label">📂 Ընտրել ֆայլը</label>
+                <input type="file" name="global_hint_media" id="global_hint_media" style="display: none;" onchange="validateMedia(this)">
+                <span id="hint-file-name" style="margin-left: 10px; color: #555;">Ֆայլը ընտրված չէ</span>
+            </div>
+            <div style="margin-top: 5px;">
+                <span class="format-list" id="format-info"></span>
+                <span class="error-message" id="media-error"></span>
+            </div>
+        </div>
+
+        {% if use_keyword == 'yes' %}
+        <div style="margin-top: 15px;">
+            <label>Բանալի բառ (պարտադիր)</label>
+            <input type="text" name="keyword" oninput="this.value = this.value.toUpperCase().replace(/[^Ա-ՖA-Z]/g, '')">
+            <span class="error-message"></span>
+        </div>
+        {% endif %}
+    </div>
+
+    {% if use_keyword == 'yes' %}
+    <div class="keyword-material-section">
+        <label style="display:block; font-weight:bold; margin-bottom:5px;">🔑 Բանալի բառի նյութ</label>
+        <p style="font-size:13px; color:#888; margin-top:0;">Այս նյութը կցուցադրվի խաչբառը ճիշտ լուծելուց հետո։</p>
+
+        <select id="keyword_material_type" name="keyword_material_type" onchange="toggleKeywordMaterialInput()">
+            <option value="">— Նյութ չկա —</option>
+            <option value="text">Տեքստ</option>
+            <option value="image">Նկար / Անիմացիա</option>
+            <option value="link">Հղում</option>
+        </select>
+
+        <!-- Տեքստ -->
+        <div id="keyword_text_input" style="margin-top:10px; display:none;">
+            <textarea name="keyword_material_text" rows="3"
+                placeholder="Մուտքագրեք բանալի բառի մասին տեքստ..."
+                style="width:100%;"></textarea>
+        </div>
+
+        <!-- Նկար / Անիմացիա -->
+        <div id="keyword_media_input" style="margin-top:10px; display:none;">
+            <label style="margin-bottom:5px; display:block;">Ներբեռնել ֆայլ (նկար կամ gif)</label>
+            <div class="custom-file-upload">
+                <label for="keyword_material_file" class="upload-label">📂 Ընտրել ֆայլը</label>
+                <input type="file" name="keyword_material_file" id="keyword_material_file"
+                    accept="image/*,video/*" style="display:none;"
+                    onchange="updateKeywordFileName()">
+                <span id="keyword-file-name" style="margin-left:10px; color:#555;">Ֆայլը ընտրված չէ</span>
+            </div>
+        </div>
+
+        <!-- Հղում -->
+        <div id="keyword_link_input" style="margin-top:10px; display:none;">
+            <input type="url" name="keyword_material_link"
+                placeholder="https://example.com"
+                style="width:100%;">
+        </div>
+    </div>
+    {% endif %}
+
+    <button type="submit" style="margin-top:20px;">📌 Ստեղծել խաչբառ</button>
+</form>
+
+<p style="text-align: center; margin-top: 20px;">
+    <a href="{{ url_for('dashboard') }}" style="color: #3498db; text-decoration: none; font-weight: bold;">
+        ⬅️ Վերադառնալ գլխավոր էջ
+    </a>
+</p>
+
+<script>
+    const previewContainer = document.getElementById('bg-preview-container');
+    const preview = document.getElementById('bg-preview');
+    const widthSlider = document.getElementById('width-slider');
+    const heightSlider = document.getElementById('height-slider');
+
+    const SUPPORTED_FORMATS = {
+        image: {
+            extensions: ['jpg', 'jpeg', 'png', 'bmp', 'gif'],
+            mimeTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/bmp']
+        },
+        video: {
+            extensions: ['mp4', 'mpeg4', 'mov', 'webm', 'mkv'],
+            mimeTypes: ['video/mp4', 'video/mpeg', 'video/quicktime', 'video/webm', 'video/x-matroska']
+        },
+        audio: {
+            extensions: ['mp3', 'aac', 'flac', 'wav'],
+            mimeTypes: ['audio/mpeg', 'audio/wav', 'audio/aac', 'audio/flac']
+        }
+    };
+
+    let qaCount = document.querySelectorAll('#qa-container .qa-row').length + 1;
+
+    function toggleSizeInputs(isCoverMode) {
+        const fixedInputs = document.getElementById('fixed-size-inputs');
+        const modeInput = document.getElementById('bg_size_mode_input');
+        const widthInput = document.getElementById('bg_width_input');
+        const heightInput = document.getElementById('bg_height_input');
+        const previewImg = document.getElementById('bg-preview');
+        const container = document.getElementById('bg-preview-container');
+
+        if (isCoverMode) {
+            fixedInputs.style.display = 'none';
+            modeInput.value = 'cover';
+            widthInput.value = 'cover';
+            heightInput.value = 'cover';
+            previewImg.classList.add('full-screen-preview');
+            container.classList.add('cover-mode-active');
+            previewImg.style.width = '90%';
+            previewImg.style.height = '300px';
+            previewImg.style.objectFit = 'cover';
+        } else {
+            fixedInputs.style.display = 'block';
+            modeInput.value = 'fixed';
+            previewImg.classList.remove('full-screen-preview');
+            container.classList.remove('cover-mode-active');
+            resizeBg();
+        }
+    }
+
+    function resizeBg() {
+        const width = widthSlider.value;
+        const height = heightSlider.value;
+        const previewImg = document.getElementById('bg-preview');
+        const previewContainerEl = document.getElementById('bg-preview-container');
+
+        document.getElementById('bg_size_mode_input').value = 'fixed';
+        document.querySelector('input[name="bg_size_mode"][value="fixed"]').checked = true;
+
+        previewImg.classList.remove('full-screen-preview');
+        previewContainerEl.classList.remove('cover-mode-active');
+
+        previewImg.style.objectFit = 'contain';
+        previewImg.style.width = width + 'px';
+        previewImg.style.height = height + 'px';
+
+        document.getElementById('width-val').textContent = width;
+        document.getElementById('height-val').textContent = height;
+        document.getElementById('bg_width_input').value = width;
+        document.getElementById('bg_height_input').value = height;
+    }
+
+    document.querySelectorAll('.bg-option').forEach(option => {
+        option.addEventListener('click', () => {
+            document.querySelectorAll('.bg-option').forEach(o => o.classList.remove('selected'));
+            document.getElementById('remove-bg-btn').style.display = 'block';
+            option.classList.add('selected');
+            option.querySelector('input').checked = true;
+
+            preview.src = option.querySelector('img').src;
+            previewContainer.style.display = 'block';
+
+            document.querySelector('input[name="bg_size_mode"][value="fixed"]').checked = true;
+            toggleSizeInputs(false);
+
+            widthSlider.value = 400;
+            heightSlider.value = 200;
+            resizeBg();
+        });
+    });
+
+    function handleBgUpload(input) {
+        if (input.files && input.files[0]) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                preview.src = e.target.result;
+                previewContainer.style.display = 'block';
+                document.getElementById('remove-bg-btn').style.display = 'block';
+
+                document.querySelector('input[name="bg_size_mode"][value="fixed"]').checked = true;
+                toggleSizeInputs(false);
+
+                widthSlider.value = 400;
+                heightSlider.value = 200;
+                resizeBg();
+            };
+            reader.readAsDataURL(input.files[0]);
+
+            document.querySelectorAll('.bg-option').forEach(o => o.classList.remove('selected'));
+            document.querySelectorAll('.bg-option input').forEach(i => i.checked = false);
+
+            const fileNameSpan = document.getElementById("file-name");
+            fileNameSpan.textContent = input.files[0].name;
+        } else {
+            document.getElementById('bg-preview-container').style.display = 'none';
+            document.getElementById('remove-bg-btn').style.display = 'none';
+        }
+    }
+
+    function addField() {
+        const container = document.getElementById('qa-container');
+        const div = document.createElement('div');
+        div.innerHTML = `
+            <div class="qa-row">
+                <label>${qaCount}.</label>
+                <textarea name="question_${qaCount}" placeholder="Հարց ${qaCount}" required></textarea>
+                <textarea name="answer_${qaCount}" placeholder="Պատասխան ${qaCount}" required></textarea>
+                <button type="button" class="delete-btn" onclick="removeField(this)">❌</button>
+            </div>
+            <span class="error-message"></span>
+        `;
+        container.appendChild(div);
+        qaCount++;
+    }
+
+    function removeBackground() {
+        const btn = document.getElementById('remove-bg-btn');
+        const previewImg = document.getElementById('bg-preview');
+        const containerEl = document.getElementById('bg-preview-container');
+        const uploadInput = document.querySelector('input[name="bg_upload"]');
+
+        document.getElementById('bg_width_input').value = '400';
+        document.getElementById('bg_height_input').value = '200';
+        document.getElementById('bg_size_mode_input').value = 'fixed';
+
+        previewImg.src = "";
+        containerEl.style.display = 'none';
+        uploadInput.value = "";
+        btn.style.display = 'none';
+
+        document.querySelectorAll('.bg-option input[type="radio"]').forEach(r => r.checked = false);
+        document.querySelectorAll('.bg-option').forEach(o => o.classList.remove('selected'));
+
+        document.querySelector('input[name="bg_size_mode"][value="fixed"]').checked = true;
+        toggleSizeInputs(false);
+
+        document.getElementById("file-name").textContent = "Ֆայլը չի ընտրված";
+    }
+
+    function toggleHintInput() {
+        const type = document.getElementById('hint_type').value;
+        const textInput = document.getElementById('text_hint_input');
+        const fileInput = document.getElementById('file_hint_input');
+        const mediaInput = document.getElementById('global_hint_media');
+        const formatInfo = document.getElementById('format-info');
+
+        mediaInput.value = '';
+        document.getElementById('media-error').textContent = '';
+
+        if (type === 'text') {
+            textInput.style.display = 'block';
+            fileInput.style.display = 'none';
+        } else {
+            textInput.style.display = 'none';
+            fileInput.style.display = 'block';
+
+            let extensions;
+            let acceptValue = '';
+
+            if (type === 'image') {
+                extensions = SUPPORTED_FORMATS.image.extensions;
+                acceptValue = SUPPORTED_FORMATS.image.mimeTypes.join(',');
+            } else if (type === 'audio') {
+                extensions = SUPPORTED_FORMATS.audio.extensions;
+                acceptValue = SUPPORTED_FORMATS.audio.mimeTypes.join(',');
+            } else if (type === 'video') {
+                extensions = SUPPORTED_FORMATS.video.extensions;
+                acceptValue = SUPPORTED_FORMATS.video.mimeTypes.join(',');
+            }
+
+            mediaInput.accept = acceptValue;
+            formatInfo.textContent = `Աջակցվող ֆորմատներ՝ ${extensions.map(e => e.toUpperCase()).join(', ')}`;
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', toggleHintInput);
+
+    function validateMedia(input) {
+        const file = input.files[0];
+        const errorSpan = document.getElementById('media-error');
+        const fileNameSpan = document.getElementById('hint-file-name');
+
+        errorSpan.textContent = '';
+
+        if (!file) {
+            fileNameSpan.textContent = "Ֆայլը ընտրված չէ";
+            return;
+        } else {
+            fileNameSpan.textContent = file.name;
+        }
+
+        const maxDuration = 30;
+        const hintType = document.getElementById('hint_type').value;
+
+        const allowedMimeTypes = SUPPORTED_FORMATS[hintType].mimeTypes;
+        const allowedExtensions = SUPPORTED_FORMATS[hintType].extensions;
+
+        const fileExtension = file.name.split('.').pop().toLowerCase();
+        const isTypeAllowed = allowedMimeTypes.includes(file.type) || allowedExtensions.includes(fileExtension);
+
+        if (!isTypeAllowed) {
+            errorSpan.textContent = `Ֆայլի ֆորմատը (${fileExtension.toUpperCase()}) թույլատրված չէ։ Աջակցվում է՝ ${allowedExtensions.map(e => e.toUpperCase()).join(', ')}`;
+            input.value = "";
+            fileNameSpan.textContent = "Ֆայլը ընտրված չէ";
+            return;
+        }
+
+        if (hintType === 'audio' || hintType === 'video') {
+            const url = URL.createObjectURL(file);
+            let media = hintType === 'audio' ? new Audio(url) : document.createElement('video');
+            media.src = url;
+
+            media.addEventListener('loadedmetadata', function() {
+                if (media.duration > maxDuration) {
+                    errorSpan.textContent = `Ֆայլը պետք է լինի մինչև ${maxDuration} վայրկյան։`;
+                    input.value = "";
+                    fileNameSpan.textContent = "Ֆայլը ընտրված չէ";
+                }
+                URL.revokeObjectURL(url);
+            });
+
+            media.addEventListener('error', function() {
+                errorSpan.textContent = "Ֆայլի բեռնման սխալ կամ անվավեր ֆորմատ։";
+                input.value = "";
+                fileNameSpan.textContent = "Ֆայլը ընտրված չէ";
+            });
+        }
+    }
+
+    let pendingDeleteBtn = null;
+
+    function removeField(button) {
+        pendingDeleteBtn = button;
+        document.getElementById('confirm-overlay').classList.add('active');
+    }
+
+    function closeConfirm() {
+        pendingDeleteBtn = null;
+        document.getElementById('confirm-overlay').classList.remove('active');
+    }
+
+    function confirmDelete() {
+        document.getElementById('confirm-overlay').classList.remove('active');
+        if (!pendingDeleteBtn) return;
+
+        const wrapper = pendingDeleteBtn.closest(".qa-row");
+        const allRows = document.querySelectorAll("#qa-container .qa-row");
+
+        if (allRows.length === 1 || wrapper.querySelector("label").textContent.trim() === "1.") {
+            wrapper.querySelector(`[name^="question_"]`).value = "";
+            wrapper.querySelector(`[name^="answer_"]`).value = "";
+        } else {
+            wrapper.parentNode.remove();
+            updateLabels();
+        }
+        pendingDeleteBtn = null;
+    }
+
+    document.getElementById('confirm-overlay').addEventListener('click', function(e) {
+        if (e.target === this) closeConfirm();
+    });
+
+    function updateLabels() {
+        const rows = document.querySelectorAll('#qa-container .qa-row');
+        qaCount = 1;
+        rows.forEach(row => {
+            const label = row.querySelector('label');
+            label.textContent = `${qaCount}.`;
+            const qInput = row.querySelector(`[name^="question_"]`);
+            const aInput = row.querySelector(`[name^="answer_"]`);
+            qInput.name = `question_${qaCount}`;
+            aInput.name = `answer_${qaCount}`;
+            qaCount++;
+        });
+    }
+
+    function updateSubjectSelection() {
+        const checkboxes = document.querySelectorAll('#subject-options input:checked');
+        const selected = Array.from(checkboxes).map(cb => cb.value);
+
+        const display = document.getElementById("subject-select-display");
+        const hiddenInput = document.getElementById("selected_subjects");
+
+        hiddenInput.value = selected.join(',');
+
+        const displayNames = Array.from(checkboxes).map(cb => cb.parentNode.textContent.trim());
+        display.textContent = displayNames.length > 0 ? displayNames.join(", ") : "Ընտրել առարկա(ներ)";
+        display.innerHTML += ' <span class="arrow">▼</span>';
+
+        if (selected.length > 0) {
+            document.getElementById('subject-error').textContent = "";
+        }
+    }
+
+    function toggleSubjectDropdown() {
+        const options = document.getElementById("subject-options");
+        options.style.display = options.style.display === "block" ? "none" : "block";
+    }
+
+    document.addEventListener("click", function(e) {
+        const gradeOptions = document.getElementById("grade-options");
+        const subjectOptions = document.getElementById("subject-options");
+
+        if (!e.target.closest(".custom-select-wrapper")) {
+            gradeOptions.style.display = "none";
+            subjectOptions.style.display = "none";
+        }
+    });
+
+    function toggleDropdown() {
+        const options = document.getElementById("grade-options");
+        options.style.display = options.style.display === "block" ? "none" : "block";
+    }
+
+    function autoSetFontByGrade() {
+        const selectedGrades = Array.from(document.querySelectorAll('#grade-options input:checked'))
+                                     .map(cb => parseInt(cb.value));
+        const fontSizeSelect = document.getElementById("font_size");
+        const fontFamilySelect = document.getElementById("font_family");
+
+        if (selectedGrades.length === 0) return;
+
+        const minGrade = Math.min(...selectedGrades);
+
+        if (minGrade >= 1 && minGrade <= 3) {
+            fontSizeSelect.value = "28px";
+            fontFamilySelect.value = "Segoe UI";
+        } else if (minGrade >= 4 && minGrade <= 6) {
+            fontSizeSelect.value = "24px";
+            fontFamilySelect.value = "Segoe UI";
+        } else if (minGrade >= 7 && minGrade <= 9) {
+            fontSizeSelect.value = "20px";
+            fontFamilySelect.value = "Arial";
+        } else if (minGrade >= 10 && minGrade <= 12) {
+            fontSizeSelect.value = "16px";
+            fontFamilySelect.value = "Times New Roman";
+        }
+    }
+
+    function updateSelection() {
+        const selected = Array.from(document.querySelectorAll('#grade-options input:checked'))
+                              .map(cb => {
+                                  const grade = parseInt(cb.value);
+                                  return grade + (grade === 1 ? "-ին" : "-րդ");
+                              });
+
+        const display = document.querySelector(".custom-select");
+        display.textContent = selected.length > 0 ? selected.join(", ") : "Ընտրել դասարան(ներ)";
+        display.innerHTML += ' <span class="arrow">▼</span>';
+
+        const fontSettings = document.getElementById("font-settings");
+        fontSettings.style.display = selected.length > 0 ? "block" : "none";
+
+        if (selected.length > 0) {
+            document.getElementById('grade-error').textContent = "";
+        }
+
+        autoSetFontByGrade();
+    }
+
+    function validateForm() {
+    let valid = true;
+
+    // մաքրել բոլոր սխալները
+    document.querySelectorAll('.error-message').forEach(el => el.textContent = "");
+        // ===== QA պարտադիր ստուգում =====
+    const qaRows = document.querySelectorAll('#qa-container .qa-row');
+
+    qaRows.forEach(row => {
+        const q = row.querySelector('[name^="question_"]');
+        const a = row.querySelector('[name^="answer_"]');
+        const errorSpan = row.parentNode.querySelector('.error-message');
+
+        if (!q.value.trim() || !a.value.trim()) {
+            errorSpan.textContent = "Հարցն ու պատասխանը պարտադիր են";
+            valid = false;
+        }
+    });
+
+    // ===== Creator name =====
+    const creatorNameInput = document.getElementById('creator_name');
+    if (creatorNameInput && !creatorNameInput.value.trim()) {
+        const errorSpan = creatorNameInput.nextElementSibling;
+        if (errorSpan && errorSpan.classList.contains('error-message')) {
+            errorSpan.textContent = "Խնդրում ենք մուտքագրել ստեղծողի անունը և ազգանունը:";
+        }
+        valid = false;
+    }
+
+    // ===== Subjects =====
+    const selectedSubjectsInput = document.getElementById('selected_subjects');
+    if (selectedSubjectsInput && !selectedSubjectsInput.value.trim()) {
+        document.getElementById('subject-error').textContent = "Խնդրում ենք ընտրել առնվազն մեկ առարկա:";
+        valid = false;
+    }
+
+    // ===== Grades =====
+    const selectedGrades = document.querySelectorAll('#grade-options input:checked');
+    if (selectedGrades.length === 0) {
+        document.getElementById('grade-error').textContent = "Խնդրում ենք ընտրել առնվազն մեկ դասարան:";
+        valid = false;
+    }
+
+    // ===== Required inputs / textareas / selects =====
+    const inputs = document.querySelectorAll('input[required], textarea[required], select[required]');
+    inputs.forEach(input => {
+    if (
+        input.id === 'selected_subjects' ||
+        input.id === 'creator_name' ||
+        input.name?.startsWith('question_') ||
+        input.name?.startsWith('answer_')
+    ) return;
+        if (!input.value.trim()) {
+            valid = false;
+
+            let errorSpan;
+            if (input.closest('.qa-row')) {
+                errorSpan = input.closest('.qa-row').parentNode.querySelector('.error-message');
+            } else {
+                errorSpan = input.nextElementSibling;
+            }
+
+            if (errorSpan && errorSpan.classList.contains('error-message')) {
+                errorSpan.textContent = "Պարտադիր դաշտ է, խնդրում ենք լրացնել:";
+            }
+        }
+    });
+
+    // ===== KEYWORD VALIDATION (IMPORTANT PART) =====
+    const useKeyword = document.querySelector('input[name="use_keyword"]')?.value;
+
+    if (useKeyword === 'yes') {
+        const keywordInput = document.querySelector('input[name="keyword"]');
+        const keyword = keywordInput ? keywordInput.value.trim() : "";
+
+        const questions = document.querySelectorAll('#qa-container .qa-row');
+        const questionCount = questions.length;
+
+        if (!keyword) {
+            const errorSpan = keywordInput.nextElementSibling;
+            if (errorSpan) {
+                errorSpan.textContent = "Խնդրում ենք մուտքագրել բանալի բառը:";
+            }
+            valid = false;
+
+        } else if (keyword.length !== questionCount) {
+            const errorSpan = keywordInput.nextElementSibling;
+            if (errorSpan) {
+                errorSpan.textContent =
+                    `Բանալի բառը պետք է ունենա ${questionCount} տառ (հիմա ունի ${keyword.length}):`;
+            }
+            valid = false;
+
+            alert(`❗ Սխալ: Բանալի բառի տառերի քանակը պետք է հավասար լինի հարցերի քանակին (${questionCount})`);
+        }
+    }
+
+    return valid;
+}
+
+    document.getElementById("bg_upload").addEventListener("change", function() {
+        const fileNameSpan = document.getElementById("file-name");
+        if (this.files && this.files.length > 0) {
+            fileNameSpan.textContent = this.files[0].name;
+            handleBgUpload(this);
+        } else {
+            fileNameSpan.textContent = "Ֆայլը չի ընտրված";
+        }
+    });
+
+    async function generateAIQuestions() {
+        const topicInput = document.getElementById("ai_topic");
+        const topic = topicInput ? topicInput.value.trim() : "";
+
+        const questionCountInput = document.getElementById("ai_count");
+        const questionCount = questionCountInput ? parseInt(questionCountInput.value) || 3 : 3;
+
+        if (!topic) {
+            alert("Մուտքագրիր թեմա");
+            return;
+        }
+
+        const btn = document.getElementById("ai-generate-btn");
+        const spinner = document.getElementById("ai-spinner");
+        const btnText = document.getElementById("ai-btn-text");
+        const statusBox = document.getElementById("ai-status");
+        const statusText = document.getElementById("ai-status-text");
+
+        btn.disabled = true;
+        spinner.style.display = "block";
+        btnText.textContent = "Գեներացվում է...";
+                statusBox.style.display = "flex";
+        statusBox.style.color = "#6c3483";
+        statusText.textContent = questionCount + " հարց գեներացվում է «" + topic + "» թեմայով...";
+
+        try {
+            const res = await fetch("/api/ai-questions-for-edit", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ topic: topic, count: questionCount })
+            });
+
+            const data = await res.json();
+
+            if (data.error) {
+                alert(data.error);
+                statusBox.style.display = "none";
+                return;
+            }
+
+            addQuestionsToForm(data.pairs);
+
+            statusText.textContent = "✅ " + data.pairs.length + " հարց հաջողությամբ ավելացվեց։";
+            statusBox.style.color = "#27ae60";
+            setTimeout(() => {
+                statusBox.style.display = "none";
+                statusBox.style.color = "#6c3483";
+            }, 3000);
+
+        } catch (err) {
+            console.error(err);
+            alert("Սխալ AI հարցեր գեներացնելիս");
+            statusBox.style.display = "none";
+        } finally {
+            btn.disabled = false;
+            spinner.style.display = "none";
+            btnText.textContent = "🤖 Գեներացնել";
+        }
+    }
+
+    function addQuestionsToForm(pairs) {
+    const container = document.getElementById("qa-container");
+
+    pairs.forEach(pair => {
+
+        // ❗ Ստուգում՝ դատարկ չլինի
+        if (!pair.question || !pair.answer) {
+            console.warn("Բաց թողնված հարց կամ պատասխան", pair);
+            return;
+        }
+
+        const questionText = pair.question.trim();
+        const answerText = pair.answer.trim();
+
+        if (questionText === "" || answerText === "") {
+            console.warn("Դատարկ արժեք AI-ից", pair);
+            return;
+        }
+
+        const div = document.createElement("div");
+        div.innerHTML = `
+            <div class="qa-row">
+                <label>${qaCount}.</label>
+                <textarea name="question_${qaCount}" required>${questionText}</textarea>
+                <textarea name="answer_${qaCount}" required>${answerText}</textarea>
+                <button type="button" class="delete-btn" onclick="removeField(this)">❌</button>
+            </div>
+            <span class="error-message"></span>
+        `;
+        container.appendChild(div);
+        qaCount++;
+    });
+}
+
+    // ===== ԲANALI BARI NYUT =====
+    function toggleKeywordMaterialInput() {
+        const type = document.getElementById('keyword_material_type').value;
+        document.getElementById('keyword_text_input').style.display  = type === 'text'  ? 'block' : 'none';
+        document.getElementById('keyword_media_input').style.display = type === 'image' ? 'block' : 'none';
+        document.getElementById('keyword_link_input').style.display  = type === 'link'  ? 'block' : 'none';
+    }
+
+    function updateKeywordFileName() {
+        const input = document.getElementById('keyword_material_file');
+        const fileName = input.files.length > 0 ? input.files[0].name : "Ֆайлы yntrvac che";
+        document.getElementById('keyword-file-name').textContent = fileName;
+    }
+
+    // ===== INPUT RESTRICTIONS =====
+    function enforceUppercaseLettersOnly(element) {
+        element.value = element.value
+            .toUpperCase()
+            .replace(/[^Ա-ՖA-Z]/g, '');
+    }
+
+    document.addEventListener("input", function(e) {
+        if (e.target.name && e.target.name.startsWith("answer_")) {
+            enforceUppercaseLettersOnly(e.target);
+        }
+        if (e.target.name === "keyword") {
+            enforceUppercaseLettersOnly(e.target);
+        }
+        if (e.target.tagName === "TEXTAREA") {
+            e.target.style.height = "auto";
+            e.target.style.height = (e.target.scrollHeight) + "px";
+        }
+    });
+    function openGuide() {
+        document.getElementById("guide-modal").classList.add("active");
+    }
+
+    function closeGuide() {
+        document.getElementById("guide-modal").classList.remove("active");
+    }
+
+    // փակել եթե սեղմում են դուրսը
+    document.getElementById('guide-modal').addEventListener('click', function(e) {
+        if (e.target === this) closeGuide();
+    });
+</script>
+</body>
+</html>

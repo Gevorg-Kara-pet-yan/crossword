@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        @page { size: A4; margin: 1cm; }
+        body { font-family: sans-serif; }
+        .title { text-align: center; font-size: 24px; margin-bottom: 20px; }
+        .grid { border-collapse: collapse; margin: 0 auto; }
+        .cell { width: 30px; height: 30px; border: 1px solid black; text-align: center; position: relative; }
+        .black { background-color: black; }
+        .num { font-size: 8px; position: absolute; top: 1px; left: 1px; }
+        .q-section { margin-top: 30px; }
+    </style>
+</head>
+<body>
+    <div class="title">{{ title }}</div>
+
+    <table class="grid">
+        {% for row in grid %}
+        <tr>
+            {% for cell in row %}
+            <td class="cell {{ 'black' if cell.is_black else '' }}">
+                {% if not cell.is_black and cell.number %}
+                    <span class="num">{{ cell.number }}</span>
+                {% endif %}
+            </td>
+            {% endfor %}
+        </tr>
+        {% endfor %}
+    </table>
+
+    <div class="q-section">
+        <h3>Հարցեր</h3>
+        {% for q in questions %}
+            <p>{{ loop.index }}. {{ q.question }} (__________)</p>
+        {% endfor %}
+    </div>
+</body>
+</html>

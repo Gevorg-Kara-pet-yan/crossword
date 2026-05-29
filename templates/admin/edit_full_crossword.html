@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="hy">
+<head>
+    <meta charset="UTF-8">
+    <title>Ադմին - Խաչբառի խմբագրում</title>
+    <style>
+        body { font-family:'Segoe UI',sans-serif; background:#f9f9f9; padding:40px; max-width:1000px; margin:auto; }
+        h2 { text-align:center; color:#2c3e50; }
+        input, select, textarea, button { width:100%; padding:8px; margin-top:5px; border-radius:5px; border:1px solid #ccc; box-sizing:border-box; }
+        .qa-row { display:flex; gap:10px; align-items:center; margin-bottom:10px; position:relative; flex-wrap:wrap; }
+        .qa-row label { width:30px; text-align:center; flex-shrink:0; }
+        .qa-row input { flex:1; min-width:100px; }
+        .qa-row button { background:#e74c3c; border:none; color:white; padding:6px 10px; border-radius:5px; cursor:pointer; flex-shrink:0; }
+        .confirm-box { position:absolute; top:0; right:40px; z-index:10; width:auto; min-width:300px; background:#fff3cd; border:1px solid #f1c40f; padding:10px; border-radius:5px; box-shadow:0 4px 8px rgba(0,0,0,0.1); display:none; align-items:center; justify-content:space-between; gap:10px; }
+        .confirm-box p { margin:0; font-size:14px; line-height:1.2; flex-grow:1; }
+        .yes-btn { background:#e74c3c; color:white; }
+        .no-btn { background:#95a5a6; color:white; }
+
+        .custom-select-wrapper { position:relative; width:100%; cursor:pointer; margin:10px 0; }
+        .custom-select { background:#fff; border:1px solid #ccc; padding:10px; border-radius:6px; display:flex; justify-content:space-between; align-items:center; }
+        .custom-select .arrow { line-height:1.5; }
+        .custom-options { display:none; position:absolute; top:100%; left:0; width:100%; background:#fff; border:1px solid #ccc; border-radius:6px; max-height:200px; overflow-y:auto; box-shadow:0 4px 10px rgba(0,0,0,0.1); z-index:1000; padding:5px; }
+        .custom-options label { display:block; padding:8px 10px; margin:0; cursor:pointer; font-weight:normal; }
+        .custom-options label:hover { background-color:#ecf0f1; }
+
+        #font-settings { margin-top:20px; padding:10px; border:1px dashed #ccc; border-radius:6px; display:none; }
+
+        .bg-options { display:flex; flex-wrap:wrap; gap:10px; margin-top:10px; }
+        .bg-option { border:2px solid transparent; border-radius:8px; padding:5px; cursor:pointer; transition:border-color 0.2s; }
+        .bg-option.selected { border-color:#3498db; }
+        .bg-option img { width:80px; height:50px; border-radius:4px; display:block; }
+        .bg-option input[type="radio"] { display:none; }
+
+        .mode-label { padding:8px 15px; border:1px solid #ccc; border-radius:5px; cursor:pointer; background-color:#ecf0f1; transition:background-color 0.2s, border-color 0.2s; display:inline-block; margin-right:5px; }
+        .mode-label:hover { background-color:#bdc3c7; }
+        .mode-label.selected-mode { background-color:#3498db; color:white; border-color:#2980b9; }
+        .mode-label input[type="radio"] { display:none; }
+
+        button.submit-btn { background-color:#3498db; color:white; padding:10px 20px; border:none; font-size:16px; border-radius:6px; cursor:pointer; margin-top:20px; }
+        .add-btn { background-color:#2ecc71; color:white; border:none; padding:8px 16px; border-radius:5px; margin-bottom:20px; cursor:pointer; }
+    </style>
+</head>
+<body>
+<h2>Խաչբառի խմբագրում (Ադմին)</h2>
+
+<form method="post" enctype="multipart/form-data">
+    <label>Վերնագիր</label>
+    <input type="text" name="title" value="{{ cw.title }}" required>
+
+    <label>Ստեղծողի անուն, ազգանուն</label>
+    <input type="text" name="creator_name" value="{{ cw.creator_name or '' }}">
+
+    <label>Բանալի բառ</label>
+    <input type="text" name="keyword" value="{{ cw.keyword }}">
+
+    <label>Նկարագրություն</label>
+    <textarea name="description">{{ cw.description }}</textarea>
+
+    <!-- Դասարաններ -->
+    <div class="custom-select-wrapper">
+        <div class="custom-select" onclick="toggleDropdown('grade-options')">
+            Ընտրել դասարան(ներ)
+            <span class="arrow">▼</span>
+        </div>
+        <div class="custom-options" id="grade-options">
+            {% for i in range(1,13) %}
+            <label>
+                <input type="checkbox" name="grades" value="{{ i }}" onchange="updateSelection()"
+                    {% if cw.grades and i|string in cw.grades.split(',') %}checked{% endif %}>
+                {{ i }}{% if i==1 %}-ին{% else %}-րդ{% endif %} դասարան
+            </label>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Ֆոնային պատկեր -->
+    <label>Ֆոնային պատկեր</label>
+    <div class="bg-options">
+        {% for bg in bg_images %}
+        <label class="bg-option {% if cw.background == 'backgrounds/'~bg %}selected{% endif %}">
+            <input type="radio" name="bg_choice" value="{{ bg }}" {% if cw.background == 'backgrounds/'~bg %}checked{% endif %} onchange="updateBgPreview(this)">
+            <img src="{{ url_for('static', filename='backgrounds/'~bg) }}" alt="Ֆոն">
+        </label>
+        {% endfor %}
+    </div>
+
+    <div id="bg-preview-container" style="margin-top:10px; text-align:center; {% if cw.background %}display:block{% else %}display:none{% endif %};">
+        <p>Ֆոնային նախադիտում</p>
+        <img id="bg-preview" src="{{ url_for('static', filename=cw.background) if cw.background else '' }}" style="width:400px;height:200px;border:1px solid #ccc;border-radius:6px;">
+        <div id="bg-mode-buttons" style="margin-top:10px;">
+            <label class="mode-label selected-mode">
+                <input type="radio" name="bg_mode_choice" value="fixed" checked onclick="toggleBgSizeInputs('fixed')"> Ֆիքսված Չափ
+            </label>
+            <label class="mode-label">
+                <input type="radio" name="bg_mode_choice" value="cover" onclick="toggleBgSizeInputs('cover')"> Ամբողջական Էկրան
+            </label>
+        </div>
+    </div>
+
+    <!-- Հարցեր -->
+    <h4>Հարցեր</h4>
+    <div id="qa-container">
+        {% for item in placed %}
+        <div class="qa-row" id="qa-{{ loop.index }}">
+            <label>{{ loop.index }}.</label>
+            <input type="text" name="question_{{ loop.index }}" value="{{ item.question }}" required>
+            <input type="text" name="answer_{{ loop.index }}" value="{{ item.answer }}" required>
+            <button type="button" onclick="showConfirm('qa-{{ loop.index }}')">❌</button>
+            <div class="confirm-box" id="confirm-qa-{{ loop.index }}">
+                <p>Համոզվա՞ծ եք, որ ջնջեք այս հարցը</p>
+                <div>
+                    <button type="button" class="yes-btn" onclick="removeField('qa-{{ loop.index }}')">Այո</button>
+                    <button type="button" class="no-btn" onclick="hideConfirm('qa-{{ loop.index }}')">Ոչ</button>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    <button type="button" class="add-btn" onclick="addField()">➕ Ավելացնել նոր հարց</button>
+
+    <button type="submit" class="submit-btn">Պահպանել</button>
+</form>
+
+<script>
+    let count = {{ placed|length + 1 }};
+
+    function addField() {
+        const container = document.getElementById('qa-container');
+        const div = document.createElement('div');
+        div.className = 'qa-row';
+        div.id = 'qa-' + count;
+        div.innerHTML = `
+            <label>${count}.</label>
+            <input type="text" name="question_${count}" placeholder="Հարց ${count}" required>
+            <input type="text" name="answer_${count}" placeholder="Պատասխան ${count}" required>
+            <button type="button" onclick="showConfirm('qa-${count}')">❌</button>
+            <div class="confirm-box" id="confirm-qa-${count}">
+                <p>Համոզվա՞ծ եք, որ ջնջեք այս հարցը</p>
+                <div>
+                    <button type="button" class="yes-btn" onclick="removeField('qa-${count}')">Այո</button>
+                    <button type="button" class="no-btn" onclick="hideConfirm('qa-${count}')">Ոչ</button>
+                </div>
+            </div>
+        `;
+        container.appendChild(div);
+        count++;
+    }
+
+    function showConfirm(id){ document.getElementById('confirm-'+id).style.display='flex'; }
+    function hideConfirm(id){ document.getElementById('confirm-'+id).style.display='none'; }
+    function removeField(id){ document.getElementById(id).remove(); }
+
+    function toggleDropdown(id) {
+        const options = document.getElementById(id);
+        options.style.display = options.style.display === "block" ? "none" : "block";
+    }
+
+    function updateSelection(){
+        const selected = document.querySelectorAll('#grade-options input:checked');
+        document.getElementById('font-settings').style.display = selected.length>0?'block':'none';
+    }
+
+    function updateBgPreview(radio){
+        document.getElementById('bg-preview').src = radio.nextElementSibling.src;
+        document.getElementById('bg-preview-container').style.display = 'block';
+    }
+
+    function toggleBgSizeInputs(mode){
+        const labels = document.querySelectorAll('#bg-mode-buttons .mode-label');
+        labels.forEach(l => l.classList.remove('selected-mode'));
+        const selected = Array.from(labels).find(l => l.querySelector('input').value===mode);
+        if(selected) selected.classList.add('selected-mode');
+    }
+
+</script>
+</body>
+</html>

@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="hy">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Խաչբառ</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Armenian:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Noto Sans Armenian', 'Segoe UI', sans-serif;
+            background: #f5f7fa;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            padding: 40px 20px;
+        }
+
+        /* Card */
+        .card {
+            background: white;
+            border-radius: 20px;
+            padding: 28px 32px 36px;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+        }
+
+        /* Radio options */
+        .options {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .option {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 16px 18px;
+            border: 1.5px solid #e8ecf0;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: border-color 0.2s, background 0.2s;
+            position: relative;
+        }
+
+        .option:hover {
+            border-color: #b0bec5;
+        }
+
+        .option.selected {
+            border-color: #d0d8e0;
+            background: #fafbfc;
+        }
+
+        .option-icon {
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            color: #555;
+        }
+
+        .option-label {
+            flex: 1;
+            font-size: 0.95rem;
+            color: #2c3e50;
+            font-weight: 500;
+        }
+
+        /* Custom radio */
+        .radio-circle {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            border: 2px solid #cdd5dd;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            transition: border-color 0.2s;
+        }
+
+        .option.selected .radio-circle {
+            border-color: #888;
+        }
+
+        .radio-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #555;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .option.selected .radio-dot {
+            opacity: 1;
+        }
+
+        input[type="radio"] {
+            display: none;
+        }
+
+        /* Buttons */
+        .btn-continue {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #4F2675;
+            border-radius: 12px;
+            background: white;
+            color: #4F2675;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            margin-bottom: 12px;
+            transition: background 0.25s, color 0.25s;
+        }
+
+        .btn-continue:hover {
+            background: #4F2675;
+            color: white;
+        }
+
+        .btn-info {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 12px;
+            background: #3aaa5c;
+            color: white;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            transition: background 0.2s;
+        }
+
+        .btn-info:hover {
+            background: #2e8f4c;
+        }
+
+        /* Popup */
+        .popup-bg {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.45);
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+
+        .popup-bg.open {
+            display: flex;
+        }
+
+        .popup-box {
+            background: white;
+            padding: 28px 32px;
+            border-radius: 16px;
+            max-width: 380px;
+            width: 90%;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+        }
+
+        .popup-box h3 {
+            font-size: 1.1rem;
+            color: #2c3e50;
+            margin-bottom: 16px;
+        }
+
+        .popup-box p {
+            font-size: 0.9rem;
+            line-height: 1.7;
+            color: #4a5568;
+        }
+
+        .popup-close {
+            margin-top: 20px;
+            background: #e74c3c;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 9px 20px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 0.9rem;
+        }
+        #guideBtn {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    background: #4F2675;
+    color: white;
+    border: none;
+    padding: 10px 16px;
+    border-radius: 10px;
+    font-size: 14px;
+    cursor: pointer;
+    z-index: 200;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+    transition: 0.2s;
+}
+
+#guideBtn:hover {
+    background: #3b1d5c;
+    transform: scale(1.05);
+}
+    </style>
+</head>
+<body>
+    <a href="https://dshh.am/am" target="_blank">
+        <img src="{{ url_for('static', filename='dshh.png') }}" alt="Dshh.am" style="max-width:200px; display:block; margin:20px auto;">
+    </a>
+    <button id="guideBtn" onclick="openGuide()">📘 Օգտագործման ուղեցույց</button>
+    <div id="guidePopup" class="popup-bg" onclick="if(event.target===this) closeGuide()">
+    <div class="popup-box">
+        <h3>📘 Օգտագործման ուղեցույց</h3>
+        <p>
+            1. Ընտրեք խաչբառի տեսակը։<br><br>
+            2. Սեղմեք «Շարունակել»։<br><br>
+            3. Եթե ընտրել եք «ԱԲ օգնությամբ», կտեղափոխվեք նոր էջ։<br><br>
+            4. Լրացրեք հարցերը և ստեղծեք ձեր խաչբառը։<br><br>
+            5. Խաղացեք կամ կիսվեք ձեր ստեղծած խաչբառով։
+        </p>
+        <button class="popup-close" onclick="closeGuide()">Փակել</button>
+    </div>
+</div>
+    <br>
+    <br>
+    <br>
+
+
+    <!-- Card -->
+    <div class="card">
+        <form method="POST" id="main-form">
+        <div class="options" id="options">
+
+            <label class="option selected" data-value="yes">
+                <input type="radio" name="use_keyword" value="yes" checked />
+                <div class="option-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                    </svg>
+                </div>
+                <span class="option-label">Բանալի բառով</span>
+                <div class="radio-circle"><div class="radio-dot"></div></div>
+            </label>
+
+            <label class="option" data-value="no">
+                <input type="radio" name="use_keyword" value="no" />
+                <div class="option-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+                        <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
+                    </svg>
+                </div>
+                <span class="option-label">Առանց բանալի բառի</span>
+                <div class="radio-circle"><div class="radio-dot"></div></div>
+            </label>
+
+            <label class="option" data-value="ai">
+                <input type="radio" name="use_keyword" value="ai" />
+                <div class="option-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="8" r="4"/><path d="M12 12v9"/><path d="M8 16l4 5 4-5"/>
+                        <path d="M5 8h2M17 8h2"/>
+                    </svg>
+                </div>
+                <span class="option-label">ԱԲ օգնությամբ</span>
+                <div class="radio-circle"><div class="radio-dot"></div></div>
+            </label>
+
+        </div>
+
+        <button type="submit" class="btn-continue">Շարունակել</button>
+        </form>
+        <button class="btn-info" onclick="document.querySelector('.popup-bg').classList.add('open')">Ինչ է սա նշանակում</button>
+    </div>
+
+    <!-- Popup -->
+    <div class="popup-bg" onclick="if(event.target===this) this.classList.remove('open')">
+        <div class="popup-box">
+            <h3>Բացատրություն</h3>
+            <p>
+                <b>Բանալի բառով խաչբառ</b> — Խաչբառ, որը լուծելիս որոշ բջիջների տառերը միասին կազմում են հատուկ բառ՝ բանալի բառ։<br><br>
+                <b>Առանց բանալի բառի խաչբառ</b> — Սովորական խաչբառ, որտեղ չկա հատուկ թաքնված բառ։<br><br>
+                <b>ԱԲ օգնությամբ</b> — Արհեստական բանականության օգնությամբ ստեղծված խաչբառ։
+            </p>
+            <button class="popup-close" onclick="document.querySelector('.popup-bg').classList.remove('open')">Փակել</button>
+        </div>
+    </div>
+
+    <script>
+        const options = document.querySelectorAll('.option');
+        options.forEach(opt => {
+            opt.addEventListener('click', () => {
+                options.forEach(o => o.classList.remove('selected'));
+                opt.classList.add('selected');
+                opt.querySelector('input[type="radio"]').checked = true;
+            });
+        });
+
+        document.getElementById('main-form').addEventListener('submit', function(e) {
+            const selected = document.querySelector('input[type="radio"]:checked');
+            if (selected && selected.value === 'ai') {
+                e.preventDefault();
+                window.location.href = '/ai_setup';
+            }
+        });
+        function openGuide() {
+            document.getElementById('guidePopup').classList.add('open');
+        }
+
+        function closeGuide() {
+            document.getElementById('guidePopup').classList.remove('open');
+        }
+    </script>
+</body>
+</html>

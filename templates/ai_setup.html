@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="hy">
+<head>
+    <meta charset="UTF-8">
+    <title>ԱԲ Խաչբառի Ստեղծում</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f4f8;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .ai-container {
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 420px;
+            width: 100%;
+        }
+
+        h2 { color: #3498db; margin-bottom: 20px; }
+        p { color: #7f8c8d; font-size: 0.9rem; margin-bottom: 25px; }
+
+        .input-group { margin-bottom: 20px; text-align: left; }
+
+        label { display: block; margin-bottom: 8px; font-weight: 600; }
+
+        input[type="text"],
+        input[type="number"],
+        select,
+        textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            box-sizing: border-box;
+            font-size: 1rem;
+            transition: border-color 0.3s;
+            background: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        input[type="text"]:focus,
+        input[type="number"]:focus,
+        select:focus,
+        textarea:focus {
+            border-color: #3498db;
+            outline: none;
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+            line-height: 1.5;
+        }
+
+        .hint {
+            font-size: 0.78rem;
+            color: #b0bec5;
+            margin-top: 6px;
+            font-weight: normal;
+        }
+
+        form button {
+            width: 100%;
+            background-color: #3498db;
+            color: white;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        button:hover { background-color: #2980b9; }
+
+        /* Toggle Switch */
+        .toggle-wrapper {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .toggle-wrapper label { margin-bottom: 0; }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 26px;
+            flex-shrink: 0;
+        }
+
+        .switch input { display: none; }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider { background-color: #3498db; }
+        input:checked + .slider:before { transform: translateX(24px); }
+
+        #keywordInput { display: none; }
+
+        .auto-label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.85rem;
+            color: #95a5a6;
+            font-weight: normal;
+            cursor: pointer;
+            margin-bottom: 0;
+        }
+
+        .auto-label input[type="checkbox"] {
+            width: auto;
+            cursor: pointer;
+        }
+
+        input[type="text"]:disabled {
+            background: #f5f5f5;
+            color: #aaa;
+            cursor: not-allowed;
+        }
+
+        /* Loading Overlay */
+        #loader {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255,255,255,0.9);
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .spinner {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #3498db;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        #guideBtn {
+    position: fixed;
+    top: 15px;
+    left: 15px;
+
+    background: linear-gradient(135deg, #8e44ad, #6c3483);
+    color: white;
+
+    padding: 8px 12px;
+    border-radius: 8px;
+
+    font-size: 13px;
+    font-weight: 600;
+
+    cursor: pointer;
+    z-index: 1000;
+
+    writing-mode: horizontal-tb;
+    transform: none;
+
+    box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+}
+        /* Overlay background */
+.guide-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 999;
+}
+
+/* Active state */
+.guide-overlay.active {
+    display: flex;
+}
+
+/* Guide box */
+.guide-box {
+    background: white;
+    width: 320px;
+    max-width: 90%;
+    border-radius: 12px;
+    padding: 20px;
+    text-align: left;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+}
+
+/* Purple title */
+.guide-box h3 {
+    color: #8e44ad;
+    margin-bottom: 15px;
+}
+
+/* Close button */
+.close-guide {
+    margin-top: 15px;
+    width: 100%;
+    background: #8e44ad;
+    color: white;
+    border: none;
+    padding: 10px;
+    border-radius: 8px;
+    cursor: pointer;
+}
+.close-guide:hover {
+    background: #6c3483;
+}
+    </style>
+</head>
+<body>
+<button id="guideBtn" onclick="openGuide()">📘 Օգտագործման ուղեցույց</button>
+<div class="guide-overlay" id="guideModal">
+    <div class="guide-box">
+        <h3>📘 Օգտագործման ուղեցույց</h3>
+
+        <div class="guide-content">
+            <p><strong>1.</strong> Ընտրեք ԱԲ համակարգը (Claude կամ ԴՇՀ)</p>
+            <p><strong>2.</strong> Մուտքագրեք խաչբառի թեման</p>
+            <p><strong>3.</strong> (Ընտրովի) գրեք մանրամասն նկարագրություն</p>
+            <p><strong>4.</strong> Ընտրեք՝ ուզում եք բանալի բառ, թե ոչ</p>
+            <p><strong>5.</strong> Եթե միացրել եք բանալի բառը՝</p>
+            <p> • ընտրեք ավտոմատ կամ գրեք ձեռքով</p>
+            <p><strong>6.</strong> Եթե բանալի բառ չկա՝ նշեք հարցերի քանակը</p>
+            <p><strong>7.</strong> (Ընտրովի) գրեք հեղինակի անունը</p>
+            <p><strong>8.</strong> Սեղմեք «Ստեղծել Խաչբառ»</p>
+
+            <hr>
+            <p style="color:#7f8c8d;">💡 Խորհուրդ՝ ավելի մանրամասն թեման տալիս է ավելի լավ արդյունք</p>
+        </div>
+
+        <button class="close-guide" onclick="closeGuide()">Փակել</button>
+    </div>
+</div>
+<div id="loader">
+    <div class="spinner"></div>
+    <h3 style="margin-top: 20px; color: #2c3e50;">ԱԲ-ն գեներացնում է ձեր խաչբառը...</h3>
+    <p>Սա կարող է տևել մի քանի վայրկյան:</p>
+</div>
+
+<div class="ai-container">
+    <h2>ԱԲ Գեներատոր ✨</h2>
+<form action="/generate_ai_crossword" method="POST" onsubmit="showLoader()">
+
+    <div class="input-group">
+        <label>Ընտրեք ԱԲ համակարգը</label>
+
+        <label>
+            <input type="radio" name="ai_model" value="claude" required>
+            Claude ԱԲ
+        </label>
+
+        <label>
+            <input type="radio" name="ai_model" value="dshh">
+            ԴՇՀ ԱԲ
+        </label>
+    </div>
+        <div class="input-group">
+            <label>Խաչբառի թեման</label>
+            <input type="text" name="topic" placeholder="Օրինակ՝ Հայ մեծանուն գրողներ" required>
+        </div>
+
+        <!-- Մանրամասն նկարագրություն -->
+        <div class="input-group">
+            <label>Մանրամասն նկարագրություն</label>
+            <textarea name="description" placeholder="Օրինակ՝ 8-րդ դասարանի հայոց լեզվի դաս, միջին բարդության, վերաբերում է բառակազմությանը, կենտրոնացած գոյականների վրա..."></textarea>
+            <p class="hint">Որքան մանրամասն գրեք, այնքան ճշգրիտ կլինի խաչբառը։</p>
+        </div>
+
+        <!-- Toggle -->
+        <div class="input-group">
+            <div class="toggle-wrapper">
+                <label>Բանալի բառ օգտագործել</label>
+                <label class="switch">
+                    <input type="checkbox" name="keyword_mode" value="with" onchange="toggleKeywordInput(this)">
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+
+        <!-- Keyword Input -->
+        <div class="input-group" id="keywordInput">
+            <div class="toggle-wrapper" style="margin-bottom: 8px;">
+                <label>Բանալի բառ</label>
+                <label class="auto-label">
+                    <input type="checkbox" id="autoKeyword" checked onchange="toggleAutoKeyword(this)">
+                    Ավտոմատ
+                </label>
+            </div>
+            <input type="text" name="keyword" id="keywordField"
+                   placeholder="Մուտքագրեք բանալի բառ" disabled>
+        </div>
+
+        <!-- Հարցերի քանակ — թաքնվում է բանալի բառի ռեժիմում -->
+        <div class="input-group" id="questionCountGroup">
+            <label>Հարցերի քանակ (2–40)</label>
+            <input type="number" name="question_count" value="10" min="2" max="40">
+        </div>
+
+        <div class="input-group">
+            <label>Հեղինակի անունը</label>
+            <input type="text" name="creator_name" placeholder="Ձեր անունը">
+        </div>
+
+        <button type="submit">Ստեղծել Խաչբառ</button>
+    </form>
+
+    <a href="/choose_keyword_mode"
+       style="display: block; margin-top: 15px; color: #95a5a6; text-decoration: none; font-size: 0.8rem;">
+       ⬅️ Հետ դեպի ընտրություն
+    </a>
+</div>
+
+<script>
+    function showLoader() {
+        document.getElementById('loader').style.display = 'flex';
+    }
+
+    function toggleKeywordInput(checkbox) {
+        const keywordInput = document.getElementById('keywordInput');
+        const questionCountGroup = document.getElementById('questionCountGroup');
+
+        if (checkbox.checked) {
+            keywordInput.style.display = "block";
+            questionCountGroup.style.display = "none";
+        } else {
+            keywordInput.style.display = "none";
+            questionCountGroup.style.display = "block";
+            document.getElementById('autoKeyword').checked = true;
+            toggleAutoKeyword(document.getElementById('autoKeyword'));
+        }
+    }
+
+    function toggleAutoKeyword(checkbox) {
+        const field = document.getElementById('keywordField');
+        if (checkbox.checked) {
+            field.disabled = true;
+            field.value = "";
+        } else {
+            field.disabled = false;
+            field.focus();
+        }
+    }
+    function openGuide() {
+        document.getElementById("guide-modal").classList.add("active");
+    }
+
+    function closeGuide() {
+        document.getElementById("guide-modal").classList.remove("active");
+    }
+
+    // փակել եթե սեղմում են դուրսը
+    document.getElementById('guide-modal').addEventListener('click', function(e) {
+        if (e.target === this) closeGuide();
+    });
+function openGuide() {
+    document.getElementById("guideModal").classList.add("active");
+}
+
+function closeGuide() {
+    document.getElementById("guideModal").classList.remove("active");
+}
+
+document.getElementById("guideModal").addEventListener("click", function(e) {
+    if (e.target === this) closeGuide();
+});
+</script>
+
+</body>
+</html>
