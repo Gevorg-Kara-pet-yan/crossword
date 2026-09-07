@@ -4,253 +4,512 @@
     <meta charset="UTF-8">
     <title>Գլխավոր էջ</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <!-- Noto Sans Armenian տառատեսակ (ըստ դիզայնի) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Armenian:wght@400;500;600;700;900&display=swap" rel="stylesheet">
     <style>
-    *{
-        box-sizing:border-box;
-        margin:0;
-        padding:0;
-    }
+    *{ box-sizing:border-box; margin:0; padding:0; }
 
     body{
         font-family:sans-serif;
         background-color:#ffffff;
         display:flex;
-        flex-direction:column;
-        align-items:center;
         min-height:100vh;
-        padding:40px 20px 60px;
     }
 
-    /* Լոգո */
-    .logo-wrap{
-        margin-bottom:60px;
-    }
-    .logo-wrap img{
-        max-width:180px;
-        display:block;
-    }
-
-    /* Վերնագիր */
-    h2{
-        font-size:3rem;
-        font-weight:900;
-        color:#3b1f7a;
-        text-transform:uppercase;
-        letter-spacing:2px;
-        margin-bottom:50px;
-        text-align:center;
-    }
-
-    /* Կոճակների բլոկ */
-    .nav-links{
+    /* ===== SIDEBAR ===== */
+    /* Հիմնական (նեղ՝ պատկերակների) վիճակ */
+    .sidebar{
+        width:84px;
+        min-width:84px;
+        background:#ffffff;
+        border-right:1px solid #e8e8f0;
         display:flex;
         flex-direction:column;
         align-items:center;
-        gap:20px;
-        width:100%;
-        max-width:360px;
+        padding:0 0 28px;
+        position:fixed;
+        top:0; left:0;
+        height:100vh;
+        overflow-y:auto;
+        overflow-x:visible;
+        z-index:100;
+        font-family:'Noto Sans Armenian', sans-serif;
+        transition:width .25s ease, min-width .25s ease;
     }
 
-    /* Ընդհանուր կոճակ */
+    /* Վերնագիր՝ լոգո + բացել/փակել կոճակ */
+    .sidebar-header{
+        display:flex; align-items:center; justify-content:center;
+        width:100%; padding:18px 0; margin-bottom:6px;
+        border-bottom:1px solid #f0f0f8;
+    }
+    .sidebar-logo{ display:none; align-items:center; }
+    .sidebar-logo img{ width:46px; height:auto; display:block; }
+    .sidebar-toggle{
+        background:none; border:none; cursor:pointer; color:#4F4F4F;
+        width:44px; height:44px; border-radius:11px; flex-shrink:0;
+        display:inline-flex; align-items:center; justify-content:center;
+        transition:background .18s, color .18s;
+    }
+    .sidebar-toggle:hover{ background:#f4f4f4; color:#2f2f2f; }
+    .sidebar-toggle svg{ width:24px; height:24px; }
+
+    /* Խումբ */
+    .sidebar-group{ width:100%; }
+    .group-header{
+        position:relative;
+        display:flex; align-items:center; justify-content:center;
+        gap:0; cursor:pointer;
+        margin:5px auto; padding:0;
+        width:44px; height:44px; border-radius:12px;
+        color:#4F4F4F;
+        transition:background .18s, color .18s;
+    }
+    .group-header:hover{ background:#f1f0f8; color:#2f2f2f; }
+    .g-left{ display:flex; align-items:center; gap:13px; }
+    .g-icon{
+        width:44px; height:44px; border-radius:12px; flex-shrink:0;
+        display:inline-flex; align-items:center; justify-content:center;
+        color:currentColor; transition:background .18s, color .18s;
+    }
+    .g-icon svg{ width:22px; height:22px; }
+    .rail-label{ display:none; }
+    .chevron{ display:none; font-size:.62rem; color:#b5b5c0; transition:transform .25s; }
+
+    /* Ուղիղ հղում (Վիճակագրություն, Կարգավորումներ, Անձնական էջ) */
+    .rail-item{
+        display:flex; align-items:center; justify-content:center; gap:0;
+        width:44px; height:44px; margin:5px auto; padding:0;
+        border-radius:12px; color:#4F4F4F; text-decoration:none;
+        transition:background .18s, color .18s;
+    }
+    .rail-item svg{ width:22px; height:22px; }
+    .rail-item:hover{ background:#f1f0f8; color:#2f2f2f; }
+
+    .sidebar-divider{ width:60%; height:1px; background:#eeeef4; margin:10px auto; }
+
+    /* Ենթացանկ (ակորդեոն՝ միայն լայն վիճակում) */
+    .group-children{ display:none; }
+
+    /* === Նեղ վիճակում flyout-ով ակտիվ խումբ === */
+    .sidebar-group.flyout-active > .group-header,
+    .sidebar-group.flyout-active > .group-header .g-icon{
+        background:#4F2675; color:#ffffff;
+    }
+
+    /* ===== FLYOUT (նեղ վիճակում) ===== */
+    .flyout{
+        position:fixed;
+        left:96px; top:120px;
+        width:230px;
+        background:#ffffff;
+        border:1px solid #ececf2;
+        border-radius:14px;
+        box-shadow:0 18px 48px rgba(40,30,80,.16);
+        padding:14px 12px;
+        z-index:200;
+        opacity:0; visibility:hidden; transform:translateX(-8px);
+        transition:opacity .18s ease, transform .18s ease, visibility .18s;
+    }
+    .flyout.open{ opacity:1; visibility:visible; transform:translateX(0); }
+    .flyout-header{
+        font-family:'Noto Sans Armenian', sans-serif;
+        font-size:12px; font-weight:700; letter-spacing:.6px;
+        text-transform:uppercase; color:#a6a6b4; padding:4px 12px 10px;
+    }
+    .flyout a{
+        display:block; font-family:'Noto Sans Armenian', sans-serif;
+        font-size:16px; font-weight:500; color:#4F4F4F;
+        padding:11px 14px; border-radius:9px; text-decoration:none;
+        transition:background .16s, color .16s;
+    }
+    .flyout a:hover{ background:#f4f4f4; color:#2f2f2f; }
+    .flyout a.active{ background:#ececec; color:#4F2675; font-weight:600; }
+
+    /* ================================================== */
+    /* ===== EXPANDED (լայն վիճակ՝ պիտակներով) ===== */
+    /* ================================================== */
+    body.sidebar-open .sidebar{ width:268px; min-width:268px; align-items:stretch; }
+    body.sidebar-open .main{ margin-left:268px; }
+
+    body.sidebar-open .sidebar-header{ justify-content:space-between; padding:16px 14px; }
+    body.sidebar-open .sidebar-logo{ display:inline-flex; }
+
+    /* Խմբի վերնագիր լայն վիճակում */
+    body.sidebar-open .group-header{
+        width:auto; height:auto; justify-content:space-between;
+        margin:3px 12px; padding:10px 12px;
+        font-family:'Noto Sans Armenian', sans-serif;
+        font-size:18px; font-weight:500; line-height:1.35;
+    }
+    body.sidebar-open .g-icon{ width:36px; height:36px; border-radius:9px; background:#f0f0f0; }
+    body.sidebar-open .g-icon svg{ width:19px; height:19px; }
+    body.sidebar-open .rail-label{ display:inline; }
+    body.sidebar-open .chevron{ display:inline; }
+
+    /* Բացված խումբ (ակորդեոն) */
+    body.sidebar-open .sidebar-group.open > .group-header{ background:#efeaf7; color:#4F2675; }
+    body.sidebar-open .sidebar-group.open > .group-header .g-icon{ background:#4F2675; color:#fff; }
+    body.sidebar-open .sidebar-group.open .chevron{ transform:rotate(180deg); }
+    body.sidebar-open .sidebar-group.open .group-children{ display:block; margin:2px 0 8px; }
+
+    /* Ենթակետեր */
+    body.sidebar-open .group-children a{
+        position:relative; display:block;
+        font-family:'Noto Sans Armenian', sans-serif;
+        font-size:16.5px; font-weight:500; color:#4F4F4F;
+        text-decoration:none; padding:9px 14px 9px 40px;
+        margin:1px 12px; border-radius:8px;
+        transition:background .16s, color .16s;
+    }
+    body.sidebar-open .group-children a::before{
+        content:''; position:absolute; left:22px; top:50%; transform:translateY(-50%);
+        width:5px; height:5px; border-radius:50%; background:#bdbdbd; transition:background .16s;
+    }
+    body.sidebar-open .group-children a:hover{ background:#f4f4f4; color:#2f2f2f; }
+    body.sidebar-open .group-children a:hover::before{ background:#4F2675; }
+    body.sidebar-open .group-children a.active{ background:#ececec; color:#4F2675; font-weight:600; }
+    body.sidebar-open .group-children a.active::before{ background:#4F2675; }
+
+    /* Ուղիղ հղումներ լայն վիճակում */
+    body.sidebar-open .rail-item{
+        width:auto; height:auto; justify-content:flex-start; gap:13px;
+        margin:3px 12px; padding:11px 12px;
+        font-family:'Noto Sans Armenian', sans-serif;
+        font-size:18px; font-weight:500;
+    }
+    body.sidebar-open .rail-item svg{ width:22px; height:22px; }
+
+    /* Լայն վիճակում flyout-ները չեն երևում */
+    body.sidebar-open .flyout{ display:none; }
+
+    /* ===== MAIN ===== */
+    .main{
+        margin-left:84px; flex:1;
+        display:flex; flex-direction:column; align-items:center;
+        padding:40px 20px 60px;
+        transition:margin-left .25s ease;
+    }
+    .logo-wrap{ margin-bottom:60px; }
+    .logo-wrap img{ max-width:180px; display:block; }
+    h2{
+        font-size:3rem; font-weight:900; color:#3b1f7a;
+        text-transform:uppercase; letter-spacing:2px;
+        margin-bottom:50px; text-align:center;
+    }
+    .nav-links{ display:flex; flex-direction:column; align-items:center; gap:20px; width:100%; max-width:360px; }
     .nav-links a{
-        display:flex;
-        align-items:center;
-        gap:14px;
-        width:100%;
-        padding:16px 28px;
-        font-size:1.05rem;
-        font-weight:600;
-        border-radius:10px;
-        text-decoration:none;
-        cursor:pointer;
-        position:relative;
-        overflow:hidden;
-        transition:color .35s ease,border-color .35s ease,
-           box-shadow .35s ease,transform .2s ease,
-           background .35s ease;
+        display:flex; align-items:center; gap:14px; width:100%;
+        padding:16px 28px; font-size:1.05rem; font-weight:600;
+        border-radius:10px; text-decoration:none; cursor:pointer;
+        position:relative; overflow:hidden;
+        transition:color .35s ease,border-color .35s ease,box-shadow .35s ease,transform .2s ease,background .35s ease;
     }
-
-    /* icon */
-    .nav-links a .btn-icon{
-        display:inline-flex;
-        transition:transform .4s cubic-bezier(.34,1.56,.64,1);
-        position:relative;
-        z-index:1;
-    }
-    .nav-links a:hover .btn-icon{
-        transform:rotate(90deg);
-    }
-
-    .nav-links a .btn-label{
-        position:relative;
-        z-index:1;
-    }
-
-    /* hover animation */
-    .nav-links a:hover{
-        transform:translateY(-2px);
-    }
-
-    .nav-links a:active{
-        transform:translateY(0) scale(.98);
-    }
-
-    /* Ստեղծել խաչբառ */
-    .btn-create {
-        border: 2px solid #4F2675;
-        color: #4F2675;
-        background: #ffffff;  /* սպիտակ ֆոն default-ում */
-        transition: background 0.3s ease, color 0.3s ease,
-                    box-shadow 0.3s ease, transform 0.2s ease;
-    }
-
-    .btn-create:hover {
-        background: #4F2675;
-        border-color: #4F2675;
-        color: #ffffff;
-        box-shadow: 0 6px 20px rgba(79, 38, 117, 0.4);
-    }
-    .btn-create:hover .btn-icon {
-        transform: rotate(90deg) scale(1.1);
-    }
-    /* Իմ խաչբառները */
-    .btn-my{
-        border:2px solid #4F2675;
-        color:#4F2675;
-        background:transparent;
-    }
-    .btn-my:hover{
-        background:#4F2675;
-        border-color:#4F2675;
-        color:#ffffff;
-        box-shadow:0 6px 20px rgba(107,53,200,.35);
-    }
-
-    /* Ուղեցույց */
-    .btn-guide{
-        border:2px solid #27ae60;
-        background:#27ae60;
-        color:#ffffff;
-        margin-top:20px;
-    }
-    .btn-guide:hover{
-        background:#1a7a45;
-        border-color:#1a7a45;
-        box-shadow:0 6px 20px rgba(30,148,80,.4);
-    }
+    .nav-links a .btn-icon{ display:inline-flex; transition:transform .4s cubic-bezier(.34,1.56,.64,1); position:relative; z-index:1; }
+    .nav-links a:hover .btn-icon{ transform:rotate(90deg); }
+    .nav-links a .btn-label{ position:relative; z-index:1; }
+    .nav-links a:hover{ transform:translateY(-2px); }
+    .nav-links a:active{ transform:translateY(0) scale(.98); }
+    .btn-create{ border:2px solid #4F2675; color:#4F2675; background:#ffffff; transition:background .3s ease,color .3s ease,box-shadow .3s ease,transform .2s ease; }
+    .btn-create:hover{ background:#4F2675; border-color:#4F2675; color:#fff; box-shadow:0 6px 20px rgba(79,38,117,.4); }
+    .btn-create:hover .btn-icon{ transform:rotate(90deg) scale(1.1); }
+    .btn-my{ border:2px solid #4F2675; color:#4F2675; background:transparent; }
+    .btn-my:hover{ background:#4F2675; border-color:#4F2675; color:#fff; box-shadow:0 6px 20px rgba(107,53,200,.35); }
+    .btn-guide{ border:2px solid #27ae60; background:#27ae60; color:#fff; margin-top:20px; }
+    .btn-guide:hover{ background:#1a7a45; border-color:#1a7a45; box-shadow:0 6px 20px rgba(30,148,80,.4); }
 
     /* Մոդալ */
-    .modal{
-        display:none;
-        position:fixed;
-        z-index:1000;
-        left:0;
-        top:0;
-        width:100%;
-        height:100%;
-        background:rgba(0,0,0,.55);
-    }
+    .modal{ display:none; position:fixed; z-index:1000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,.55); }
+    .modal-content{ background:#fff; margin:6% auto; padding:30px 36px; border-radius:12px; max-width:640px; position:relative; max-height:80vh; overflow-y:auto; }
+    .modal-content h2{ font-size:1.4rem; margin-bottom:16px; color:#3b1f7a; text-transform:none; letter-spacing:0; }
+    .modal-content h3{ font-size:1.1rem; color:#3b1f7a; margin:20px 0 8px; }
+    .modal-content ol,.modal-content ul{ padding-left:20px; }
+    .modal-content li{ margin-bottom:6px; font-size:.95rem; line-height:1.6; color:#333; }
+    .modal-content p{ font-size:.95rem; line-height:1.6; color:#444; margin-bottom:8px; }
+    .close-btn{ position:absolute; top:14px; right:18px; width:34px; height:34px; display:flex; align-items:center; justify-content:center; font-size:20px; cursor:pointer; color:#aaa; border-radius:50%; transition:.3s; }
+    .close-btn:hover{ color:#e74c3c; background:#ffeaea; border:2px solid #e74c3c; transform:rotate(90deg); }
 
-    .modal-content{
-        background:#fff;
-        margin:6% auto;
-        padding:30px 36px;
-        border-radius:12px;
-        max-width:640px;
-        position:relative;
-        max-height:80vh;
-        overflow-y:auto;
+    /* ================================================== */
+    /* ===== ՎԵՐԻՆ ԱՋ ՎԱՀԱՆԱԿ (մութ / լեզու / օգտվող) ===== */
+    /* ================================================== */
+    .topbar-controls{
+        position:fixed; top:16px; right:22px; z-index:300;
+        display:flex; align-items:center; gap:12px;
     }
-
-    .modal-content h2{
-        font-size:1.4rem;
-        margin-bottom:16px;
-        color:#3b1f7a;
+    .tb-btn{
+        display:inline-flex; align-items:center; justify-content:center; gap:7px;
+        height:42px; min-width:42px; padding:0 13px;
+        border:1px solid #e8e8f0; background:#fff; color:#4F4F4F;
+        border-radius:999px; cursor:pointer;
+        font-family:'Noto Sans Armenian',sans-serif; font-size:14px; font-weight:600;
+        text-decoration:none; transition:background .18s,color .18s,border-color .18s,box-shadow .18s;
     }
+    .tb-btn:hover{ background:#f4f4f4; color:#2f2f2f; box-shadow:0 4px 14px rgba(40,30,80,.08); }
+    .tb-btn svg{ width:20px; height:20px; }
+    .tb-avatar{ width:42px; padding:0; background:#4F2675; color:#fff; border-color:#4F2675; font-weight:700; }
+    .tb-avatar:hover{ background:#3b1f7a; color:#fff; }
 
-    .modal-content h3{
-        font-size:1.1rem;
-        color:#3b1f7a;
-        margin:20px 0 8px;
+    /* Լեզվի մենյու */
+    .tb-lang{ position:relative; }
+    .tb-lang-menu{
+        position:absolute; top:52px; right:0; min-width:150px;
+        background:#fff; border:1px solid #ececf2; border-radius:12px;
+        box-shadow:0 14px 40px rgba(40,30,80,.16); padding:6px;
+        opacity:0; visibility:hidden; transform:translateY(-6px);
+        transition:opacity .16s,transform .16s,visibility .16s;
     }
-
-    .modal-content ol,
-    .modal-content ul{
-        padding-left:20px;
+    .tb-lang-menu.open{ opacity:1; visibility:visible; transform:translateY(0); }
+    .tb-lang-menu button{
+        display:block; width:100%; text-align:left; background:none; border:none; cursor:pointer;
+        font-family:'Noto Sans Armenian',sans-serif; font-size:15px; color:#4F4F4F;
+        padding:9px 12px; border-radius:8px; transition:background .14s,color .14s;
     }
+    .tb-lang-menu button:hover{ background:#f4f4f4; color:#4F2675; }
 
-    .modal-content li{
-        margin-bottom:6px;
-        font-size:.95rem;
-        line-height:1.6;
-        color:#333;
+    /* Օգտվողի մենյու */
+    .tb-user{ position:relative; }
+    .tb-user-menu{
+        position:absolute; top:52px; right:0; min-width:250px;
+        background:#fff; border:1px solid #ececf2; border-radius:14px;
+        box-shadow:0 16px 44px rgba(40,30,80,.18); padding:8px; overflow:hidden;
+        opacity:0; visibility:hidden; transform:translateY(-6px);
+        transition:opacity .16s,transform .16s,visibility .16s;
     }
-
-    .modal-content p{
-        font-size:.95rem;
-        line-height:1.6;
-        color:#444;
-        margin-bottom:8px;
+    .tb-user-menu.open{ opacity:1; visibility:visible; transform:translateY(0); }
+    .tb-user-head{ padding:12px 14px 14px; border-bottom:1px solid #f0f0f6; margin-bottom:6px; }
+    .tb-user-name{ font-family:'Noto Sans Armenian',sans-serif; font-weight:700; font-size:16px; color:#2f2f3a; text-transform:uppercase; }
+    .tb-user-mail{ font-size:13px; color:#9a9aa8; margin-top:3px; }
+    .tb-user-menu a{
+        display:flex; align-items:center; gap:12px;
+        font-family:'Noto Sans Armenian',sans-serif; font-size:15px; color:#4F4F4F;
+        text-decoration:none; padding:11px 14px; border-radius:9px;
+        transition:background .14s,color .14s;
     }
+    .tb-user-menu a svg{ width:19px; height:19px; flex-shrink:0; }
+    .tb-user-menu a:hover{ background:#f4f4f4; color:#4F2675; }
+    .tb-user-menu a.tb-logout{ color:#e74c3c; }
+    .tb-user-menu a.tb-logout:hover{ background:#ffeaea; color:#e74c3c; }
 
-    .close-btn{
-        position:absolute;
-        top:14px;
-        right:18px;
-        width:34px;
-        height:34px;
-        display:flex;
-        align-items:center;
-        justify-content:center;
-        font-size:20px;
-        cursor:pointer;
-        color:#aaa;
-        border-radius:50%;
-        transition:.3s;
+    /* Google Translate-ի լռելյայն տարրերը թաքցնել */
+    .goog-te-banner-frame,
+    .goog-te-gadget,
+    .skiptranslate iframe{ display:none !important; }
+    body{ top:0 !important; }
+    #goog-gt-tt, .goog-te-balloon-frame{ display:none !important; }
+    font font{ background:none !important; box-shadow:none !important; }
+
+    /* ================================================== */
+    /* ===== ՄՈՒԹ ՌԵԺԻՄ ===== */
+    /* ================================================== */
+    body.dark{ background-color:#15131c; color:#e7e5ee; }
+    body.dark .sidebar{ background:#1c1925; border-right-color:#2a2535; }
+    body.dark .sidebar-header{ border-bottom-color:#2a2535; }
+    body.dark .sidebar-toggle, body.dark .group-header, body.dark .rail-item{ color:#c9c5d6; }
+    body.dark .sidebar-toggle:hover, body.dark .group-header:hover, body.dark .rail-item:hover{ background:#262031; color:#fff; }
+    body.dark .sidebar-divider{ background:#2a2535; }
+    body.dark .flyout{ background:#1c1925; border-color:#2a2535; }
+    body.dark .flyout a{ color:#c9c5d6; }
+    body.dark .flyout a:hover{ background:#262031; color:#fff; }
+    body.dark .flyout a.active{ background:#2a2535; color:#b99cff; }
+    body.dark h2{ color:#b99cff; }
+    body.dark .btn-create, body.dark .btn-my{ background:transparent; color:#b99cff; border-color:#6b35c8; }
+    body.dark .btn-create:hover, body.dark .btn-my:hover{ background:#6b35c8; color:#fff; }
+    body.dark .modal-content{ background:#1c1925; color:#e7e5ee; }
+    body.dark .modal-content h2, body.dark .modal-content h3{ color:#b99cff; }
+    body.dark .modal-content li, body.dark .modal-content p{ color:#cfccd9; }
+
+    body.dark .tb-btn{ background:#1c1925; border-color:#2a2535; color:#c9c5d6; }
+    body.dark .tb-btn:hover{ background:#262031; color:#fff; }
+    body.dark .tb-lang-menu, body.dark .tb-user-menu{ background:#1c1925; border-color:#2a2535; }
+    body.dark .tb-lang-menu button, body.dark .tb-user-menu a{ color:#c9c5d6; }
+    body.dark .tb-lang-menu button:hover, body.dark .tb-user-menu a:hover{ background:#262031; color:#b99cff; }
+    body.dark .tb-user-head{ border-bottom-color:#2a2535; }
+    body.dark .tb-user-name{ color:#e7e5ee; }
+    body.dark .tb-logout:hover{ background:#3a1f22 !important; }
+
+    @media (max-width:700px){
+        body.sidebar-open .sidebar{ width:230px; min-width:230px; }
+        body.sidebar-open .main{ margin-left:230px; }
     }
-
-    .close-btn:hover{
-        color:#e74c3c;
-        background:#ffeaea;
-        border:2px solid #e74c3c;
-        transform:rotate(90deg);
-    }
-
     </style>
 </head>
 <body>
 
-    <!-- Լոգո -->
-    <div class="logo-wrap">
-        <a href="https://dshh.am/am" target="_blank">
-            <img src="{{ url_for('static', filename='dshh.png') }}" alt="Dshh.am">
-        </a>
+    <!-- ===== ՎԵՐԻՆ ԱՋ ՎԱՀԱՆԱԿ ===== -->
+    <div class="topbar-controls">
+        <!-- Մութ / լուսավոր ռեժիմ -->
+        <button class="tb-btn" id="themeToggle" onclick="toggleTheme()"
+                title="Մութ / լուսավոր ռեժիմ" aria-label="Մութ / լուսավոր ռեժիմ"></button>
+
+        <!-- Լեզու -->
+        <div class="tb-lang">
+            <button class="tb-btn" id="langBtn" onclick="toggleLangMenu()" title="Լեզու" translate="no">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                     stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/>
+                    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                </svg>
+                <span id="langLabel">HY</span>
+            </button>
+            <div class="tb-lang-menu" id="langMenu" translate="no">
+                <button onclick="setLang('hy')">Հայերեն</button>
+                <button onclick="setLang('en')">English</button>
+                <button onclick="setLang('ru')">Русский</button>
+            </div>
+        </div>
+
+        <!-- Օգտվող -->
+        <div class="tb-user" translate="no">
+            <button class="tb-btn tb-avatar" id="userBtn" onclick="toggleUserMenu()" title="Անձնական մենյու">
+                <span id="avatarInitials">{{ user.get('initials', 'ԳՀ') }}</span>
+            </button>
+
+            <div class="tb-user-menu" id="userMenu">
+                <div class="tb-user-head">
+                    <div class="tb-user-name" id="userName">{{ user.get('name', '') }}</div>
+                    <div class="tb-user-mail" id="userMail">{{ user.get('email', '') }}</div>
+                </div>
+                <a href="https://mainlogin.dshh.am:15107/Profiles/UserProfile">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    Անձնական Էջ
+                </a>
+                <a href="https://mainlogin.dshh.am:15107/Settings">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                    Կարգավորումներ
+                </a>
+                <a href="https://mainlogin.dshh.am:15107/Account/Logout" class="tb-logout">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                    Դուրս գալ
+                </a>
+            </div>
+        </div>
     </div>
 
-    <!-- Վերնագիր -->
-    <h2>Բարի գալուստ</h2>
+    <!-- Թաքնված Google Translate widget -->
+    <div id="google_translate_element" style="display:none;"></div>
 
-    <!-- Կոճակներ -->
-    <div class="nav-links">
-        <a href="{{ url_for('choose_keyword_mode') }}" class="btn-create">
-            <i class="btn-icon">＋</i>
-            <span class="btn-label">Ստեղծել նոր խաչբառ</span>
+    <!-- ===== SIDEBAR ===== -->
+    <aside class="sidebar">
+
+        <!-- Վերնագիր՝ լոգո (լայն վիճակում) + բացել/փակել կոճակ -->
+        <div class="sidebar-header">
+            <a class="sidebar-logo" href="https://dshh.am/am" target="_blank">
+                <img src="{{ url_for('static', filename='dshh.png') }}" alt="Dshh.am">
+            </a>
+            <button class="sidebar-toggle" type="button" onclick="toggleSidebar()"
+                    aria-label="Բացել" title="Փակել">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+            </button>
+        </div>
+
+        <!-- 1) Կրթական գործիքներ -->
+        <div class="sidebar-group" id="group-tools">
+            <div class="group-header" data-flyout="flyout-tools" onclick="handleGroup(this)">
+                <span class="g-left">
+                    <span class="g-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+                    </span>
+                    <span class="rail-label">Կրթական գործիքներ</span>
+                </span>
+                <span class="chevron">▼</span>
+            </div>
+            <div class="group-children">
+                <a href="https://gatewayapi.dshh.am:15106/ibook/">թղթապանակ</a>
+                <a href="{{ url_for('choose_keyword_mode') }}" class="active">խաչբառ</a>
+                <a href="https://gatewayapi.dshh.am:15106/ibook/digital-book">Նյութերի թվայնացում</a>
+                <a href="https://gatewayapi.dshh.am:15106/pairmatch">Գտիր զույգը</a>
+            </div>
+        </div>
+
+        <!-- 2) Իմ ստեղծած նյութերը -->
+        <div class="sidebar-group" id="group-mine">
+            <div class="group-header" data-flyout="flyout-mine" onclick="handleGroup(this)">
+                <span class="g-left">
+                    <span class="g-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+                    </span>
+                    <span class="rail-label">Իմ ստեղծած նյութերը</span>
+                </span>
+                <span class="chevron">▼</span>
+            </div>
+            <div class="group-children">
+                <a href="https://gatewayapi.dshh.am:15106/ibook/">Թղթապանակներ</a>
+                <a href="https://mainlogin.dshh.am:15107/Materials/Crosswords">Խաչբառներ</a>
+                <a href="#">Թվայնացված նյութերը</a>
+                <a href="#"><<Գտիր զույգը>> խաղեր</a>
+            </div>
+        </div>
+
+        <div class="sidebar-divider"></div>
+
+        <!-- Վիճակագրություն -->
+        <a class="rail-item" href="https://mainlogin.dshh.am:15107/Profiles/UserStatistics" title="Վիճակագրություն">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="20" x2="6" y2="13"/><line x1="12" y1="20" x2="12" y2="7"/><line x1="18" y1="20" x2="18" y2="10"/></svg>
+            <span class="rail-label">Վիճակագրություն</span>
         </a>
-        <a href="{{ url_for('my_crosswords') }}" class="btn-my">
-            <i class="btn-icon">📄</i>
-            <span class="btn-label">Իմ ստեղծած խաչբառները</span>
+
+        <!-- Կարգավորումներ -->
+        <a class="rail-item" href="https://mainlogin.dshh.am:15107/Settings" title="Կարգավորումներ">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            <span class="rail-label">Կարգավորումներ</span>
         </a>
-        <a href="#" class="btn-guide" onclick="openGuide(); return false;">
-            <i class="btn-icon">📖</i>
-            <span class="btn-label">Օգտագործման ուղեցույց</span>
+
+        <!-- Անձնական էջ -->
+        <a class="rail-item" href="https://mainlogin.dshh.am:15107/Profiles/UserProfile" title="Անձնական էջ">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            <span class="rail-label">Անձնական էջ</span>
         </a>
+    </aside>
+
+    <!-- ===== FLYOUT-ՆԵՐ (միայն նեղ վիճակում) ===== -->
+    <div class="flyout" id="flyout-tools">
+        <div class="flyout-header">Կրթական գործիքներ</div>
+        <a href="https://gatewayapi.dshh.am:15106/ibook/">թղթապանակ</a>
+        <a href="{{ url_for('choose_keyword_mode') }}" class="active">խաչբառ</a>
+        <a href="https://gatewayapi.dshh.am:15106/ibook/digital-book">նյութերի թվայնացում</a>
+        <a href="#">զույգերի խաղ</a>
     </div>
+    <div class="flyout" id="flyout-mine">
+        <div class="flyout-header">Իմ ստեղծած նյութերը</div>
+        <a href="https://gatewayapi.dshh.am:15106/ibook/">Թղթապանակներ</a>
+        <a href="https://mainlogin.dshh.am:15107/Materials/Crosswords">Խաչբառներ</a>
+        <a href="#">Թվայնացված նյութեր</a>
+        <a href="#"><<Գտիր զույգը>> խաղեր</a>
+    </div>
+
+    <!-- ===== MAIN ===== -->
+    <main class="main">
+        <div class="logo-wrap">
+            <a href="https://dshh.am/am" target="_blank">
+                <img src="{{ url_for('static', filename='dshh.png') }}" alt="Dshh.am">
+            </a>
+        </div>
+
+        <h2>Բարի գալուստ</h2>
+
+        <div class="nav-links">
+            <a href="{{ url_for('choose_keyword_mode') }}" class="btn-create">
+                <i class="btn-icon">＋</i>
+                <span class="btn-label">Ստեղծել նոր խաչբառ</span>
+            </a>
+            <a href="{{ url_for('my_crosswords') }}" class="btn-my">
+                <i class="btn-icon">📄</i>
+                <span class="btn-label">Իմ ստեղծած խաչբառները</span>
+            </a>
+            <a href="#" class="btn-guide" onclick="openGuide(); return false;">
+                <i class="btn-icon">📖</i>
+                <span class="btn-label"></span>
+            </a>
+        </div>
+    </main>
 
     <!-- Մոդալ -->
     <div id="guideModal" class="modal">
         <div class="modal-content">
             <span class="close-btn" onclick="closeGuide()">✕</span>
-            <h2>📖 Օգտագործման ուղեցույց</h2>
+            <h2>📖 </h2>
 
             <h3>➕ «Ստեղծել նոր խաչբառ» բաժին</h3>
             <ol>
@@ -267,8 +526,7 @@
                 <li>Հարց-պատասխան զույգի կողքին «❌» կոճակով կարող եք ջնջել մուտքագրված տվյալները։</li>
                 <li>Ընտրե՛ք հուշման տեսակը՝ տեքստային, պատկերային, ձայնային կամ տեսաձայնային։</li>
                 <li>Եթե ընտրել եք «Բանալի բառով» տեսակը, մուտքագրե՛ք համապատասխան բանալի բառը։</li>
-                <li>Աշխատանքն ավարտելու համար սեղմե՛ք «Ստեղծել խաչբառ» կոճակը։ 🎉</li>
-                <li>Գլխավոր էջ գնալու համար սեղմե՛ք «Վերադառնալ գլխավոր էջ» կոճակը։</li>
+                <li>Աշխատանքն ավարտելու համար սեղմե՛ք «Ստեղծել» կոճակը։ 🎉</li>
             </ol>
 
             <h3>📋 «Իմ ստեղծած խաչբառները» բաժին</h3>
@@ -283,18 +541,125 @@
         </div>
     </div>
 
+    <!-- ===== Google Translate ===== -->
+    <script type="text/javascript">
+        function googleTranslateElementInit() {
+            new google.translate.TranslateElement({
+                pageLanguage: 'hy',
+                includedLanguages: 'hy,en,ru',
+                autoDisplay: false
+            }, 'google_translate_element');
+        }
+    </script>
+    <script src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+
     <script>
-        function openGuide() {
-            document.getElementById("guideModal").style.display = "block";
-        }
-        function closeGuide() {
-            document.getElementById("guideModal").style.display = "none";
-        }
-        window.onclick = function(event) {
-            let modal = document.getElementById("guideModal");
-            if (event.target === modal) {
-                modal.style.display = "none";
+        /* ========== ՄԵՆՅՈՒ ԲԱՑԵԼ / ՓԱԿԵԼ (նեղ <-> լայն) ========== */
+        function toggleSidebar(){
+            const opening = !document.body.classList.contains('sidebar-open');
+            document.body.classList.toggle('sidebar-open');
+            closeAllFlyouts();
+            if (!opening){
+                document.querySelectorAll('.sidebar-group.open').forEach(g => g.classList.remove('open'));
             }
+        }
+
+        function handleGroup(header){
+            const group = header.closest('.sidebar-group');
+
+            if (document.body.classList.contains('sidebar-open')){
+                group.classList.toggle('open');
+                return;
+            }
+
+            const id = header.getAttribute('data-flyout');
+            const panel = document.getElementById(id);
+            const isOpen = panel.classList.contains('open');
+            closeAllFlyouts();
+            if (!isOpen){
+                const r = header.getBoundingClientRect();
+                panel.style.top = r.top + 'px';
+                panel.classList.add('open');
+                group.classList.add('flyout-active');
+            }
+        }
+
+        function closeAllFlyouts(){
+            document.querySelectorAll('.flyout.open').forEach(p => p.classList.remove('open'));
+            document.querySelectorAll('.sidebar-group.flyout-active').forEach(g => g.classList.remove('flyout-active'));
+        }
+
+        /* ========== ՄՈՒԹ ՌԵԺԻՄ ========== */
+        const MOON_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+        const SUN_SVG  = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.2" y1="4.2" x2="5.6" y2="5.6"/><line x1="18.4" y1="18.4" x2="19.8" y2="19.8"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.2" y1="19.8" x2="5.6" y2="18.4"/><line x1="18.4" y1="5.6" x2="19.8" y2="4.2"/></svg>';
+
+        function applyTheme(theme){
+            document.body.classList.toggle('dark', theme === 'dark');
+            const btn = document.getElementById('themeToggle');
+            if (btn) btn.innerHTML = theme === 'dark' ? SUN_SVG : MOON_SVG;
+        }
+        function toggleTheme(){
+            const next = document.body.classList.contains('dark') ? 'light' : 'dark';
+            localStorage.setItem('theme', next);
+            applyTheme(next);
+        }
+        applyTheme(localStorage.getItem('theme') || 'light');
+
+        /* ========== ԼԵԶՈՒ (Google Translate cookie + reload) ========== */
+        function toggleLangMenu(){ document.getElementById('langMenu').classList.toggle('open'); }
+
+        function setLang(code){
+            document.getElementById('langLabel').textContent = code.toUpperCase();
+            document.getElementById('langMenu').classList.remove('open');
+            if (code === 'hy') {
+                deleteGoogtrans();
+            } else {
+                setCookie('googtrans', '/hy/' + code);
+            }
+            location.reload();
+        }
+        function setCookie(name, value){
+            document.cookie = name + '=' + value + '; path=/;';
+            document.cookie = name + '=' + value + '; path=/; domain=.dshh.am;';
+        }
+        function deleteGoogtrans(){
+            const exp = '; expires=Thu, 01 Jan 1970 00:00:00 UTC';
+            document.cookie = 'googtrans=' + exp + '; path=/;';
+            document.cookie = 'googtrans=' + exp + '; path=/; domain=.dshh.am;';
+        }
+        (function initLangLabel(){
+            const m = document.cookie.match(/googtrans=\/[^/]+\/([^;]+)/);
+            const cur = m ? m[1] : 'hy';
+            const label = document.getElementById('langLabel');
+            if (label) label.textContent = cur.toUpperCase();
+        })();
+
+        /* ========== ՕԳՏՎՈՂԻ ՄԵՆՅՈՒ ========== */
+        function toggleUserMenu(){ document.getElementById('userMenu').classList.toggle('open'); }
+
+        /* ========== ԴՐՍՈՒՄ ՍԵՂՄԵԼԻՍ ՓԱԿԵԼ ========== */
+        document.addEventListener('click', function(e){
+            // flyout-ներ
+            if (!e.target.closest('.group-header') && !e.target.closest('.flyout')) closeAllFlyouts();
+            // լեզվի մենյու
+            if (!e.target.closest('.tb-lang')) document.getElementById('langMenu')?.classList.remove('open');
+            // օգտվողի մենյու
+            if (!e.target.closest('.tb-user')) document.getElementById('userMenu')?.classList.remove('open');
+        });
+        document.addEventListener('keydown', function(e){
+            if (e.key === 'Escape'){
+                closeAllFlyouts();
+                document.getElementById('langMenu')?.classList.remove('open');
+                document.getElementById('userMenu')?.classList.remove('open');
+            }
+        });
+
+        /* ========== ՈՒՂԵՑՈՒՅՑ ՄՈԴԱԼ ========== */
+        function openGuide(){ document.getElementById("guideModal").style.display = "block"; }
+        function closeGuide(){ document.getElementById("guideModal").style.display = "none"; }
+        window.onclick = function(event){
+            let modal = document.getElementById("guideModal");
+            if (event.target === modal){ modal.style.display = "none"; }
         }
     </script>
 </body>

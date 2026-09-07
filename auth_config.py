@@ -20,7 +20,7 @@ INTROSPECT_CLIENT_SECRET = os.environ.get(
 
 VERIFY_TLS = os.environ.get(
     "AUTHSERVER_VERIFY_TLS",
-    "false"
+    "true"
 ).lower() == "true"
 
 INTROSPECTION_CACHE_TTL = int(

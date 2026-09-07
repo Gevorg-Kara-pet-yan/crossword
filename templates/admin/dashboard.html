@@ -10,6 +10,7 @@
         th, td { padding: 10px; border: 1px solid #ddd; text-align: center; }
         th { background: #1976d2; color: #fff; }
         a, button { text-decoration: none; color: #1976d2; border: none; background: none; cursor: pointer; }
+        .center-button { display: block; margin: 20px auto; padding: 10px 20px; background: #1976d2; color: #fff; border-radius: 5px; }
         .danger { color: red; }
         .action-block { display: inline-block; }
         .confirm-box {
@@ -21,28 +22,6 @@
             margin-top: 5px;
         }
         hr { border: none; border-top: 1px solid #ccc; margin: 5px 0; }
-
-        /* Էջավորում */
-        .pagination {
-            display: flex;
-            justify-content: center;
-            gap: 8px;
-            margin: 20px auto;
-        }
-        .pagination a, .pagination span {
-            padding: 8px 14px;
-            border: 1px solid #1976d2;
-            border-radius: 4px;
-            color: #1976d2;
-            text-decoration: none;
-        }
-        .pagination span.current {
-            background: #1976d2;
-            color: white;
-        }
-        .pagination a:hover {
-            background: #e3f2fd;
-        }
     </style>
 </head>
 <body>
@@ -65,8 +44,10 @@
         <td>{{ c.creator_name or "-" }}</td>
         <td>{{ c.participants }}</td>
         <td>
+            <!-- Ջնջել կոճակ inline հաստատմամբ -->
             <div class="action-block">
                 <button class="danger" onclick="showConfirm({{ c.id }})">Ջնջել</button>
+
                 <div id="confirm-{{ c.id }}" class="confirm-box" style="display:none;">
                     <span>Վստա՞հ եք, որ ցանկանում եք ջնջել։</span><br>
                     <form method="post" action="{{ url_for('admin_delete_crossword', id=c.id) }}" style="display:inline;">
@@ -75,9 +56,11 @@
                     <button type="button" onclick="hideConfirm({{ c.id }})">Չեղարկել</button>
                 </div>
             </div>
+
             <hr>
+
+            <!-- Արդյունքներ -->
             <div class="action-block">
-                <a href="{{ url_for('admin_edit_full_crossword', cw_id=c.id) }}">Խմբագրել</a>
                 <a href="{{ url_for('admin_crossword_results', id=c.id) }}">Արդյունքներ</a>
             </div>
         </td>
@@ -85,43 +68,13 @@
     {% endfor %}
 </table>
 
-<!-- Էջավորում -->
-{% if total_pages > 1 %}
-<div class="pagination">
-    {% if page > 1 %}
-        <a href="{{ url_for('admin_dashboard', page=page-1) }}">‹ Նախ.</a>
-    {% endif %}
-
-    {% for p in range(1, total_pages + 1) %}
-        {% if p == page %}
-            <span class="current">{{ p }}</span>
-        {% else %}
-            <a href="{{ url_for('admin_dashboard', page=p) }}">{{ p }}</a>
-        {% endif %}
-    {% endfor %}
-
-    {% if page < total_pages %}
-        <a href="{{ url_for('admin_dashboard', page=page+1) }}">Հաջ. ›</a>
-    {% endif %}
-</div>
-{% endif %}
-
-<a href="{{ url_for('admin_change_credentials') }}"
-   style="display: block; width: 150px; margin: 10px auto;
-          text-align: center; padding: 10px;
-          background-color: #1976d2; color: white;
-          text-decoration: none; border-radius: 5px;">
-    🔐 Փոխել տվյալները
-</a>
-
 <a href="{{ url_for('admin_logout') }}"
-   style="display: block; width: 150px; margin: 20px auto;
+   style="display: block; width: 150px; margin: 30px auto;
           text-align: center; padding: 10px;
           background-color: #d32f2f; color: white;
           text-decoration: none; border-radius: 5px;">
     Դուրս գալ
 </a>
-
 <script>
 function showConfirm(id) {
     document.getElementById('confirm-' + id).style.display = 'inline-block';
@@ -130,5 +83,6 @@ function hideConfirm(id) {
     document.getElementById('confirm-' + id).style.display = 'none';
 }
 </script>
+
 </body>
 </html>

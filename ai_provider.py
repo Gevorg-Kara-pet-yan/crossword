@@ -95,11 +95,13 @@ class ClaudeProvider(AIProvider):
         if not api_key:
             raise RuntimeError("ANTHROPIC_API_KEY is not set")
         self._client = anthropic.Anthropic(api_key=api_key)
+        # Մոդելը .env-ից (default՝ ընթացիկ վավեր claude-sonnet-4-6)
+        self._model = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6")
 
     async def ask_async(self, prompt: str) -> str:
         message = await asyncio.to_thread(
             self._client.messages.create,
-            model="claude-sonnet-4-20250514",
+            model=self._model,
             max_tokens=1500,
             messages=[{"role": "user", "content": prompt}],
         )
@@ -122,7 +124,12 @@ class CustomProvider(AIProvider):
         }
         payload = json.dumps({"message": prompt}, ensure_ascii=False).encode("utf-8")
         response = await asyncio.to_thread(
-            requests.post, self._url, headers=headers, data=payload, timeout=100
+            requests.post,
+            self._url,
+            headers=headers,
+            data=payload,
+            timeout=120,
+            verify=False
         )
         response.encoding = "utf-8"
         raw = response.text

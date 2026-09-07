@@ -1,413 +1,1209 @@
 <!DOCTYPE html>
 <html lang="hy">
 <head>
-    <meta charset="UTF-8">
-    <title>ԱԲ Խաչբառի Ստեղծում</title>
-    <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f0f4f8;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            margin: 0;
-            padding: 20px;
-            box-sizing: border-box;
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ԱԲ Օգնական</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Armenian:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   ԱԲ Օգնական — ամբողջական ոճաթերթ
+   Փոփոխված՝ վարդագույնները փոխարինված են --grad գրադիենտով
+   (#B652E4 → #E65EB1), վերնագիրը՝ սև
+   ============================================================ */
 
-        .ai-container {
-            background: white;
-            padding: 40px;
-            border-radius: 15px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-            text-align: center;
-            max-width: 420px;
-            width: 100%;
-        }
-
-        h2 { color: #3498db; margin-bottom: 20px; }
-        p { color: #7f8c8d; font-size: 0.9rem; margin-bottom: 25px; }
-
-        .input-group { margin-bottom: 20px; text-align: left; }
-
-        label { display: block; margin-bottom: 8px; font-weight: 600; }
-
-        input[type="text"],
-        input[type="number"],
-        select,
-        textarea {
-            width: 100%;
-            padding: 12px;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            box-sizing: border-box;
-            font-size: 1rem;
-            transition: border-color 0.3s;
-            background: white;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-
-        input[type="text"]:focus,
-        input[type="number"]:focus,
-        select:focus,
-        textarea:focus {
-            border-color: #3498db;
-            outline: none;
-        }
-
-        textarea {
-            resize: vertical;
-            min-height: 100px;
-            line-height: 1.5;
-        }
-
-        .hint {
-            font-size: 0.78rem;
-            color: #b0bec5;
-            margin-top: 6px;
-            font-weight: normal;
-        }
-
-        form button {
-            width: 100%;
-            background-color: #3498db;
-            color: white;
-            padding: 14px;
-            border: none;
-            border-radius: 8px;
-            font-size: 1.1rem;
-            font-weight: bold;
-            cursor: pointer;
-            transition: 0.3s;
-        }
-
-        button:hover { background-color: #2980b9; }
-
-        /* Toggle Switch */
-        .toggle-wrapper {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        .toggle-wrapper label { margin-bottom: 0; }
-
-        .switch {
-            position: relative;
-            display: inline-block;
-            width: 50px;
-            height: 26px;
-            flex-shrink: 0;
-        }
-
-        .switch input { display: none; }
-
-        .slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background-color: #ccc;
-            transition: .4s;
-            border-radius: 34px;
-        }
-
-        .slider:before {
-            position: absolute;
-            content: "";
-            height: 20px;
-            width: 20px;
-            left: 3px;
-            bottom: 3px;
-            background-color: white;
-            transition: .4s;
-            border-radius: 50%;
-        }
-
-        input:checked + .slider { background-color: #3498db; }
-        input:checked + .slider:before { transform: translateX(24px); }
-
-        #keywordInput { display: none; }
-
-        .auto-label {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 0.85rem;
-            color: #95a5a6;
-            font-weight: normal;
-            cursor: pointer;
-            margin-bottom: 0;
-        }
-
-        .auto-label input[type="checkbox"] {
-            width: auto;
-            cursor: pointer;
-        }
-
-        input[type="text"]:disabled {
-            background: #f5f5f5;
-            color: #aaa;
-            cursor: not-allowed;
-        }
-
-        /* Loading Overlay */
-        #loader {
-            display: none;
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(255,255,255,0.9);
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-        }
-
-        .spinner {
-            border: 5px solid #f3f3f3;
-            border-top: 5px solid #3498db;
-            border-radius: 50%;
-            width: 50px;
-            height: 50px;
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        #guideBtn {
-    position: fixed;
-    top: 15px;
-    left: 15px;
-
-    background: linear-gradient(135deg, #8e44ad, #6c3483);
-    color: white;
-
-    padding: 8px 12px;
-    border-radius: 8px;
-
-    font-size: 13px;
-    font-weight: 600;
-
-    cursor: pointer;
-    z-index: 1000;
-
-    writing-mode: horizontal-tb;
-    transform: none;
-
-    box-shadow: 0 4px 10px rgba(0,0,0,0.15);
-}
-        /* Overlay background */
-.guide-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0,0,0,0.5);
-
-    display: none;
-    justify-content: center;
-    align-items: center;
-    z-index: 999;
+*{ box-sizing:border-box; margin:0; padding:0; }
+body{ font-family:'Noto Sans Armenian', sans-serif; background:#f5f4f9; min-height:100vh; color:#2A140C; }
+.sidebar, .app-topbar, .topbar-dropdown {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
-/* Active state */
-.guide-overlay.active {
-    display: flex;
+
+:root{
+    --sidebar-width:280px;
+    --sidebar-collapsed-width:64px;
+    --topbar-height:60px;
+    --footer-height:90px;
+    --icon-size:44px;
+    --pp-purple:#4a3fb5;
+
+    --purple:#9B59B6;--purple-dark:#8E44AD;--purple-deeper:#6C3483;
+    --purple-light:#F5EEF8;--purple-border:#D7BDE2;
+
+    --accent:#E04AAB;--accent-soft:#ECC2F3;
+    --field-border:#E8D8EA;--banner-bg:#FCEAF7;--banner-border:#E4B6F1;
+
+    /* ★ ՆՈՐ — ընդհանուր գրադիենտ */
+    --grad: linear-gradient(90deg,#B652E4 0%,#E65EB1 100%);
+    --grad-start:#B652E4;
+    --grad-end:#E65EB1;
+    --grad-shadow:0 4px 4px rgba(0,0,0,0.25);
 }
 
-/* Guide box */
-.guide-box {
-    background: white;
-    width: 320px;
-    max-width: 90%;
-    border-radius: 12px;
-    padding: 20px;
-    text-align: left;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+/* ===================================================== */
+/* ===========  ՄԱՍՆԱԳԻՏԱԿԱՆ ՏՎՅԱԼՆԵՐԻ ԲԱԺԻՆ  ========= */
+/* ===================================================== */
+.creator-data-section{
+    margin:0 0 22px; padding:20px 22px;
+    border:1px solid var(--banner-border); border-radius:22px;
+    background:var(--banner-bg);
+}
+.cd-header{
+    display:flex; align-items:center; justify-content:space-between;
+    gap:12px; cursor:pointer; user-select:none;
+}
+.cd-selectall{ display:flex; align-items:center; cursor:pointer; flex-shrink:0; }
+.cd-selectall-circle{
+    width:22px; height:22px; border-radius:50%;
+    border:1.5px solid #CFCFCF; background:#fff;
+    display:inline-flex; align-items:center; justify-content:center;
+    transition:background .18s, border-color .18s;
+}
+.cd-selectall-circle svg{ width:13px; height:13px; color:#fff; opacity:0; transition:opacity .15s; }
+
+/* ★ ՓՈՓՈԽՎԱԾ — գրադիենտ */
+.cd-selectall-circle.checked{ background:var(--grad); border-color:transparent; }
+.cd-selectall-circle.checked svg{ opacity:1; }
+
+.cd-head-left{ display:flex; align-items:center; gap:10px; flex:1; }
+.cd-icon{ display:inline-flex; color:var(--grad-start); }
+.cd-icon svg{ width:24px; height:24px; }
+.cd-title{ font-weight:700; font-size:17px; color:#2A140C; }
+.cd-star{ width:15px; height:15px; color:var(--grad-start); flex-shrink:0; }
+.cd-chevron{
+    width:22px; height:22px; color:var(--grad-start); flex-shrink:0;
+    transition:transform .25s ease;
+}
+.creator-data-section.collapsed .cd-chevron{ transform:rotate(180deg); }
+
+.cd-body{ margin-top:16px; }
+.creator-data-section.collapsed .cd-body{ display:none; }
+
+.cd-desc{
+    background:#fff; border:1px solid var(--banner-border); border-radius:18px;
+    padding:14px 18px; margin:0 0 16px;
+    font-size:14px; color:#8e3aad; line-height:1.5;
 }
 
-/* Purple title */
-.guide-box h3 {
-    color: #8e44ad;
-    margin-bottom: 15px;
+.cd-grid{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+
+.cd-option{
+    display:flex; align-items:center; gap:12px; background:#fff;
+    border:1px solid var(--field-border); border-radius:18px; padding:16px 18px;
+    cursor:pointer; font-weight:500; color:#2A140C; margin:0;
+    transition:border-color .18s, box-shadow .18s;
+}
+.cd-option:hover{ border-color:var(--accent-soft); box-shadow:0 4px 14px rgba(176,82,228,.10); }
+.cd-option input{ display:none; }
+
+.cd-checkbox{
+    width:18px; height:18px; min-width:18px; border-radius:6px;
+    border:1.5px solid #CFCFCF; background:#fff;
+    display:inline-flex; align-items:center; justify-content:center;
+    transition:background .18s, border-color .18s;
+}
+.cd-checkbox svg{ width:12px; height:12px; color:#fff; opacity:0; transition:opacity .15s; }
+
+/* ★ ՓՈՓՈԽՎԱԾ — գրադիենտ պտիչկա */
+.cd-option input:checked + .cd-checkbox{ background:var(--grad); border-color:transparent; }
+.cd-option input:checked + .cd-checkbox svg{ opacity:1; }
+.cd-option input:checked ~ .cd-label{ color:var(--grad-start); font-weight:600; }
+
+@media (max-width:640px){ .cd-grid{ grid-template-columns:1fr; } }
+
+/* Մասնագիտական տվյալներ — մութ ռեժիմ */
+body.dark .creator-data-section{ background:#241a2b; border-color:#4a2d57; }
+body.dark .cd-title{ color:#e7e5ee; }
+body.dark .cd-desc{ background:#1c1925; border-color:#4a2d57; color:#cba6e0; }
+body.dark .cd-option{ background:#211d2b; border-color:#3a3147; color:#e7e5ee; }
+body.dark .cd-checkbox{ background:#211d2b; border-color:#5a5266; }
+body.dark .cd-selectall-circle{ background:#211d2b; border-color:#5a5266; }
+body.dark .cd-option input:checked + .cd-checkbox{ background:var(--grad); border-color:transparent; }
+/* ===========  ՄԱՍՆԱԳԻՏԱԿԱՆ ՏՎՅԱԼՆԵՐԻ ԲԱԺԻՆ  ========= */
+.creator-data-section{
+    margin:0 0 22px; padding:0;
+    border:none; border-radius:22px;
+    background:transparent;
+}
+.cd-header{
+    display:flex; align-items:center; justify-content:space-between;
+    gap:12px; cursor:pointer; user-select:none;
+    background: var(--banner-bg);
+    border: 1px solid var(--banner-border);
+    border-radius: 22px;
+    padding: 20px 24px;
+}
+.creator-data-section:not(.collapsed) .cd-header{ border-radius: 22px 22px 0 0; border-bottom: none; }
+.cd-head-left{ display:flex; align-items:center; gap:12px; }
+.cd-head-right{ display:flex; align-items:center; gap:14px; flex-shrink:0; }
+.cd-checkbox-box{
+    width:20px; height:20px; min-width:20px; border-radius:6px;
+    border:1.5px solid #CFCFCF; background:#fff;
+    display:inline-flex; align-items:center; justify-content:center;
+    transition:background .18s, border-color .18s;
+    cursor:pointer;
+}
+.cd-checkbox-box svg{ width:13px; height:13px; color:#fff; opacity:0; transition:opacity .15s; }
+.cd-icon{ display:inline-flex; color:var(--accent); flex-shrink:0; }
+.cd-icon svg{ width:22px; height:22px; }
+.cd-title{ font-weight:700; font-size:16px; color:#2A140C; display:flex; align-items:center; gap:6px; }
+.cd-star{ color:#E04AAB; font-size:16px; line-height:1; }
+.cd-chevron{
+    width:20px; height:20px; color:var(--accent); flex-shrink:0;
+    transition:transform .25s ease;
+}
+.creator-data-section.collapsed .cd-chevron{ transform:rotate(0deg); }
+.creator-data-section:not(.collapsed) .cd-chevron{ transform:rotate(180deg); }
+
+.cd-body{
+    margin-top:0; padding: 18px 24px 22px;
+    background: var(--banner-bg);
+    border: 1px solid var(--banner-border); border-top: none;
+    border-radius: 0 0 22px 22px;
+}
+.creator-data-section.collapsed .cd-body{ display:none; }
+
+.cd-desc{
+    background:#fff; border:1px solid var(--banner-border); border-radius:18px;
+    padding:14px 18px; margin:0 0 16px;
+    font-size:14px; color:#2A140C; line-height:1.5;
 }
 
-/* Close button */
-.close-guide {
-    margin-top: 15px;
-    width: 100%;
-    background: #8e44ad;
-    color: white;
-    border: none;
-    padding: 10px;
-    border-radius: 8px;
-    cursor: pointer;
+.cd-grid{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+
+.cd-option{
+    display:flex; align-items:center; gap:12px; background:#fff;
+    border:1px solid var(--field-border); border-radius:18px; padding:16px 18px;
+    cursor:pointer; font-weight:500; color:#2A140C; margin:0;
+    transition:border-color .18s, box-shadow .18s;
 }
-.close-guide:hover {
-    background: #6c3483;
+.cd-option:hover{ border-color:var(--accent-soft); box-shadow:0 4px 14px rgba(176,82,228,.10); }
+.cd-option input{ display:none; }
+
+.cd-checkbox{
+    width:18px; height:18px; min-width:18px; border-radius:6px;
+    border:1.5px solid #CFCFCF; background:#fff;
+    display:inline-flex; align-items:center; justify-content:center;
+    transition:background .18s, border-color .18s;
 }
-    </style>
+.cd-checkbox svg{ width:12px; height:12px; color:#fff; opacity:0; transition:opacity .15s; }
+.cd-option input:checked + .cd-checkbox{ background:var(--accent); border-color:var(--accent); }
+.cd-option input:checked + .cd-checkbox svg{ opacity:1; }
+.cd-option input:checked ~ .cd-label{ color:#2A140C; font-weight:600; }
+
+@media (max-width:640px){ .cd-grid{ grid-template-columns:1fr; } }
+
+/* Մասնագիտական տվյալներ — մութ ռեժիմ */
+body.dark .cd-header{ background:#241a2b; border-color:#4a2d57; }
+body.dark .cd-body{ background:#241a2b; border-color:#4a2d57; }
+body.dark .cd-title{ color:#e7e5ee; }
+body.dark .cd-icon{ color:#d9a8ea; }
+body.dark .cd-checkbox-box{ background:#211d2b; border-color:#5a5266; }
+body.dark .cd-desc{ background:#1c1925; border-color:#4a2d57; color:#e7e5ee; }
+body.dark .cd-option{ background:#211d2b; border-color:#3a3147; color:#e7e5ee; }
+body.dark .cd-checkbox{ background:#211d2b; border-color:#5a5266; }
+body.dark .cd-option input:checked ~ .cd-label{ color:#e7e5ee; }
+
+/* ===================================================== */
+/* ===============  ՁԱԽ SIDEBAR  ====================== */
+/* ===================================================== */
+.sidebar{
+    position:fixed; top:0; left:0; bottom:0;
+    width:var(--sidebar-width);
+    background:#fff; border-right:1px solid #e4e1f0;
+    display:flex; flex-direction:column; z-index:200;
+    transition:width .25s ease; overflow:hidden;
+}
+.sidebar-header{
+    height:var(--topbar-height);
+    display:flex; align-items:center; justify-content:space-between;
+    padding:0 1rem; border-bottom:1px solid #e4e1f0; flex-shrink:0;
+}
+.sidebar-logo img{ height:30px; object-fit:contain; display:block; }
+.sidebar-collapse-btn{
+    width:28px; height:28px; display:flex; align-items:center; justify-content:center;
+    border-radius:7px; border:none; background:transparent; color:#9b9bb5; cursor:pointer;
+    flex-shrink:0; transition:background .15s, color .15s;
+}
+.sidebar-collapse-btn:hover{ background:#f0eef8; color:var(--pp-purple); }
+.sidebar-collapse-btn svg{ width:15px; height:15px; }
+
+.sidebar-nav{ flex:1; padding:.75rem .625rem; overflow-y:auto; overflow-x:hidden; }
+.sidebar-nav::-webkit-scrollbar{ display:none; }
+.sidebar-divider{ height:1px; background:#f0eef8; margin:8px 4px; }
+
+.sidebar-link{
+    display:flex; align-items:center; gap:8px; padding:7px 8px; border-radius:10px;
+    text-decoration:none; color:#6b6b8a; font-size:13px; font-weight:500; margin-bottom:2px;
+    transition:background .15s, color .15s; white-space:nowrap; overflow:hidden; cursor:pointer;
+}
+.sidebar-link:hover{ background:#f0eef8; color:var(--pp-purple); text-decoration:none; }
+.sidebar-link.active{ color:var(--pp-purple); font-weight:600; }
+.sidebar-link.active:not(.sidebar-sub){ background:#f0eef8; }
+.sidebar-sub{ padding-left:44px; font-size:12.5px; }
+
+.sidebar-icon{
+    width:30px; height:30px; display:flex; align-items:center; justify-content:center;
+    flex-shrink:0; border-radius:8px; transition:background .15s;
+}
+.sidebar-icon svg{ width:15px; height:15px; }
+.sidebar-link.active .sidebar-icon{ background:var(--pp-purple); color:#fff; }
+.sidebar-link.active .sidebar-icon svg{ stroke:#fff; }
+.sidebar-link.active .sidebar-icon svg path{ stroke:currentColor; }
+
+.sidebar-label{ overflow:hidden; text-overflow:ellipsis; flex:1; transition:opacity .2s; }
+
+.sidebar-group{ margin-bottom:2px; }
+.sidebar-group-btn{
+    display:flex; align-items:center; gap:8px; width:100%; padding:7px 8px; border-radius:10px;
+    border:none; background:transparent; color:#6b6b8a; font-size:13px; font-weight:500; cursor:pointer;
+    font-family:inherit; text-align:left; transition:background .15s, color .15s; white-space:nowrap; overflow:hidden;
+}
+.sidebar-group-btn:hover{ background:#f0eef8; color:var(--pp-purple); }
+.sidebar-group-btn.active{ background:#f0eef8; color:var(--pp-purple); font-weight:600; }
+.sidebar-group-btn.active .sidebar-icon{ background:var(--pp-purple); color:#fff; }
+.sidebar-group-btn.active .sidebar-icon svg{ stroke:#fff; }
+.sidebar-group-btn.active .sidebar-chevron{ color:var(--pp-purple); }
+.sidebar-chevron{ width:12px; height:12px; flex-shrink:0; margin-left:auto; transition:transform .2s; }
+.sidebar-group.open .sidebar-chevron{ transform:rotate(180deg); }
+.sidebar-group-items{ overflow:hidden; max-height:0; transition:max-height .15s ease; }
+.sidebar-group-items.open{ max-height:130px; }
+
+/* ===================================================== */
+/* ===============  ՎԵՐԻՆ TOPBAR  ===================== */
+/* ===================================================== */
+.app-topbar{
+    position:fixed; top:0; left:var(--sidebar-width); right:0; height:var(--topbar-height);
+    background:#fff; border-bottom:1px solid #e4e1f0;
+    display:flex; align-items:center; justify-content:flex-end;
+    padding:0 1.5rem; z-index:100; transition:left .25s ease;
+}
+.app-topbar-right{ display:flex; align-items:center; gap:10px; }
+
+.app-icon-btn,
+.dark-mode-btn{
+    width:36px; height:36px; display:flex; align-items:center; justify-content:center;
+    border-radius:50%; background:#f5f4f9; border:none; color:#6b6b8a; cursor:pointer;
+    transition:background .15s, color .15s; flex-shrink:0; text-decoration:none;
+}
+.app-icon-btn:hover,
+.dark-mode-btn:hover{ background:#f0eef8; color:var(--pp-purple); }
+.app-icon-btn svg,
+.dark-mode-btn svg{ width:18px; height:18px; }
+
+.topbar-dropdown-wrap{ position:relative; }
+.topbar-language-btn{
+    display:flex; align-items:center; gap:5px; height:36px; padding:0 10px; border-radius:8px;
+    background:#f5f4f9; border:none; color:#6b6b8a; cursor:pointer;
+    transition:background .15s, color .15s; flex-shrink:0;
+}
+.topbar-language-btn:hover{ background:#f0eef8; color:var(--pp-purple); }
+.topbar-language-btn svg{ width:17px; height:17px; }
+.current-lang{ font-size:12px; font-weight:700; letter-spacing:.04em; font-family:inherit; }
+
+.topbar-avatar{
+    width:36px; height:36px; border-radius:50%; background:#e8e4f8; color:var(--pp-purple);
+    font-size:13px; font-weight:700; display:flex; align-items:center; justify-content:center;
+    text-decoration:none; overflow:hidden; border:2px solid #d8d4ed; transition:border-color .15s;
+    flex-shrink:0; cursor:pointer; font-family:inherit;
+}
+.topbar-avatar:hover{ border-color:var(--pp-purple); }
+.topbar-avatar img{ width:100%; height:100%; object-fit:cover; }
+
+.topbar-dropdown{
+    position:absolute; top:calc(100% + 10px); right:0; background:#fff;
+    border:1px solid #e4e1f0; border-radius:14px; box-shadow:0 8px 32px rgba(0,0,0,.12);
+    z-index:10000; min-width:240px; overflow:hidden; animation:dropdownIn .15s ease;
+}
+@keyframes dropdownIn{ from{opacity:0; transform:translateY(-6px);} to{opacity:1; transform:translateY(0);} }
+.language-dropdown{ min-width:160px; padding:6px; }
+.language-options{ display:flex; flex-direction:column; gap:2px; }
+.language-option{
+    display:flex; align-items:center; gap:10px; padding:9px 10px; border-radius:8px; font-size:13px;
+    color:#1a1a2e; background:none; border:none; width:100%; text-align:left; cursor:pointer;
+    font-family:inherit; transition:background .15s; margin:0;
+}
+.language-option:hover{ background:#f5f4f9; }
+.language-option.active{ color:var(--pp-purple); font-weight:600; background:#f0eef8; }
+
+.avatar-dropdown-header{ padding:1rem 1rem .75rem; border-bottom:1px solid #f0eef8; }
+.avatar-dropdown-name{ font-size:14px; font-weight:700; color:#1a1a2e; margin-bottom:2px; text-transform:uppercase; }
+.avatar-dropdown-email{ font-size:12px; color:#9b9bb5; }
+.avatar-dropdown-links{ padding:.4rem 0; }
+.avatar-dropdown-link{
+    display:flex; align-items:center; gap:10px; padding:9px 1rem; font-size:13px; color:#1a1a2e;
+    text-decoration:none; transition:background .15s; cursor:pointer; border:none; background:none;
+    width:100%; font-family:inherit; text-align:left; margin:0;
+}
+.avatar-dropdown-link:hover{ background:#f5f4f9; color:#1a1a2e; text-decoration:none; }
+.avatar-dropdown-link svg{ width:16px; height:16px; flex-shrink:0; color:#6b6b8a; }
+.avatar-dropdown-link.danger{ color:#ef4444; }
+.avatar-dropdown-link.danger:hover{ background:#fff5f5; }
+.avatar-dropdown-link.danger svg{ color:#ef4444; }
+.avatar-dropdown-divider{ height:1px; background:#f0eef8; margin:2px 0; }
+
+/* Google Translate թաքցում */
+.goog-te-banner-frame,.goog-te-gadget,.skiptranslate iframe{ display:none !important; }
+body{ top:0 !important; }
+#goog-gt-tt, .goog-te-balloon-frame{ display:none !important; }
+font font{ background:none !important; box-shadow:none !important; }
+
+/* ===================================================== */
+/* ===============  ՀԻՄՆԱԿԱՆ ՄԱՍ  ====================== */
+/* ===================================================== */
+.app-main{
+    margin-left:var(--sidebar-width); margin-top:var(--topbar-height);
+    padding:1.5rem; min-height:calc(100vh - var(--topbar-height) - var(--footer-height));
+    box-sizing:border-box; width:calc(100% - var(--sidebar-width));
+    transition:margin-left .25s ease, width .25s ease;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+}
+
+/* ===========  FOOTER  =========== */
+.app-footer{
+    margin-left: var(--sidebar-width);
+    padding: 10px 40px;
+    border-top: 1px solid #e4e1f0;
+    background: #fff;
+    display: flex; justify-content: center; align-items: center;
+    gap: 60px; flex-wrap: wrap;
+    transition: margin-left .25s ease;
+}
+.footer-col{ display: flex; flex-direction: column; gap: 2px; text-align: left; align-items: flex-start; }
+.footer-col.right{ text-align: left; align-items: flex-start; }
+.app-footer p{ font-size: 12px; line-height: 1.4; color: #6b6b8a; margin: 0; }
+body.dark .app-footer{ background: #16162a; border-color: #2a2a45; }
+body.dark .app-footer p{ color: #9b9bb5; }
+
+/* ===================================================== */
+/* ===============  ՍԵՂՄՎԱԾ ՎԻՃԱԿ  ==================== */
+/* ===================================================== */
+body.sidebar-collapsed .sidebar{ width:var(--sidebar-collapsed-width); }
+body.sidebar-collapsed .app-topbar{ left:var(--sidebar-collapsed-width); }
+body.sidebar-collapsed .app-main{ margin-left:var(--sidebar-collapsed-width); width:calc(100% - var(--sidebar-collapsed-width)); }
+body.sidebar-collapsed .app-footer{ margin-left:var(--sidebar-collapsed-width); }
+body.sidebar-collapsed .sidebar-label,
+body.sidebar-collapsed .sidebar-chevron{ opacity:0; width:0; overflow:hidden; }
+body.sidebar-collapsed .sidebar-group-items{ max-height:0 !important; }
+body.sidebar-collapsed .sidebar-header{ justify-content:center; padding:0; }
+body.sidebar-collapsed .sidebar-logo{ display:none; }
+body.sidebar-collapsed .sidebar-nav{ padding:.5rem 0; display:flex; flex-direction:column; align-items:center; gap:2px; }
+body.sidebar-collapsed .sidebar-link,
+body.sidebar-collapsed .sidebar-group-btn{
+    width:var(--icon-size); height:var(--icon-size); min-width:var(--icon-size);
+    padding:0 8px; margin:0; justify-content:center; align-items:center; gap:0; border-radius:10px; overflow:visible;
+}
+body.sidebar-collapsed .sidebar-icon{ margin:0; }
+body.sidebar-collapsed .sidebar-divider{ width:36px; }
+
+/* ===================================================== */
+/* ===============  FLYOUT (սեղմված ենթամենյու)  ====== */
+/* ===================================================== */
+.sidebar-flyout{ display:none; }
+body.sidebar-collapsed .sidebar-flyout-wrap .sidebar-flyout.open{
+    display:flex; flex-direction:column; position:fixed; left:var(--sidebar-collapsed-width);
+    background:#fff; border:1px solid #e4e1f0; border-radius:12px; box-shadow:0 8px 24px rgba(0,0,0,.10);
+    padding:6px; z-index:9999; min-width:190px; gap:2px; margin-top:-8px;
+}
+.sidebar-flyout-title{
+    font-size:11px; font-weight:600; color:#9b9bb5; text-transform:uppercase; letter-spacing:.05em; padding:6px 10px 4px;
+}
+.qcount-warning{
+    display:none;
+    margin-top:8px;
+    padding:10px 14px;
+    background:var(--banner-bg);
+    border:1px solid var(--banner-border);
+    border-radius:12px;
+    font-size:13px;
+    color:#c0392b;
+    line-height:1.4;
+}
+.qcount-warning.show{ display:block; }
+input[type=number].invalid{
+    border-color:#e57373;
+    box-shadow:0 0 0 3px rgba(224,74,171,0.10);
+}
+body.dark .qcount-warning{ background:#2a1a1a; border-color:#5a2d2d; color:#f3a3a3; }
+.sidebar-flyout-link{
+    padding:8px 12px; border-radius:8px; font-size:13px; color:#6b6b8a; text-decoration:none;
+    transition:background .15s, color .15s; font-weight:500;
+}
+.sidebar-flyout-link:hover{ background:#f0eef8; color:var(--pp-purple); text-decoration:none; }
+.sidebar-flyout-link.active{ color:var(--pp-purple); font-weight:600; }
+
+/* ===================================================== */
+/* ===============  ADAPTIVE (≤768px)  =============== */
+/* ===================================================== */
+@media (max-width:768px){
+    .sidebar{ width:var(--sidebar-collapsed-width); }
+    .app-topbar{ left:var(--sidebar-collapsed-width); }
+    .app-main{ margin-left:var(--sidebar-collapsed-width); width:calc(100% - var(--sidebar-collapsed-width)); padding:1rem; }
+    .app-footer{ margin-left:var(--sidebar-collapsed-width); }
+    .sidebar-label,
+    .sidebar-chevron{ opacity:0; width:0; overflow:hidden; }
+    .sidebar-logo{ display:none; }
+    .sidebar-group-items{ max-height:0 !important; }
+    .sidebar-header{ justify-content:center; padding:0; }
+    .sidebar-nav{ padding:.5rem 0; display:flex; flex-direction:column; align-items:center; gap:2px; }
+    .sidebar-link, .sidebar-group-btn{
+        width:var(--icon-size); height:var(--icon-size); min-width:var(--icon-size);
+        padding:0 8px; margin:0; justify-content:center; align-items:center; gap:0; border-radius:10px; overflow:visible;
+    }
+    .sidebar-flyout-wrap .sidebar-flyout.open{
+        display:flex; flex-direction:column; position:fixed; left:var(--sidebar-collapsed-width);
+        background:#fff; border:1px solid #e4e1f0; border-radius:12px; box-shadow:0 8px 24px rgba(0,0,0,.10);
+        padding:6px; z-index:9999; min-width:190px; gap:2px;
+    }
+}
+
+/* ===================================================== */
+/* ===============  ՄՈՒԹ ՌԵԺԻՄ (մենյուներ)  ========== */
+/* ===================================================== */
+body.dark .sidebar{ background:#16162a; border-color:#2a2a45; }
+body.dark .sidebar-header{ border-color:#2a2a45; }
+body.dark .sidebar-divider{ background:#2a2a45; }
+body.dark .sidebar-link{ color:#9b9bb5; }
+body.dark .sidebar-link:hover{ background:#2a2a45; color:#c4b8f0; }
+body.dark .sidebar-link.active{ color:#a78bfa; }
+body.dark .sidebar-link.active:not(.sidebar-sub){ background:#2a2a45; }
+body.dark .sidebar-link.active .sidebar-icon{ background:var(--pp-purple); }
+body.dark .sidebar-group-btn{ color:#9b9bb5; }
+body.dark .sidebar-group-btn:hover{ background:#2a2a45; color:#c4b8f0; }
+body.dark .sidebar-group-btn.active{ background:#2a2a45; color:#a78bfa; }
+body.dark .sidebar-collapse-btn{ color:#9b9bb5; }
+body.dark .sidebar-collapse-btn:hover{ background:#2a2a45; color:#c4b8f0; }
+body.dark .app-topbar{ background:#16162a; border-color:#2a2a45; }
+body.dark .app-icon-btn,
+body.dark .dark-mode-btn{ background:#2a2a45; color:#a78bfa; }
+body.dark .app-icon-btn:hover,
+body.dark .dark-mode-btn:hover{ background:#3a3a55; }
+body.dark .topbar-language-btn{ background:#2a2a45; color:#9b9bb5; }
+body.dark .topbar-language-btn:hover{ background:#3a3a55; color:#c4b8f0; }
+body.dark .topbar-avatar{ background:#2a2a45; border-color:var(--pp-purple); }
+body.dark .topbar-dropdown{ background:#16162a; border-color:#2a2a45; box-shadow:0 8px 32px rgba(0,0,0,.4); }
+body.dark .avatar-dropdown-header{ border-color:#2a2a45; }
+body.dark .avatar-dropdown-name{ color:#e2e2f0; }
+body.dark .avatar-dropdown-email{ color:#6b6b8a; }
+body.dark .avatar-dropdown-link{ color:#e2e2f0; }
+body.dark .avatar-dropdown-link:hover{ background:#2a2a45; color:#e2e2f0; }
+body.dark .avatar-dropdown-link svg{ color:#9b9bb5; }
+body.dark .avatar-dropdown-link.danger{ color:#f87171; }
+body.dark .avatar-dropdown-link.danger:hover{ background:#2a1a1a; }
+body.dark .avatar-dropdown-divider{ background:#2a2a45; }
+body.dark .language-option{ color:#e2e2f0; }
+body.dark .language-option:hover{ background:#2a2a45; }
+body.dark .language-option.active{ color:#a78bfa; background:#2a2a45; }
+body.dark .sidebar-flyout-wrap .sidebar-flyout.open{ background:#16162a; border-color:#2a2a45; box-shadow:0 8px 24px rgba(0,0,0,.4); }
+body.dark .sidebar-flyout-title{ color:#6b6b8a; }
+body.dark .sidebar-flyout-link{ color:#9b9bb5; }
+body.dark .sidebar-flyout-link:hover{ background:#2a2a45; color:#c4b8f0; }
+body.dark .sidebar-flyout-link.active{ color:#a78bfa; }
+
+/* ===================================================== */
+/* ===============  ՖՈՐՄ CARD (ԱԲ օգնական)  ========= */
+/* ===================================================== */
+.card{ background:#FCFCFB; border-radius:16px; box-shadow:7px 9px 47.8px rgba(0,0,0,0.18);
+    padding:40px 44px; width:100%; max-width:720px; }
+
+/* ★ ՓՈՓՈԽՎԱԾ — վերնագիրը սև */
+h2{ color:#000; font-size:20px; font-weight:700; margin-bottom:6px; text-align:center; }
+
+.subtitle{ color:#7f8c8d; font-size:13px; text-align:center; margin-bottom:24px; }
+.group{ margin-bottom:18px; }
+label.field-label{ display:block; font-size:14px; font-weight:600; color:#2c3e50; margin-bottom:8px; }
+
+.radio-option{
+    display:flex; align-items:center; gap:16px; width:100%;
+    padding:15px 22px; border-radius:999px;
+    border:1.5px solid var(--field-border); margin-bottom:12px;
+    cursor:pointer; background:#fff;
+    font-size:18px; font-weight:500; color:#000;   /* ← փոխված */
+    transition:border-color .2s, box-shadow .2s, background .2s;
+}
+.radio-option:hover{ border-color:var(--accent-soft); }
+.radio-option.selected{
+    border-color:var(--accent);
+    background:#fff;
+    color:#000;   /* ← փոխված */
+    box-shadow:0 0 0 3px rgba(224,74,171,0.12);
+}
+
+.radio-dot{
+    width:26px; height:26px; border-radius:50%;
+    border:1.5px solid var(--field-border); background:#fff;
+    display:flex; align-items:center; justify-content:center;
+    flex-shrink:0; transition:border-color .2s, background .2s;
+}
+.radio-option:hover .radio-dot{ border-color:var(--accent-soft); }
+.radio-option.selected .radio-dot{ border-color:var(--accent); background:#fff; }
+.radio-dot-inner{
+    width:14px; height:14px; border-radius:50%;
+    background:var(--grad); display:none;
+}
+.radio-option.selected .radio-dot-inner{ display:block; }
+.radio-option input[type=radio]{ display:none; }
+
+input[type=text],input[type=number],textarea{
+    width:100%; padding:12px 16px;
+    border:1.5px solid var(--field-border); border-radius:16px;
+    font-size:14px; color:#2A140C; background:#fff;
+    transition:border-color .2s, box-shadow .2s; outline:none;
+    font-family:'Noto Sans Armenian',sans-serif;
+}
+input[type=text]:hover,input[type=number]:hover,textarea:hover{ border-color:var(--accent-soft); }
+input[type=text]:focus,input[type=number]:focus,textarea:focus{
+    border-color:var(--accent);
+    box-shadow:0 0 0 3px rgba(224,74,171,0.12);
+}
+textarea{ resize:vertical; min-height:90px; line-height:1.5; }
+input[type=text]:disabled{ background:#f5f5f5; color:#aaa; cursor:not-allowed; border-color:#e8e8e8; }
+input[type=text]:disabled:hover{ border-color:#e8e8e8; }
+.hint{ font-size:12px; color:#b0bec5; margin-top:5px; }
+
+/* ===============  ՍՈՂՆԱԿ (switch)  =============== */
+.toggle-row{ display:flex; align-items:center; justify-content:space-between; }
+.switch{ position:relative; display:inline-block; width:44px; height:24px; flex-shrink:0; }
+.switch input{ display:none; }
+.slider{ position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background:var(--field-border); transition:.3s; border-radius:34px; }
+.slider:before{ position:absolute; content:""; height:18px; width:18px; left:3px; bottom:3px; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.25); transition:.3s; border-radius:50%; }
+
+/* ★ ՓՈՓՈԽՎԱԾ — գրադիենտ սողնակ */
+input:checked+.slider{ background:var(--grad); box-shadow:var(--grad-shadow); }
+input:checked+.slider:before{ transform:translateX(20px); background:#fff; }
+
+.keyword-block{ margin-bottom:18px; display:none; }
+.kw-toprow{ display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+.auto-label{ display:flex; align-items:center; gap:5px; font-size:12px; color:#95a5a6; cursor:pointer; }
+
+/* ★ ՓՈՓՈԽՎԱԾ — «Ավտոմատ» գրադիենտ չեքբոքս */
+.auto-label input[type=checkbox]{
+    -webkit-appearance:none; appearance:none;
+    width:16px; height:16px; margin:0;
+    border:1.5px solid #CFCFCF; border-radius:5px;
+    background:#fff; cursor:pointer; position:relative;
+    transition:background .18s, border-color .18s;
+    flex-shrink:0;
+}
+.auto-label input[type=checkbox]:checked{ background:var(--grad); border-color:transparent; }
+.auto-label input[type=checkbox]:checked::after{
+    content:""; position:absolute;
+    left:4.5px; top:1px; width:4px; height:8px;
+    border:solid #fff; border-width:0 2px 2px 0;
+    transform:rotate(45deg);
+}
+
+.creator-box{ border:1px solid var(--purple-border); border-radius:16px; padding:14px; background:var(--purple-light); }
+.creator-title{ display:flex; align-items:center; gap:7px; font-weight:600; color:var(--purple-deeper); font-size:14px; cursor:pointer; }
+.creator-title input[type=checkbox]{ width:auto; margin:0; accent-color:var(--grad-start); }
+.creator-hint{ font-size:12px; color:#b0bec5; margin:6px 0 0; }
+.creator-fields{ margin-top:12px; display:none; flex-direction:column; gap:6px; }
+.creator-fields label{ display:flex; align-items:center; gap:7px; font-size:13px; color:#34495e; cursor:pointer; }
+.creator-fields input[type=checkbox]{ width:auto; margin:0; accent-color:var(--grad-start); }
+
+/* ===============  ԿՈՃԱԿ  =============== */
+.btn-row{ display:flex; justify-content:flex-end; margin-top:6px; }
+
+/* ★ ՓՈՓՈԽՎԱԾ — գրադիենտ կոճակ */
+.btn{ width:auto; background:var(--grad); color:#fff; padding:11px 28px; border:none; border-radius:19.5px;
+    font-size:14px; font-weight:700; cursor:pointer; box-shadow:var(--grad-shadow);
+    transition:filter .2s, transform .12s; font-family:'Noto Sans Armenian',sans-serif; }
+.btn:hover{ filter:brightness(1.05); }
+.btn:active{ transform:scale(0.98); }
+
+.back-link{ display:block; text-align:center; margin-top:14px; font-size:13px; color:#7f8c8d; text-decoration:none; }
+.back-link:hover{ color:var(--grad-start); }
+
+#loader{ display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.92);
+    flex-direction:column; justify-content:center; align-items:center; z-index:1000; }
+.spinner{ border:5px solid #f3f3f3; border-top:5px solid var(--grad-start); border-radius:50%; width:50px; height:50px; animation:spin 1s linear infinite; }
+@keyframes spin{ 0%{transform:rotate(0deg)}100%{transform:rotate(360deg)} }
+
+.modal{ display:none; position:fixed; z-index:1000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,.55); }
+.modal-content{ background:#fff; margin:6% auto; padding:30px 36px; border-radius:12px; max-width:640px; position:relative; max-height:80vh; overflow-y:auto; font-family:'Noto Sans Armenian',sans-serif; }
+.modal-content h2{ font-size:1.4rem; margin-bottom:16px; color:#3b1f7a; }
+.modal-content h3{ font-size:1.1rem; color:#3b1f7a; margin:20px 0 8px; }
+.modal-content ol,.modal-content ul{ padding-left:20px; }
+.modal-content li{ margin-bottom:6px; font-size:.95rem; line-height:1.6; color:#333; }
+.modal-content p{ font-size:.95rem; line-height:1.6; color:#444; margin-bottom:8px; }
+.modal-close{ position:absolute; top:14px; right:18px; width:34px; height:34px; display:flex; align-items:center; justify-content:center;
+    font-size:20px; cursor:pointer; color:#aaa; border-radius:50%; transition:.3s; background:none; border:none; }
+.modal-close:hover{ color:#e74c3c; background:#ffeaea; border:2px solid #e74c3c; transform:rotate(90deg); }
+
+/* ===== ՖՈՐՄ — մութ ռեժիմ ===== */
+body.dark{ background-color:#15131c; color:#e7e5ee; }
+body.dark .card{ background:#1c1925; box-shadow:7px 9px 48px rgba(0,0,0,.5); }
+
+/* ★ ՓՈՓՈԽՎԱԾ — մութ ռեժիմում սևը չի երևա */
+body.dark h2{ color:#e7e5ee; }
+
+body.dark .radio-option{ background:#211d2b; border-color:#3a3147; color:#e7e5ee; }
+body.dark .radio-option:hover{ border-color:var(--accent-soft); }
+body.dark .radio-option.selected{ background:#211d2b; border-color:var(--accent); color:#e7e5ee; }
+body.dark .radio-dot{ background:#211d2b; border-color:#3a3147; }
+body.dark .radio-option:hover .radio-dot{ border-color:var(--accent-soft); }
+body.dark .radio-option.selected .radio-dot{ background:#211d2b; border-color:var(--accent); }
+body.dark input[type=text],body.dark input[type=number],body.dark textarea{ background:#211d2b; border-color:#3a3147; color:#e7e5ee; }
+body.dark input[type=text]:hover,body.dark input[type=number]:hover,body.dark textarea:hover{ border-color:var(--accent-soft); }
+body.dark input[type=text]:focus,body.dark input[type=number]:focus,body.dark textarea:focus{ border-color:var(--accent); }
+body.dark input[type=text]:disabled{ background:#1a1722; color:#5a5266; border-color:#2a2535; }
+body.dark input[type=text]:disabled:hover{ border-color:#2a2535; }
+body.dark .creator-box{ background:#211d2b; border-color:#4a3560; }
+body.dark .creator-fields label{ color:#c9c5d6; }
+body.dark label.field-label{ color:#c9c5d6; }
+body.dark .creator-title{ color:#c9a6f0; }
+body.dark .auto-label input[type=checkbox]{ background:#211d2b; border-color:#5a5266; }
+body.dark .auto-label input[type=checkbox]:checked{ background:var(--grad); border-color:transparent; }
+body.dark .slider{ background:#3a3147; }
+body.dark input:checked+.slider{ background:var(--grad); }
+body.dark .modal-content{ background:#1c1925; color:#e7e5ee; }
+body.dark .modal-content h2,body.dark .modal-content h3{ color:#b99cff; }
+body.dark .modal-content li,body.dark .modal-content p{ color:#cfccd9; }
+
+@media (max-width:760px){
+    .app-main{ padding:1.5rem 12px 40px; }
+    .card{ max-width:100%; }
+
+    .app-footer { flex-direction: column; padding: 16px 20px; gap: 8px; }
+    .footer-col.right { text-align: left; align-items: flex-start; }
+    .app-footer p { font-size: 12px; }
+}
+</style>
 </head>
 <body>
-<button id="guideBtn" onclick="openGuide()">📘 Օգտագործման ուղեցույց</button>
-<div class="guide-overlay" id="guideModal">
-    <div class="guide-box">
-        <h3>📘 Օգտագործման ուղեցույց</h3>
 
-        <div class="guide-content">
-            <p><strong>1.</strong> Ընտրեք ԱԲ համակարգը (Claude կամ ԴՇՀ)</p>
-            <p><strong>2.</strong> Մուտքագրեք խաչբառի թեման</p>
-            <p><strong>3.</strong> (Ընտրովի) գրեք մանրամասն նկարագրություն</p>
-            <p><strong>4.</strong> Ընտրեք՝ ուզում եք բանալի բառ, թե ոչ</p>
-            <p><strong>5.</strong> Եթե միացրել եք բանալի բառը՝</p>
-            <p> • ընտրեք ավտոմատ կամ գրեք ձեռքով</p>
-            <p><strong>6.</strong> Եթե բանալի բառ չկա՝ նշեք հարցերի քանակը</p>
-            <p><strong>7.</strong> (Ընտրովի) գրեք հեղինակի անունը</p>
-            <p><strong>8.</strong> Սեղմեք «Ստեղծել Խաչբառ»</p>
-
-            <hr>
-            <p style="color:#7f8c8d;">💡 Խորհուրդ՝ ավելի մանրամասն թեման տալիս է ավելի լավ արդյունք</p>
+    <!-- ===== ՁԱԽ SIDEBAR ===== -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <a class="sidebar-logo" href="https://mainlogin.dshh.am:15107/Tools" target="_blank">
+                <img src="{{ url_for('static', filename='dshh.png') }}" alt="ԴՇՀ">
+            </a>
+            <button class="sidebar-collapse-btn" type="button" onclick="toggleSidebar()" title="Բացել / փակել մենյուն">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+            </button>
         </div>
 
-        <button class="close-guide" onclick="closeGuide()">Փակել</button>
-    </div>
-</div>
-<div id="loader">
-    <div class="spinner"></div>
-    <h3 style="margin-top: 20px; color: #2c3e50;">ԱԲ-ն գեներացնում է ձեր խաչբառը...</h3>
-    <p>Սա կարող է տևել մի քանի վայրկյան:</p>
-</div>
+        <nav class="sidebar-nav">
 
-<div class="ai-container">
-    <h2>ԱԲ Գեներատոր ✨</h2>
-<form action="/generate_ai_crossword" method="POST" onsubmit="showLoader()">
-
-    <div class="input-group">
-        <label>Ընտրեք ԱԲ համակարգը</label>
-
-        <label>
-            <input type="radio" name="ai_model" value="claude" required>
-            Claude ԱԲ
-        </label>
-
-        <label>
-            <input type="radio" name="ai_model" value="dshh">
-            ԴՇՀ ԱԲ
-        </label>
-    </div>
-        <div class="input-group">
-            <label>Խաչբառի թեման</label>
-            <input type="text" name="topic" placeholder="Օրինակ՝ Հայ մեծանուն գրողներ" required>
-        </div>
-
-        <!-- Մանրամասն նկարագրություն -->
-        <div class="input-group">
-            <label>Մանրամասն նկարագրություն</label>
-            <textarea name="description" placeholder="Օրինակ՝ 8-րդ դասարանի հայոց լեզվի դաս, միջին բարդության, վերաբերում է բառակազմությանը, կենտրոնացած գոյականների վրա..."></textarea>
-            <p class="hint">Որքան մանրամասն գրեք, այնքան ճշգրիտ կլինի խաչբառը։</p>
-        </div>
-
-        <!-- Toggle -->
-        <div class="input-group">
-            <div class="toggle-wrapper">
-                <label>Բանալի բառ օգտագործել</label>
-                <label class="switch">
-                    <input type="checkbox" name="keyword_mode" value="with" onchange="toggleKeywordInput(this)">
-                    <span class="slider"></span>
-                </label>
+            <!-- Կրթական գործիքներ -->
+            <div class="sidebar-group sidebar-flyout-wrap open" id="group-tools-wrap">
+                <button type="button" class="sidebar-group-btn active" onclick="toggleGroup('tools')">
+                    <span class="sidebar-icon">
+                    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M6.29852 0.899902H1.79926C1.30229 0.899902 0.899414 1.30278 0.899414 1.79975V8.09871C0.899414 8.59568 1.30229 8.99856 1.79926 8.99856H6.29852C6.79549 8.99856 7.19837 8.59568 7.19837 8.09871V1.79975C7.19837 1.30278 6.79549 0.899902 6.29852 0.899902Z" stroke="currentColor" stroke-width="1.7997" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M16.196 0.899902H11.6967C11.1998 0.899902 10.7969 1.30278 10.7969 1.79975V4.4993C10.7969 4.99628 11.1998 5.39915 11.6967 5.39915H16.196C16.693 5.39915 17.0958 4.99628 17.0958 4.4993V1.79975C17.0958 1.30278 16.693 0.899902 16.196 0.899902Z" stroke="currentColor" stroke-width="1.7997" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M16.196 8.99854H11.6967C11.1998 8.99854 10.7969 9.40141 10.7969 9.89839V16.1973C10.7969 16.6943 11.1998 17.0972 11.6967 17.0972H16.196C16.693 17.0972 17.0958 16.6943 17.0958 16.1973V9.89839C17.0958 9.40141 16.693 8.99854 16.196 8.99854Z" stroke="currentColor" stroke-width="1.7997" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M6.29852 12.5977H1.79926C1.30229 12.5977 0.899414 13.0005 0.899414 13.4975V16.1971C0.899414 16.694 1.30229 17.0969 1.79926 17.0969H6.29852C6.79549 17.0969 7.19837 16.694 7.19837 16.1971V13.4975C7.19837 13.0005 6.79549 12.5977 6.29852 12.5977Z" stroke="currentColor" stroke-width="1.7997" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </span>
+                    <span class="sidebar-label">Կրթական գործիքներ</span>
+                    <svg class="sidebar-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+                <div class="sidebar-flyout">
+                    <div class="sidebar-flyout-title">Կրթական գործիքներ</div>
+                    <a href="https://gatewayapi.dshh.am:15106/ibook/" class="sidebar-flyout-link">Թղթապանակ</a>
+                    <a href="{{ url_for('choose_keyword_mode') }}" class="sidebar-flyout-link active">Խաչբառ</a>
+                    <a href="https://gatewayapi.dshh.am:15106/ibook/digital-book" class="sidebar-flyout-link">Նյութերի թվայնացում</a>
+                    <a href="https://gatewayapi.dshh.am:15106/pairmatch" class="sidebar-flyout-link">Գտիր զույգը</a>
+                    <a href="https://gatewayapi.dshh.am:15106/learn/" class="sidebar-link sidebar-sub" ><span class="sidebar-label">ՀարցԱԲան</span></a>
+                </div>
+                <div class="sidebar-group-items open" id="group-tools">
+                    <a href="https://gatewayapi.dshh.am:15106/ibook/" class="sidebar-link sidebar-sub"><span class="sidebar-label">Թղթապանակ</span></a>
+                    <a href="{{ url_for('choose_keyword_mode') }}" class="sidebar-link sidebar-sub active"><span class="sidebar-label">Խաչբառ</span></a>
+                    <a href="https://gatewayapi.dshh.am:15106/ibook/digital-book" class="sidebar-link sidebar-sub"><span class="sidebar-label">Նյութերի թվայնացում</span></a>
+                    <a href="https://gatewayapi.dshh.am:15106/pairmatch" class="sidebar-link sidebar-sub"><span class="sidebar-label">Գտիր զույգը</span></a>
+                    <a href="https://gatewayapi.dshh.am:15106/learn/" class="sidebar-link sidebar-sub" ><span class="sidebar-label">ՀարցԱԲան</span></a>
+                </div>
             </div>
-        </div>
 
-        <!-- Keyword Input -->
-        <div class="input-group" id="keywordInput">
-            <div class="toggle-wrapper" style="margin-bottom: 8px;">
-                <label>Բանալի բառ</label>
-                <label class="auto-label">
-                    <input type="checkbox" id="autoKeyword" checked onchange="toggleAutoKeyword(this)">
-                    Ավտոմատ
-                </label>
+            <!-- Իմ ստեղծած նյութերը -->
+            <div class="sidebar-group sidebar-flyout-wrap" id="group-mine-wrap">
+                <button type="button" class="sidebar-group-btn" onclick="toggleGroup('mine')">
+                    <span class="sidebar-icon">
+                    <svg width="20" height="18" viewBox="0 0 20 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M4.49882 10.7983L5.84859 8.18878C5.99533 7.89735 6.21854 7.6513 6.49433 7.47695C6.77013 7.3026 7.08813 7.2065 7.41433 7.19894H17.0967M17.0967 7.19894C17.3717 7.19846 17.643 7.26097 17.8901 7.38169C18.1371 7.5024 18.3531 7.6781 18.5217 7.89531C18.6903 8.11251 18.8068 8.36545 18.8624 8.6347C18.918 8.90395 18.9112 9.18237 18.8424 9.44857L17.4567 14.8477C17.3564 15.236 17.1293 15.5797 16.8114 15.8243C16.4935 16.0688 16.103 16.2002 15.702 16.1974H2.69911C2.2218 16.1974 1.76404 16.0078 1.42653 15.6703C1.08902 15.3328 0.899414 14.8751 0.899414 14.3977V2.69969C0.899414 2.22238 1.08902 1.76462 1.42653 1.42711C1.76404 1.0896 2.2218 0.899989 2.69911 0.899989H6.20853C6.50952 0.897038 6.80644 0.969627 7.07212 1.11111C7.33779 1.2526 7.56374 1.45846 7.72928 1.70985L8.45816 2.78967C8.62203 3.03851 8.84512 3.24277 9.1074 3.38412C9.36968 3.52547 9.66296 3.59949 9.96091 3.59954H15.297C15.7743 3.59954 16.2321 3.78915 16.5696 4.12666C16.9071 4.46417 17.0967 4.92193 17.0967 5.39924V7.19894Z" stroke="currentColor" stroke-width="1.7997" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </span>
+                    <span class="sidebar-label">Իմ ստեղծած նյութերը</span>
+                    <svg class="sidebar-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+                <div class="sidebar-flyout">
+                    <div class="sidebar-flyout-title">Իմ ստեղծած նյութերը</div>
+                    <a href="https://gatewayapi.dshh.am:15106/ibook/" class="sidebar-flyout-link">Թղթապանակներ</a>
+                    <a href="https://mainlogin.dshh.am:15107/Materials/Crosswords" class="sidebar-flyout-link">Խաչբառներ</a>
+                    <a href="https://mainlogin.dshh.am:15107/Materials/Digitized" class="sidebar-flyout-link">Թվայնացված նյութեր</a>
+                    <a href="https://mainlogin.dshh.am:15107/Materials/PairsGame" class="sidebar-flyout-link">«Գտիր զույգը» խաղեր</a>
+                </div>
+                <div class="sidebar-group-items" id="group-mine">
+                    <a href="https://gatewayapi.dshh.am:15106/ibook/" class="sidebar-link sidebar-sub"><span class="sidebar-label">Թղթապանակներ</span></a>
+                    <a href="https://mainlogin.dshh.am:15107/Materials/Crosswords" class="sidebar-link sidebar-sub"><span class="sidebar-label">Խաչբառներ</span></a>
+                    <a href="https://mainlogin.dshh.am:15107/Materials/Digitized" class="sidebar-link sidebar-sub"><span class="sidebar-label">Թվայնացված նյութեր</span></a>
+                    <a href="https://mainlogin.dshh.am:15107/Materials/PairsGame" class="sidebar-link sidebar-sub"><span class="sidebar-label">«Գտիր զույգը» խաղեր</span></a>
+                </div>
             </div>
-            <input type="text" name="keyword" id="keywordField"
-                   placeholder="Մուտքագրեք բանալի բառ" disabled>
+
+            <div class="sidebar-divider"></div>
+
+            <a href="https://mainlogin.dshh.am:15107/Profiles/UserStatistics" class="sidebar-link">
+                <span class="sidebar-icon">
+                    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M.9.9V15.3c0 .48.19.93.53 1.27.34.34.79.53 1.27.53H17.1"/>
+                        <path d="M14.4 13.5V6.3"/><path d="M9.9 13.5V2.7"/><path d="M5.4 13.5V10.8"/>
+                    </svg>
+                </span>
+                <span class="sidebar-label">Վիճակագրություն</span>
+            </a>
+            <a class="sidebar-link" href="https://mainlogin.dshh.am:15107/Settings" title="Կարգավորումներ">
+                <span class="sidebar-icon">
+                <svg width="19" height="20" viewBox="0 0 19 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M9.21185 0.899902H8.81592C8.33861 0.899902 7.88085 1.08951 7.54334 1.42702C7.20583 1.76453 7.01622 2.22229 7.01622 2.6996V2.86158C7.0159 3.17718 6.93258 3.48714 6.77464 3.76038C6.6167 4.03362 6.38969 4.26052 6.11637 4.41832L5.72943 4.64328C5.45584 4.80124 5.1455 4.88439 4.82958 4.88439C4.51367 4.88439 4.20332 4.80124 3.92973 4.64328L3.79475 4.57129C3.38178 4.33307 2.89116 4.26844 2.43058 4.3916C1.97001 4.51476 1.57712 4.81563 1.33816 5.22818L1.1402 5.57013C0.901972 5.9831 0.837346 6.47372 0.960503 6.9343C1.08366 7.39487 1.38454 7.78776 1.79709 8.02672L1.93206 8.1167C2.20407 8.27374 2.43024 8.49922 2.5881 8.77074C2.74596 9.04227 2.83002 9.35037 2.83191 9.66445V10.1234C2.83317 10.4405 2.75061 10.7523 2.59259 11.0273C2.43457 11.3022 2.20671 11.5305 1.93206 11.6891L1.79709 11.7701C1.38454 12.0091 1.08366 12.4019 0.960503 12.8625C0.837346 13.3231 0.901972 13.8137 1.1402 14.2267L1.33816 14.5686C1.57712 14.9812 1.97001 15.2821 2.43058 15.4052C2.89116 15.5284 3.38178 15.4637 3.79475 15.2255L3.92973 15.1535C4.20332 14.9956 4.51367 14.9124 4.82958 14.9124C5.1455 14.9124 5.45584 14.9956 5.72943 15.1535L6.11637 15.3785C6.38969 15.5363 6.6167 15.7632 6.77464 16.0364C6.93258 16.3097 7.0159 16.6196 7.01622 16.9352V17.0972C7.01622 17.5745 7.20583 18.0323 7.54334 18.3698C7.88085 18.7073 8.33861 18.8969 8.81592 18.8969H9.21185C9.68917 18.8969 10.1469 18.7073 10.4844 18.3698C10.8219 18.0323 11.0116 17.5745 11.0116 17.0972V16.9352C11.0119 16.6196 11.0952 16.3097 11.2531 16.0364C11.4111 15.7632 11.6381 15.5363 11.9114 15.3785L12.2983 15.1535C12.5719 14.9956 12.8823 14.9124 13.1982 14.9124C13.5141 14.9124 13.8245 14.9956 14.098 15.1535L14.233 15.2255C14.646 15.4637 15.1366 15.5284 15.5972 15.4052C16.0578 15.2821 16.4507 14.9812 16.6896 14.5686L16.8876 14.2177C17.1258 13.8047 17.1904 13.3141 17.0673 12.8535C16.9441 12.3929 16.6432 12.0001 16.2307 11.7611L16.0957 11.6891C15.8211 11.5305 15.5932 11.3022 15.4352 11.0273C15.2772 10.7523 15.1946 10.4405 15.1959 10.1234V9.67344C15.1946 9.35632 15.2772 9.04449 15.4352 8.76954C15.5932 8.49458 15.8211 8.26627 16.0957 8.1077L16.2307 8.02672C16.6432 7.78776 16.9441 7.39487 17.0673 6.9343C17.1904 6.47372 17.1258 5.9831 16.8876 5.57013L16.6896 5.22818C16.4507 4.81563 16.0578 4.51476 15.5972 4.3916C15.1366 4.26844 14.646 4.33307 14.233 4.57129L14.098 4.64328C13.8245 4.80124 13.5141 4.88439 13.1982 4.88439C12.8823 4.88439 12.5719 4.80124 12.2983 4.64328L11.9114 4.41832C11.6381 4.26052 11.4111 4.03362 11.2531 3.76038C11.0952 3.48714 11.0119 3.17718 11.0116 2.86158V2.6996C11.0116 2.22229 10.8219 1.76453 10.4844 1.42702C10.1469 1.08951 9.68917 0.899902 9.21185 0.899902Z" stroke="currentColor" stroke-width="1.7997" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M9.014 12.5983C10.5049 12.5983 11.7136 11.3897 11.7136 9.89877C11.7136 8.40785 10.5049 7.19922 9.014 7.19922C7.52308 7.19922 6.31445 8.40785 6.31445 9.89877C6.31445 11.3897 7.52308 12.5983 9.014 12.5983Z" stroke="currentColor" stroke-width="1.7997" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </span>
+                            <span class="sidebar-label">Կարգավորումներ</span>
+            </a>
+            <a class="sidebar-link" href="https://mainlogin.dshh.am:15107/Profiles/UserProfile" title="Անձնական էջ">
+                <span class="sidebar-icon">
+    <svg width="15" height="18" viewBox="0 0 15 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M13.4973 17.0964V15.2967C13.4973 14.342 13.1181 13.4265 12.4431 12.7515C11.7681 12.0765 10.8525 11.6973 9.89792 11.6973H4.49882C3.5442 11.6973 2.62867 12.0765 1.95365 12.7515C1.27864 13.4265 0.899414 14.342 0.899414 15.2967V17.0964" stroke="currentColor" stroke-width="1.7997" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M7.19901 8.09871C9.18691 8.09871 10.7984 6.4872 10.7984 4.4993C10.7984 2.51141 9.18691 0.899902 7.19901 0.899902C5.21112 0.899902 3.59961 2.51141 3.59961 4.4993C3.59961 6.4872 5.21112 8.09871 7.19901 8.09871Z" stroke="currentColor" stroke-width="1.7997" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+</span>
+                <span class="sidebar-label">Անձնական էջ</span>
+            </a>
+        </nav>
+    </aside>
+
+    <!-- ===== ՎԵՐԻՆ TOPBAR ===== -->
+    <header class="app-topbar">
+        <div class="app-topbar-right">
+
+            <!-- Ուղեցույց -->
+            <button class="app-icon-btn" type="button" onclick="openGuide()" title="Ուղեցույց">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+            </button>
+
+            <!-- Մութ / լուսավոր ռեժիմ -->
+            <button class="dark-mode-btn" id="darkModeBtn" type="button" onclick="toggleTheme()" title="Մութ / լուսավոր ռեժիմ" aria-label="Մութ / լուսավոր ռեժիմ"></button>
+
+            <!-- Լեզու -->
+            <div class="topbar-dropdown-wrap" id="langWrap" translate="no">
+                <button class="topbar-language-btn" id="languageBtn" type="button" onclick="toggleLangMenu()" title="Լեզու">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                    <span class="current-lang" id="langLabel">HY</span>
+                </button>
+                <div class="topbar-dropdown language-dropdown" id="languageDropdown" style="display:none;">
+                    <div class="language-options">
+                        <button type="button" class="language-option" onclick="setLang('hy')">🇦🇲 <span>Հայերեն</span></button>
+                        <button type="button" class="language-option" onclick="setLang('ru')">🇷🇺 <span>Русский</span></button>
+                        <button type="button" class="language-option" onclick="setLang('en')">🇬🇧 <span>English</span></button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Օգտատեր -->
+            <div class="topbar-dropdown-wrap" id="avatarWrap" translate="no">
+                <button class="topbar-avatar" id="avatarBtn" type="button" onclick="toggleUserMenu()" title="Անձնական մենյու">
+                    {% if (user or {}).get('profileImagePath') %}
+                        <img src="{{ user.profileImagePath }}" alt="avatar">
+                    {% else %}
+                        <span id="avatarInitials">{{ (user or {}).get('initials', 'ԳՀ') }}</span>
+                    {% endif %}
+                </button>
+                <div class="topbar-dropdown" id="avatarDropdown" style="display:none;">
+                    <div class="avatar-dropdown-header">
+                        <div class="avatar-dropdown-name" id="userName">{{ (user or {}).get('name', '') }}</div>
+                        <div class="avatar-dropdown-email" id="userMail">{{ (user or {}).get('email', '') }}</div>
+                    </div>
+                    <div class="avatar-dropdown-links">
+                        <a class="avatar-dropdown-link" href="https://mainlogin.dshh.am:15107/Profiles/UserProfile">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                            Անձնական Էջ
+                        </a>
+                        <a class="avatar-dropdown-link" href="https://mainlogin.dshh.am:15107/Settings">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                            Կարգավորումներ
+                        </a>
+                        <div class="avatar-dropdown-divider"></div>
+                        <a class="avatar-dropdown-link danger" href="https://mainlogin.dshh.am:15107/Login/Logout">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                            Դուրս գալ
+                        </a>
+                    </div>
+                </div>
+            </div>
+
         </div>
+    </header>
 
-        <!-- Հարցերի քանակ — թաքնվում է բանալի բառի ռեժիմում -->
-        <div class="input-group" id="questionCountGroup">
-            <label>Հարցերի քանակ (2–40)</label>
-            <input type="number" name="question_count" value="10" min="2" max="40">
+    <div id="google_translate_element" style="display:none;"></div>
+
+    <!-- ===== ՀԻՄՆԱԿԱՆ ՄԱՍ ===== -->
+    <main class="app-main">
+        <div class="card">
+            <h2>ԱԲ Օգնական</h2>
+            <p class="subtitle">Ստեղծեք խաչբառ արհեստական բանականության օգնությամբ</p>
+
+            <form action="{{ url_for('generate_ai_crossword') }}" method="POST" onsubmit="return handleSubmit(event)">
+
+                <!-- ═══════════ ՄԱՍՆԱԳԻՏԱԿԱՆ ՏՎՅԱԼՆԵՐ ═══════════ -->
+                {% if is_teacher %}
+                <div class="creator-data-section collapsed" id="creator-data-section">
+                    <div class="cd-header">
+                        <span class="cd-head-left" onclick="toggleCreatorData(event)" style="cursor:pointer;">
+                            <span class="cd-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                                    <rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+                                </svg>
+                            </span>
+                            <span class="cd-title">Ներառել իմ մասնագիտական տվյալները խաչբառում <span class="cd-star"></span></span>
+                        </span>
+                        <span class="cd-head-right">
+                            <span class="cd-checkbox-box" id="cd-master-checkbox" onclick="toggleAllCreatorFields(event)">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                            </span>
+                            <svg class="cd-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" onclick="toggleCreatorData(event)" style="cursor:pointer;"><polyline points="6 9 12 15 18 9"/></svg>
+                        </span>
+                    </div>
+
+
+                    <input type="checkbox" id="enable_creator_data" hidden>
+
+                    <div class="cd-body" id="creator_fields_box">
+                        <p class="cd-desc">Ձեր անձնական էջում լրացված մասնագիտական տվյալները տեսանելի կլինեն խաչբառը լուծողներին։</p>
+                        <div class="cd-grid">
+                            <label class="cd-option">
+                                <input type="checkbox" name="creator_fields" value="photo" onchange="syncMasterCheckbox()">
+                                <span class="cd-checkbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
+                                <span class="cd-label">Լուսանկար</span>
+                            </label>
+                            <label class="cd-option">
+                                <input type="checkbox" name="creator_fields" value="school" onchange="syncMasterCheckbox()">
+                                <span class="cd-checkbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
+                                <span class="cd-label">Ուսումնական հաստատություն</span>
+                            </label>
+                            <label class="cd-option">
+                                <input type="checkbox" name="creator_fields" value="subjects" onchange="syncMasterCheckbox()">
+                                <span class="cd-checkbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
+                                <span class="cd-label">Առարկաներ</span>
+                            </label>
+                            <label class="cd-option">
+                                <input type="checkbox" name="creator_fields" value="digitlevel" onchange="syncMasterCheckbox()">
+                                <span class="cd-checkbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
+                                <span class="cd-label">Տարակարգ</span>
+                            </label>
+                            <label class="cd-option">
+                                <input type="checkbox" name="creator_fields" value="voluntaryCertification" onchange="syncMasterCheckbox()">
+                                <span class="cd-checkbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
+                                <span class="cd-label">Կամավոր ատեստավորում</span>
+                            </label>
+                            <label class="cd-option">
+                                <input type="checkbox" name="creator_fields" value="professionalAchievements" onchange="syncMasterCheckbox()">
+                                <span class="cd-checkbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
+                                <span class="cd-label">Մասնագիտական նվաճումներ</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="group">
+                    <label class="field-label">Ընտրեք ԱԲ համակարգը</label>
+                    <label class="radio-option" id="opt-claude" onclick="selectRadio('claude')">
+                        <input type="radio" name="ai_model" value="claude" required>
+                        <div class="radio-dot"><div class="radio-dot-inner"></div></div>
+                        Claude ԱԲ
+                    </label>
+                    <label class="radio-option" id="opt-dshh" onclick="selectRadio('dshh')">
+                        <input type="radio" name="ai_model" value="dshh">
+                        <div class="radio-dot"><div class="radio-dot-inner"></div></div>
+                        ԴՇՀ ԱԲ
+                    </label>
+                </div>
+
+                <div class="group">
+                    <label class="field-label">Խաչբառի թեմա</label>
+                    <input type="text" name="topic" id="topicInput" placeholder="Օրինակ՝ Հայ մեծանուն գրողներ" oninput="checkTopic()">
+                    <p class="qcount-warning" id="topicWarning">Խնդրում ենք լրացնել խաչբառի թեման։</p>
+                </div>
+
+                <div class="group">
+                    <label class="field-label">Մանրամասն նկարագրություն</label>
+                    <textarea name="description" placeholder="Օրինակ՝ 8-րդ դասարանի հայոց լեզվի դաս, միջին բարդության..."></textarea>
+                    <p class="hint">Որքան մանրամասն գրեք, այնքան ճշգրիտ կլինի խաչբառը։</p>
+                </div>
+
+                <div class="group">
+                    <div class="toggle-row">
+                        <label class="field-label" style="margin:0">Բանալի բառ օգտագործել</label>
+                        <label class="switch">
+                            <input type="checkbox" name="keyword_mode" value="with" id="kwToggle" onchange="toggleKw(this)">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="keyword-block" id="keywordBlock">
+                    <div class="kw-toprow">
+                        <label class="field-label" style="margin:0">Բանալի բառ</label>
+                        <label class="auto-label">
+                            <input type="checkbox" id="autoKw" checked onchange="toggleAuto(this)">
+                            Ավտոմատ
+                        </label>
+                    </div>
+                    <input type="text" name="keyword" id="kwField" placeholder="Մուտքագրեք բանալի բառ" disabled>
+                </div>
+
+                <div class="group" id="qcountGroup">
+                    <label class="field-label">Հարցերի քանակ (2–40)</label>
+                    <input type="number" name="question_count" id="qcountInput" value="10" min="2" max="40" oninput="checkQcount()">
+                    <p class="qcount-warning" id="qcountWarning">Հարցերի քանակը պետք է լինի 2-ից 40-ի սահմաններում։</p>
+                </div>
+
+                <div class="btn-row">
+                    <button type="submit" class="btn">Ստեղծել</button>
+                </div>
+            </form>
+
         </div>
+    </main>
 
-        <div class="input-group">
-            <label>Հեղինակի անունը</label>
-            <input type="text" name="creator_name" placeholder="Ձեր անունը">
+    <!-- LOADER -->
+    <div id="loader">
+        <div class="spinner"></div>
+        <h3 style="margin-top:20px;color:#2c3e50;font-family:'Noto Sans Armenian',sans-serif">ԱԲ-ն ստեղծում է ձեր խաչբառը...</h3>
+        <p style="color:#7f8c8d;margin-top:8px;font-family:'Noto Sans Armenian',sans-serif">Սա կարող է տևել մի քանի վայրկյան։</p>
+    </div>
+
+    <!-- FOOTER — հեղինակային իրավունքները միշտ էջի տակ -->
+    <footer class="app-footer">
+        <div class="footer-col left">
+            <p>© 2026 ԴՇՀ: Բոլոր իրավունքները պաշտպանված են:</p>
+            <p>© Հեղինակ՝ Գևորգ Կարապետյան</p>
         </div>
+        <div class="footer-col right">
+            <p>© UI/UX ձևավորող՝ Էրիկ Մկրտչյան</p>
+            <p>© Մասնագիտական խորհրդատու՝ Հայաստան Գրիգորյան</p>
+        </div>
+    </footer>
 
-        <button type="submit">Ստեղծել Խաչբառ</button>
-    </form>
+    <!-- GUIDE MODAL -->
+    <div id="guideModal" class="modal" onclick="if(event.target===this)closeGuide()">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeGuide()">✕</button>
+            <h2>📘 Ուղեցույց</h2>
+            <ol>
+                <li>Ընտրե՛ք, թե Ձեր անձնական էջում լրացված որ մասնագիտական տվյալները կարող են տեսանելի լինել խաչբառը լրացնողներին։</li>
+                <li>Ընտրե՛ք ԱԲ օգնականի տեսակը։</li>
+                <li>Մուտքագրե՛ք խաչբառի թեման և «Մանրամասն նկարագրություն» դաշտում մանրամասն ներկայացրե՛ք խաչբառի բովանդակությունը։</li>
+                <li>Եթե ստեղծում եք առանց բանալի բառի խաչբառ, ընտրե՛ք խաչբառի հարցերի քանակը։</li>
+                <li>Եթե ցանկանում եք ստեղծել բանալի բառով խաչբառ, ընտրե՛ք «Օգտագործել բանալի բառ» տարբերակը։ Այդ դեպքում հարցերի քանակն ավտոմատ հավասարեցվում է բանալի բառի տառերի քանակին։</li>
+                <li>Մուտքագրե՛ք բանալի բառը կամ ընտրե՛ք «Ավտոմատ» տարբերակը՝ բանալի բառի ընտրությունը վստահելով ԱԲ օգնականին։</li>
+                <li>Աշխատանքն ավարտելու համար սեղմե՛ք «Ստեղծել» կոճակը։ Դուք կտեղափոխվեք խաչբառի խմբագրման էջ։</li>
+            </ol>
+            <p style="margin-top:12px;">Հիշե՛ք․ արհեստական բանականությունը կարող է սխալվել, ուստի անհրաժեշտ է ստուգել և խմբագրել նրա օգնությամբ ստեղծված բովանդակությունը։</p>
+        </div>
+    </div>
 
-    <a href="/choose_keyword_mode"
-       style="display: block; margin-top: 15px; color: #95a5a6; text-decoration: none; font-size: 0.8rem;">
-       ⬅️ Հետ դեպի ընտրություն
-    </a>
-</div>
+    <!-- ===== Google Translate ===== -->
+    <script type="text/javascript">
+        function googleTranslateElementInit(){ new google.translate.TranslateElement({ pageLanguage:'hy', includedLanguages:'hy,en,ru', autoDisplay:false }, 'google_translate_element'); }
+    </script>
+    <script src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
 
-<script>
-    function showLoader() {
-        document.getElementById('loader').style.display = 'flex';
-    }
-
-    function toggleKeywordInput(checkbox) {
-        const keywordInput = document.getElementById('keywordInput');
-        const questionCountGroup = document.getElementById('questionCountGroup');
-
-        if (checkbox.checked) {
-            keywordInput.style.display = "block";
-            questionCountGroup.style.display = "none";
-        } else {
-            keywordInput.style.display = "none";
-            questionCountGroup.style.display = "block";
-            document.getElementById('autoKeyword').checked = true;
-            toggleAutoKeyword(document.getElementById('autoKeyword'));
+    <!-- ===== ՄԵՆՅՈՒՆԵՐԻ JS ===== -->
+    <script>
+        function toggleSidebar(){
+            document.body.classList.toggle('sidebar-collapsed');
+            closeAllFlyouts();
         }
-    }
-
-    function toggleAutoKeyword(checkbox) {
-        const field = document.getElementById('keywordField');
-        if (checkbox.checked) {
-            field.disabled = true;
-            field.value = "";
-        } else {
-            field.disabled = false;
-            field.focus();
+        function isRail(){
+            return document.body.classList.contains('sidebar-collapsed') || window.innerWidth <= 768;
         }
-    }
-    function openGuide() {
-        document.getElementById("guide-modal").classList.add("active");
-    }
+        function toggleGroup(name){
+            const wrap = document.getElementById('group-' + name + '-wrap');
+            if (!wrap) return;
+            if (isRail()){
+                const fly = wrap.querySelector('.sidebar-flyout');
+                const isOpen = fly.classList.contains('open');
+                closeAllFlyouts();
+                if (!isOpen){
+                    const r = wrap.getBoundingClientRect();
+                    fly.style.top = r.top + 'px';
+                    fly.classList.add('open');
+                }
+            } else {
+                wrap.classList.toggle('open');
+                const items = wrap.querySelector('.sidebar-group-items');
+                if (items) items.classList.toggle('open');
+            }
+        }
+        function closeAllFlyouts(){
+            document.querySelectorAll('.sidebar-flyout.open').forEach(f => f.classList.remove('open'));
+        }
 
-    function closeGuide() {
-        document.getElementById("guide-modal").classList.remove("active");
-    }
+        const MOON_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+        const SUN_SVG  = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.2" y1="4.2" x2="5.6" y2="5.6"/><line x1="18.4" y1="18.4" x2="19.8" y2="19.8"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.2" y1="19.8" x2="5.6" y2="18.4"/><line x1="18.4" y1="5.6" x2="19.8" y2="4.2"/></svg>';
+        function applyTheme(theme){
+            document.body.classList.toggle('dark', theme === 'dark');
+            const btn = document.getElementById('darkModeBtn');
+            if (btn) btn.innerHTML = theme === 'dark' ? SUN_SVG : MOON_SVG;
+        }
+        function toggleTheme(){
+            const next = document.body.classList.contains('dark') ? 'light' : 'dark';
+            localStorage.setItem('theme', next);
+            applyTheme(next);
+        }
+        applyTheme(localStorage.getItem('theme') || 'light');
 
-    // փակել եթե սեղմում են դուրսը
-    document.getElementById('guide-modal').addEventListener('click', function(e) {
-        if (e.target === this) closeGuide();
-    });
-function openGuide() {
-    document.getElementById("guideModal").classList.add("active");
+        function toggleLangMenu(){
+            const m = document.getElementById('languageDropdown');
+            m.style.display = (m.style.display === 'block') ? 'none' : 'block';
+        }
+        function setLang(code){
+            document.getElementById('langLabel').textContent = code.toUpperCase();
+            document.getElementById('languageDropdown').style.display = 'none';
+            if (code === 'hy') { deleteGoogtrans(); } else { setCookie('googtrans', '/hy/' + code); }
+            location.reload();
+        }
+        function setCookie(name, value){
+            document.cookie = name + '=' + value + '; path=/;';
+            document.cookie = name + '=' + value + '; path=/; domain=.dshh.am;';
+        }
+        function deleteGoogtrans(){
+            const exp = '; expires=Thu, 01 Jan 1970 00:00:00 UTC';
+            document.cookie = 'googtrans=' + exp + '; path=/;';
+            document.cookie = 'googtrans=' + exp + '; path=/; domain=.dshh.am;';
+        }
+        (function initLangLabel(){
+            const m = document.cookie.match(/googtrans=\/[^/]+\/([^;]+)/);
+            const cur = m ? m[1] : 'hy';
+            const label = document.getElementById('langLabel');
+            if (label) label.textContent = cur.toUpperCase();
+        })();
+
+        function toggleUserMenu(){
+            const m = document.getElementById('avatarDropdown');
+            m.style.display = (m.style.display === 'block') ? 'none' : 'block';
+        }
+
+        function openGuide(){ document.getElementById('guideModal').style.display = 'block'; }
+        function closeGuide(){ document.getElementById('guideModal').style.display = 'none'; }
+
+        document.addEventListener('click', function(e){
+            if (!e.target.closest('.sidebar-flyout-wrap')) closeAllFlyouts();
+            if (!e.target.closest('#langWrap'))   document.getElementById('languageDropdown').style.display = 'none';
+            if (!e.target.closest('#avatarWrap')) document.getElementById('avatarDropdown').style.display = 'none';
+        });
+        document.addEventListener('keydown', function(e){
+            if (e.key === 'Escape'){
+                closeAllFlyouts();
+                document.getElementById('languageDropdown').style.display = 'none';
+                document.getElementById('avatarDropdown').style.display = 'none';
+                closeGuide();
+            }
+        });
+        window.addEventListener('click', function(e){
+            const modal = document.getElementById('guideModal');
+            if (e.target === modal) modal.style.display = 'none';
+        });
+        function checkQcount(){
+    const input   = document.getElementById('qcountInput');
+    const warning = document.getElementById('qcountWarning');
+    const val = parseInt(input.value, 10);
+    if (input.value !== '' && (val < 2 || val > 40)){
+        warning.classList.add('show');
+        input.classList.add('invalid');
+        return false;
+    }
+    warning.classList.remove('show');
+    input.classList.remove('invalid');
+    return true;
+}
+function checkTopic(){
+    const input   = document.getElementById('topicInput');
+    const warning = document.getElementById('topicWarning');
+    if (input.value.trim() === ''){
+        warning.classList.add('show');
+        input.classList.add('invalid');
+        return false;
+    }
+    warning.classList.remove('show');
+    input.classList.remove('invalid');
+    return true;
 }
 
-function closeGuide() {
-    document.getElementById("guideModal").classList.remove("active");
+        /* ===== ՖՈՐՄԻ JS ===== */
+        function selectRadio(val){
+            document.querySelectorAll('.radio-option').forEach(el=>el.classList.remove('selected'));
+            document.getElementById('opt-'+val).classList.add('selected');
+            document.querySelector('input[value="'+val+'"]').checked=true;
+        }
+        function toggleKw(cb){
+            document.getElementById('keywordBlock').style.display=cb.checked?'block':'none';
+            document.getElementById('qcountGroup').style.display=cb.checked?'none':'block';
+            if(!cb.checked){document.getElementById('autoKw').checked=true;toggleAuto(document.getElementById('autoKw'));}
+        }
+        function toggleAuto(cb){var f=document.getElementById('kwField');f.disabled=cb.checked;if(cb.checked)f.value='';else f.focus();}
+       function toggleCreatorData(e){
+            if (e) e.stopPropagation();
+            const sec = document.getElementById('creator-data-section');
+            if (!sec) return;
+            sec.classList.toggle('collapsed');
+        }
+        function toggleAllCreatorFields(e){
+            if (e) e.stopPropagation();
+            const sec = document.getElementById('creator-data-section');
+            const master = document.getElementById('cd-master-checkbox');
+            if (!sec || !master) return;
+            const checkboxes = document.querySelectorAll('input[name="creator_fields"]');
+            const anyChecked = Array.from(checkboxes).some(c => c.checked);
+            const newState = !anyChecked;
+            checkboxes.forEach(c => c.checked = newState);
+            master.style.background = newState ? 'var(--accent)' : '#fff';
+            master.style.borderColor = newState ? 'var(--accent)' : '#CFCFCF';
+            master.querySelector('svg').style.opacity = newState ? '1' : '0';
+            document.getElementById('enable_creator_data').checked = newState;
+            sec.classList.remove('collapsed');
+        }
+        function syncMasterCheckbox(){
+            const master = document.getElementById('cd-master-checkbox');
+            if (!master) return;
+            const checkboxes = document.querySelectorAll('input[name="creator_fields"]');
+            const anyChecked = Array.from(checkboxes).some(c => c.checked);
+            master.style.background = anyChecked ? 'var(--accent)' : '#fff';
+            master.style.borderColor = anyChecked ? 'var(--accent)' : '#CFCFCF';
+            master.querySelector('svg').style.opacity = anyChecked ? '1' : '0';
+            document.getElementById('enable_creator_data').checked = anyChecked;
+            const sec = document.getElementById('creator-data-section');
+            if (anyChecked) { sec.classList.remove('collapsed'); }
+        }
+        function handleSubmit(e){
+    let ok = true;
+
+    // Թеma-ի ստուgum
+    if (!checkTopic()) ok = false;
+
+    // Հар‌ceri qanaki ստուgum (miayn ete tesaneli e)
+    const qcountVisible = document.getElementById('qcountGroup').style.display !== 'none';
+    if (qcountVisible && !checkQcount()) ok = false;
+
+    if (!ok){
+        e.preventDefault();
+        // Fokus arajin sxal դashti vra
+        if (document.getElementById('topicInput').value.trim() === ''){
+            document.getElementById('topicInput').focus();
+        } else {
+            document.getElementById('qcountInput').focus();
+        }
+        return false;
+    }
+
+    document.getElementById('loader').style.display = 'flex';
+    return true;
 }
-
-document.getElementById("guideModal").addEventListener("click", function(e) {
-    if (e.target === this) closeGuide();
-});
-</script>
-
+    </script>
 </body>
 </html>
