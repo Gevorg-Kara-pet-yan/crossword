@@ -37,6 +37,10 @@ URL_PREFIX = os.getenv("URL_PREFIX", "")
 # Այստեղ միայն JSON API-ն է՝ /api/admin/*
 app.register_blueprint(admin_bp)
 
+# Import-ի պահին, ոչ թե __main__-ում. gunicorn/waitress-ի տակ __main__-ը
+# չի կատարվում, իսկ առանց այս աղյուսակների admin API-ն կփլուզվեր:
+ensure_admin_tables()
+
 
 async def aio_fetchone(db, sql, params=()):
     async with db.execute(sql, params) as cur:
@@ -2569,7 +2573,6 @@ if __name__ == '__main__':
     check_and_add_created_at_column()
     check_and_add_show_creator_data_column()
     check_and_add_is_draft_column()
-    ensure_admin_tables()
 
     if INTERNAL_API_KEY:
         print(

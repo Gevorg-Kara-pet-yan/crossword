@@ -1,7 +1,6 @@
 import os
 import aiosqlite
 import asyncio
-from werkzeug.security import generate_password_hash
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 db_path = os.path.join(BASE_DIR, 'crossword.db')
@@ -151,21 +150,9 @@ async def init_db():
             )
         ''')
 
-        # 6. Ադմինների աղյուսակ
-        await conn.execute('''
-            CREATE TABLE IF NOT EXISTS admins (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT UNIQUE NOT NULL,
-                password TEXT NOT NULL
-            )
-        ''')
-
-        # 7. Default ադմին
-        async with conn.execute("SELECT * FROM admins WHERE username = ?", ('admin',)) as cursor:
-            if not await cursor.fetchone():
-                hashed_pw = generate_password_hash('12345')
-                await conn.execute("INSERT INTO admins (username, password) VALUES (?, ?)", ('admin', hashed_pw))
-                print("Ադմին օգտատերը ստեղծվեց՝ username='admin', password='12345'")
+        # 6. Ադմինի աղյուսակ այլևս չի ստեղծվում:
+        # Ադմինի մուտքը սպասարկվում է AuthServer-ը (Pages/Admin/Crossword/*),
+        # իսկ իրավունքները ստուգվում են role-երով՝ admin_api.py-ում:
 
         # --- ԿԱՐԵՎՈՐ: Սյունակների թարմացում (Upgrade) ---
         # Եթե բազան արդեն կար, բայց առանց subject/grade սյունակների
