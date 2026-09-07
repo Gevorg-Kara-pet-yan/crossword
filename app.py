@@ -10,6 +10,7 @@ from functools import wraps
 
 import aiosqlite
 import requests
+from admin_api import admin_bp, ensure_admin_tables, get_settings, is_user_blocked
 from ai_provider import get_provider
 from auth_decorators import require_auth
 from dotenv import load_dotenv
@@ -17,7 +18,6 @@ from flask import Flask, render_template, request, redirect, url_for, session, f
 from flask import g
 from utils.crossword_builder import generate_crossword_grid
 from werkzeug.middleware.proxy_fix import ProxyFix
-from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 
 
@@ -32,6 +32,10 @@ load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "dev_fallback_key")
 URL_PREFIX = os.getenv("URL_PREFIX", "")
+
+# Ադմին պանելը սպասարկվում է AuthServer-ից (Pages/Admin/Crossword/*):
+# Այստեղ միայն JSON API-ն է՝ /api/admin/*
+app.register_blueprint(admin_bp)
 
 
 async def aio_fetchone(db, sql, params=()):
@@ -74,6 +78,35 @@ def user_has_role(*names):
         roles = [roles]
     roles = {str(r).strip().lower() for r in roles}
     return any(n.lower() in roles for n in names)
+
+
+def _deny(message, redirect_endpoint="my_crosswords"):
+    """403 JSON API-ի համար, flash + redirect՝ սովորական էջերի համար:"""
+    if request.is_json or request.accept_mimetypes.best == "application/json":
+        return jsonify(error=message), 403
+    flash(message)
+    return redirect(url_for(redirect_endpoint))
+
+
+def blocked_response(mode=None):
+    """Ստուգում է՝ արդյոք ընթացիկ օգտատերը կարող է խաչբառ ստեղծել/խմբագրել:
+
+    Հերթականությամբ ստուգվում է՝ անձնական արգելափակում, ստեղծելու գլոբալ
+    կողպեք, ապա տվյալ ռեժիմի (``ai`` կամ ``keyword``) կողպեքը:
+    Վերադարձնում է պատրաստի պատասխան, կամ None՝ եթե թույլատրված է:
+    """
+    cu = getattr(g, "current_user", None) or {}
+    if is_user_blocked(cu.get("sub")):
+        return _deny("Ձեր հաշիվը արգելափակված է ադմինիստրատորի կողմից:")
+
+    settings = get_settings()
+    if settings["creation_locked"]:
+        return _deny("Խաչբառ ստեղծելը ժամանակավորապես անջատված է:")
+    if mode == "ai" and settings["ai_creation_locked"]:
+        return _deny("AI-ով խաչբառ ստեղծելը ժամանակավորապես անջատված է:")
+    if mode == "keyword" and settings["keyword_creation_locked"]:
+        return _deny("Keyword ռեժիմով ստեղծելը ժամանակավորապես անջատված է:")
+    return None
 
 
 def require_api_key_or_user(*roles):
@@ -809,6 +842,10 @@ async def api_crossword_download_count(id):
 # ── ՆՈՐ: կիսվելը հաշվելու endpoint ────────────────────────────────────────────
 @app.route('/api/crosswords/<int:id>/share', methods=['POST'])
 async def api_crossword_share(id):
+    if get_settings()["sharing_locked"]:
+        return jsonify({"success": False,
+                        "error": "Կիսվելը ժամանակավորապես անջատված է:"}), 403
+
     try:
         async with aiosqlite.connect(DATABASE) as db:
             await db.execute("""
@@ -938,6 +975,10 @@ async def api_get_comments(id):
 
 @app.route('/api/crosswords/<int:id>/comments', methods=['POST'])
 async def api_add_comment(id):
+    if get_settings()["comments_locked"]:
+        return jsonify({"success": False,
+                        "error": "Մեկնաբանելը ժամանակավորապես անջատված է:"}), 403
+
     data = request.get_json(silent=True) or {}
     name = (data.get('name') or 'Անանուն').strip()[:60]
     text = (data.get('comment') or data.get('text') or '').strip()[:1000]
@@ -1161,6 +1202,10 @@ async def api_user_stats(user_id, period):
 @app.route('/generate_ai_crossword', methods=['POST'])
 @require_auth()
 async def generate_ai_crossword():
+    denied = blocked_response(mode="ai")
+    if denied:
+        return denied
+
     ai_model = request.form.get("ai_model", "claude")
     provider = get_provider(ai_model)
     topic = request.form.get('topic', 'Ընդհանուր')
@@ -1373,6 +1418,10 @@ async def ai_edit_crossword():
 @app.route('/ai_setup')
 @require_auth()
 async def ai_setup():
+    denied = blocked_response(mode="ai")
+    if denied:
+        return denied
+
     return render_template('ai_setup.html', is_teacher=user_has_role("teacher"))
 
 
@@ -1687,19 +1736,33 @@ async def save_result(id):
 async def choose_keyword_mode():
     if request.method == 'POST':
         use_keyword = request.form.get('use_keyword')
+        # Ռեժիմն արգելված լինելու դեպքում կանգնեցնում ենք դեռ ընտրության պահին
+        mode = {'yes': 'keyword', 'ai': 'ai'}.get(use_keyword)
+        denied = blocked_response(mode=mode)
+        if denied:
+            return denied
+
         if use_keyword == 'yes':
             return redirect(url_for('input_questions', mode='key'))
         elif use_keyword == 'no':
             return redirect(url_for('input_questions', use_keyword='no'))
         elif use_keyword == 'ai':
             return redirect(url_for('ai_setup'))
-    return render_template('choose_keyword_mode.html')
+
+    settings = get_settings()
+    return render_template('choose_keyword_mode.html',
+                           ai_locked=settings['ai_creation_locked'],
+                           keyword_locked=settings['keyword_creation_locked'])
 
 
 @app.route('/save_draft', methods=['POST'])
 @require_auth()
 async def save_draft():
     """Պահպանում է կիսատ խաչբառը որպես սևագիր՝ առանց խիստ վալիդացիայի։"""
+    denied = blocked_response()
+    if denied:
+        return denied
+
     draft_id = (request.form.get('draft_id', '') or '').strip()
     title = (request.form.get('title', '') or '').strip()
     keyword = (request.form.get('keyword', '') or '').strip().upper()
@@ -1802,6 +1865,15 @@ async def save_draft():
 @app.route('/input', methods=['GET', 'POST'])
 @require_auth()
 async def input_questions():
+    if request.method == 'POST':
+        # mode=key / use_keyword=yes նշանակում է keyword ռեժիմ
+        uses_keyword = (request.args.get('mode') == 'key'
+                        or request.args.get('use_keyword') == 'yes'
+                        or request.form.get('use_keyword') == 'yes')
+        denied = blocked_response(mode="keyword" if uses_keyword else None)
+        if denied:
+            return denied
+
     mode = request.args.get('mode', '')
     use_keyword = request.args.get('use_keyword', '')
 
@@ -1961,6 +2033,11 @@ async def input_questions():
 @app.route('/edit/<int:id>', methods=['GET', 'POST'])
 @require_auth()
 async def edit_crossword(id):
+    if request.method == 'POST':
+        denied = blocked_response()
+        if denied:
+            return denied
+
     user_id = g.current_user["sub"]
     cw = await asyncio.to_thread(db_operation_wrapper, fetch_crossword_by_id, id, user_id)
 
@@ -2265,6 +2342,14 @@ async def view_crossword(id):
     if cw.get('is_draft'):
         return redirect(url_for('edit_crossword', id=id))
 
+    # Թաքցվածը հասանելի է միայն սեփականատիրոջը (ադմինը դիտում է պանելից):
+    is_owner = current_user_id and str(cw.get('user_id')) == str(current_user_id)
+    if not is_owner:
+        if cw.get('hidden'):
+            return "Խաչբառը հասանելի չէ։", 404
+        if get_settings()["all_crosswords_hidden"]:
+            return "Խաչբառերը ժամանակավորապես հասանելի չեն։", 404
+
     crossword = json.loads(cw['data'])
     crossword.setdefault('global_hint', None)
 
@@ -2457,266 +2542,6 @@ def prepare_grid_data(crossword):
     return grid_data
 
 
-# =====================================================
-# 🔹 ADMIN ROUTES
-# =====================================================
-
-def get_db_connection():
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
-    return conn
-
-
-def admin_required(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        if not session.get('admin') or not session.get('admin_id'):
-            flash("Մուտք գործեք ադմին որպեսություն")
-            return redirect(url_for('admin_login'))
-        return f(*args, **kwargs)
-
-    return decorated
-
-
-@app.route('/admin/login', methods=['GET', 'POST'])
-def admin_login():
-    if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
-
-        conn = sqlite3.connect(DATABASE)
-        conn.row_factory = sqlite3.Row
-        admin = conn.execute("SELECT * FROM admins WHERE username=?", (username,)).fetchone()
-        conn.close()
-
-        if admin and check_password_hash(admin['password'], password):
-            session['admin'] = True
-            session['admin_id'] = admin['id']
-            session.modified = True
-            return redirect(url_for('admin_dashboard'))
-
-        flash("Սխալ մուտքանուն կամ գաղտնաբառ")
-    return render_template('admin/login.html')
-
-
-@app.route('/admin/logout')
-@admin_required
-def admin_logout():
-    session.pop('admin', None)
-    session.pop('admin_id', None)
-    flash("Դուրս եք եկել ադմին պանելից")
-    return redirect(url_for('admin_login'))
-
-
-@app.route('/admin/dashboard')
-@admin_required
-def admin_dashboard():
-    page = request.args.get('page', 1, type=int)
-    per_page = 5
-
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
-
-    total = conn.execute("SELECT COUNT(*) FROM crosswords").fetchone()[0]
-    total_pages = (total + per_page - 1) // per_page
-    offset = (page - 1) * per_page
-
-    crosswords = conn.execute("""
-        SELECT c.*, COUNT(p.id) AS participants
-        FROM crosswords c
-        LEFT JOIN participants p ON p.crossword_id = c.id
-        GROUP BY c.id
-        ORDER BY c.id DESC
-        LIMIT ? OFFSET ?
-    """, (per_page, offset)).fetchall()
-    conn.close()
-
-    return render_template('admin/dashboard.html',
-                           crosswords=crosswords, page=page, total_pages=total_pages)
-
-
-@app.route('/admin/crossword/results/<int:id>')
-@admin_required
-def admin_crossword_results(id):
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
-
-    results = conn.execute("""
-        SELECT p.name, p.surname, p.school, p.grade,
-               COALESCE(r.score, 0)       AS score,
-               COALESCE(r.total_words, 0) AS total_words,
-               COALESCE(r.duration, 0)    AS duration,
-               r.end_time
-        FROM results r
-        JOIN participants p ON p.id = r.participant_id
-        WHERE r.crossword_id = ?
-        ORDER BY score DESC, duration ASC
-    """, (id,)).fetchall()
-    conn.close()
-
-    return render_template('admin/results.html', results=results, crossword_id=id)
-
-
-@app.route('/admin/crossword/delete/<int:id>', methods=['POST'])
-@admin_required
-def admin_delete_crossword(id):
-    conn = sqlite3.connect(DATABASE)
-    conn.execute("DELETE FROM crosswords      WHERE id=?", (id,))
-    conn.execute("DELETE FROM participants    WHERE crossword_id=?", (id,))
-    conn.execute("DELETE FROM results         WHERE crossword_id=?", (id,))
-    conn.execute("DELETE FROM questions       WHERE crossword_id=?", (id,))
-    conn.execute("DELETE FROM crossword_stats WHERE crossword_id=?", (id,))
-    conn.execute("DELETE FROM comments        WHERE crossword_id=?", (id,))
-    conn.commit()
-    conn.close()
-    flash("Խաչբառը ջնջվեց")
-    return redirect(url_for('admin_dashboard'))
-
-
-@app.route('/admin/crossword/toggle/<int:id>', methods=['POST'])
-@admin_required
-def admin_toggle_crossword(id):
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
-    row = conn.execute("SELECT hidden FROM crosswords WHERE id=?", (id,)).fetchone()
-    current = row['hidden'] if row else 0
-    conn.execute("UPDATE crosswords SET hidden=? WHERE id=?", (0 if current else 1, id))
-    conn.commit()
-    conn.close()
-    flash("Խաչբառի տեսանելիությունը թարմացվեց")
-    return redirect(url_for('admin_dashboard'))
-
-
-@app.route("/admin/edit/<int:cw_id>", methods=["GET", "POST"])
-@admin_required
-def admin_edit_full_crossword(cw_id):
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
-
-    cw = conn.execute("SELECT * FROM crosswords WHERE id=?", (cw_id,)).fetchone()
-    if not cw:
-        conn.close()
-        flash("Խաչբառը գտնված չէ")
-        return redirect(url_for('admin_dashboard'))
-
-    cw_dict = dict(cw)
-    cw_data = json.loads(cw_dict.get('data', '{}'))
-    placed_questions = cw_data.get('placed', [])
-    questions = conn.execute("SELECT * FROM questions WHERE crossword_id=?", (cw_id,)).fetchall()
-    questions_list = [dict(q) for q in questions]
-    bg_images = os.listdir(os.path.join(app.static_folder, "backgrounds"))
-
-    if request.method == "POST":
-        title = request.form.get("title", "").strip()
-        keyword = request.form.get("keyword", "").strip().upper()
-        description = request.form.get("description", "").strip()
-        grades_list = request.form.getlist("grades")
-        grades_str = ",".join(grades_list) if grades_list else ""
-
-        bg_file = request.files.get("bg_upload")
-        bg_choice = request.form.get("bg_choice", "")
-        bg_path = cw_dict.get("background", "")
-
-        if bg_file and bg_file.filename:
-            filename = secure_filename(bg_file.filename)
-            filename = f"bg_{int(time.time())}_{filename}"
-            save_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-            bg_file.save(save_path)
-            bg_path = f"uploads/{filename}"
-        elif bg_choice:
-            bg_path = f"backgrounds/{bg_choice}"
-
-        new_questions = []
-        for key in request.form:
-            if key.startswith("question_"):
-                index = key.split("_")[1]
-                q_text = request.form.get(f"question_{index}", "").strip()
-                a_text = request.form.get(f"answer_{index}", "").strip().upper()
-                number = request.form.get(f"number_{index}", "").strip()
-                direction = request.form.get(f"dir_{index}", "h")
-                if q_text and a_text:
-                    new_questions.append({
-                        "question": q_text, "answer": a_text,
-                        "number": int(number) if number.isdigit() else None,
-                        "dir": direction
-                    })
-
-        cw_data['placed'] = new_questions
-        cw_data['description'] = description
-        cw_data['grades'] = grades_list
-
-        try:
-            conn.execute("""
-                UPDATE crosswords
-                SET title=?, keyword=?, background=?, data=?, description=?, grades=?
-                WHERE id=?
-            """, (title, keyword, bg_path, json.dumps(cw_data, ensure_ascii=False),
-                  description, grades_str, cw_id))
-
-            conn.execute("DELETE FROM questions WHERE crossword_id=?", (cw_id,))
-            for q in new_questions:
-                conn.execute("""
-                    INSERT INTO questions (crossword_id, question, answer, number, dir)
-                    VALUES (?, ?, ?, ?, ?)
-                """, (cw_id, q['question'], q['answer'], q['number'], q['dir']))
-
-            conn.commit()
-            flash("Խաչբառը հաջողությամբ թարմացվեց")
-            return redirect(url_for("admin_dashboard"))
-        except Exception as e:
-            conn.rollback()
-            flash(f"Սխալ տվյալների բազայում՝ {e}", "error")
-            return redirect(url_for("admin_edit_full_crossword", cw_id=cw_id))
-
-    conn.close()
-    return render_template("admin/edit_full_crossword.html",
-                           cw=cw_dict, placed=placed_questions,
-                           questions=questions_list, bg_images=bg_images)
-
-
-@app.route('/admin/change_credentials', methods=['GET', 'POST'])
-@admin_required
-def admin_change_credentials():
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
-    admin = conn.execute("SELECT * FROM admins WHERE id = ?", (session['admin_id'],)).fetchone()
-
-    if not admin:
-        conn.close()
-        flash("Ադմինը գտնված չէ")
-        return redirect(url_for('admin_login'))
-
-    if request.method == 'POST':
-        new_username = request.form.get('username', '').strip()
-        old_password = request.form.get('old_password', '')
-        new_password = request.form.get('new_password', '')
-
-        if not check_password_hash(admin['password'], old_password):
-            flash("Հին գաղտնաբառը սխալ է ❌")
-            conn.close()
-            return render_template("admin/change_credentials.html", admin=admin)
-
-        try:
-            hashed = generate_password_hash(new_password)
-            conn.execute("UPDATE admins SET username = ?, password = ? WHERE id = ?",
-                         (new_username, hashed, admin['id']))
-            conn.commit()
-        except Exception as e:
-            flash(f"Սխալ՝ {e} ❌")
-            conn.close()
-            return render_template("admin/change_credentials.html", admin=admin)
-
-        conn.close()
-        session['admin'] = True
-        session['admin_id'] = admin['id']
-        flash("Տվյալները հաջողությամբ փոփոխվեցին ✅")
-        return redirect(url_for('admin_dashboard'))
-
-    conn.close()
-    return render_template("admin/change_credentials.html", admin=admin)
-
-
 @app.route('/whoami')
 @require_auth()
 async def whoami():
@@ -2744,6 +2569,7 @@ if __name__ == '__main__':
     check_and_add_created_at_column()
     check_and_add_show_creator_data_column()
     check_and_add_is_draft_column()
+    ensure_admin_tables()
 
     if INTERNAL_API_KEY:
         print(

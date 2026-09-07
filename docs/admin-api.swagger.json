@@ -1,0 +1,837 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Crossword Admin API",
+    "version": "1.0.0",
+    "description": "Admin surface of the Crossword service, consumed by the AuthServer admin panel (/Admin/Crossword/*).\n\nAuthentication — every endpoint accepts either:\n  1. `X-Api-Key: <INTERNAL_API_KEY>` — server-to-server, used by the AuthServer proxy. Grants write access. The optional `X-Admin-Actor` header names the human who triggered the call and is recorded in the audit log.\n  2. `Authorization: Bearer <token>` — an AuthServer access token introspected at `/connect/introspect`. The `Admin` role grants read+write; `AdminViewer` grants read only (writes return 403).\n\nAll list endpoints return the same `{ totalCount, page, pageSize, items }` envelope. All ids are returned as strings."
+  },
+  "servers": [
+    { "url": "https://crossword.dshh.am:15400", "description": "Production" },
+    { "url": "http://localhost:15400", "description": "Local" }
+  ],
+  "tags": [
+    { "name": "Dashboard", "description": "Aggregate statistics" },
+    { "name": "Crosswords", "description": "Crossword listing, editing, moderation" },
+    { "name": "Creators", "description": "Creator listing and blocking" },
+    { "name": "Moderation", "description": "Comments and vote feedback" },
+    { "name": "Settings", "description": "Site-wide switches restricting what users may do" },
+    { "name": "Monitoring", "description": "Admin audit log and health" }
+  ],
+  "security": [{ "ApiKeyAuth": [] }, { "BearerAuth": [] }],
+  "paths": {
+    "/api/admin/stats": {
+      "get": {
+        "tags": ["Dashboard"],
+        "summary": "Aggregate statistics for the admin dashboard",
+        "operationId": "getStats",
+        "responses": {
+          "200": {
+            "description": "Statistics",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Stats" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/api/admin/crosswords": {
+      "get": {
+        "tags": ["Crosswords"],
+        "summary": "List crosswords",
+        "operationId": "listCrosswords",
+        "parameters": [
+          { "$ref": "#/components/parameters/Page" },
+          { "$ref": "#/components/parameters/Count" },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Free-text match against title, creator name and keyword.",
+            "schema": { "type": "string" }
+          },
+          { "name": "subject", "in": "query", "schema": { "type": "string" } },
+          { "name": "grade", "in": "query", "schema": { "type": "string" } },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": { "type": "string", "enum": ["visible", "hidden"] }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paged crosswords",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/PagedEnvelope" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "items": { "type": "array", "items": { "$ref": "#/components/schemas/Crossword" } }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/api/admin/crosswords/{id}": {
+      "parameters": [{ "$ref": "#/components/parameters/CrosswordId" }],
+      "get": {
+        "tags": ["Crosswords"],
+        "summary": "Get one crossword, including its questions",
+        "operationId": "getCrossword",
+        "responses": {
+          "200": {
+            "description": "Crossword with questions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/Crossword" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "questions": { "type": "array", "items": { "$ref": "#/components/schemas/Question" } }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "put": {
+        "tags": ["Crosswords"],
+        "summary": "Update a crossword's metadata and/or questions",
+        "description": "Only the fields present in the body are updated. If `questions` is present it REPLACES the whole question set; entries with a blank question or answer are dropped.",
+        "operationId": "updateCrossword",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CrosswordUpdate" },
+              "example": {
+                "title": "Հայոց լեզու, գլուխ 3",
+                "subject": "Հայոց լեզու",
+                "grade": "6",
+                "description": "Կրկնողություն",
+                "questions": [
+                  { "question": "Հայաստանի մայրաքաղաքը", "answer": "ԵՐԵՎԱՆ" }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/Ok" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "delete": {
+        "tags": ["Crosswords"],
+        "summary": "Delete a crossword and all of its dependent rows",
+        "description": "Cascades manually across questions, participants, results, comments, vote_feedback and crossword_stats.",
+        "operationId": "deleteCrossword",
+        "responses": {
+          "200": { "$ref": "#/components/responses/Ok" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/admin/crosswords/{id}/hide": {
+      "parameters": [{ "$ref": "#/components/parameters/CrosswordId" }],
+      "put": {
+        "tags": ["Crosswords"],
+        "summary": "Hide a crossword from the public site",
+        "description": "A reason is mandatory; it is stored on the crossword and written to the audit log.",
+        "operationId": "hideCrossword",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ReasonBody" },
+              "example": { "reason": "Inappropriate content" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/Ok" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/admin/crosswords/{id}/unhide": {
+      "parameters": [{ "$ref": "#/components/parameters/CrosswordId" }],
+      "put": {
+        "tags": ["Crosswords"],
+        "summary": "Make a hidden crossword public again",
+        "description": "Takes no body. Callers behind IIS must still send Content-Length: 0.",
+        "operationId": "unhideCrossword",
+        "responses": {
+          "200": { "$ref": "#/components/responses/Ok" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/admin/crosswords/{id}/results": {
+      "parameters": [{ "$ref": "#/components/parameters/CrosswordId" }],
+      "get": {
+        "tags": ["Crosswords"],
+        "summary": "Participants and their results for one crossword",
+        "description": "Returns every participant, including those who started but never finished (their result fields are zero and isCompleted is false).",
+        "operationId": "getCrosswordResults",
+        "responses": {
+          "200": {
+            "description": "Participant results",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ResultsResponse" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/admin/users": {
+      "get": {
+        "tags": ["Creators"],
+        "summary": "List crossword creators with aggregate counts",
+        "description": "Creators are derived from `crosswords.user_id` (the AuthServer `sub` claim). Someone who has never created a crossword does not appear here.",
+        "operationId": "listCreators",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Substring match against creator name or id.",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Creators",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "totalCount": { "type": "integer" },
+                    "items": { "type": "array", "items": { "$ref": "#/components/schemas/Creator" } }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/api/admin/users/{userId}/block": {
+      "parameters": [{ "$ref": "#/components/parameters/UserId" }],
+      "put": {
+        "tags": ["Creators"],
+        "summary": "Block a creator from creating or editing crosswords",
+        "description": "Idempotent — blocking an already-blocked creator updates the reason. Existing crosswords stay visible; use the hide endpoint for those.",
+        "operationId": "blockCreator",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ReasonBody" },
+              "example": { "reason": "Repeated spam submissions" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/Ok" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/api/admin/users/{userId}/unblock": {
+      "parameters": [{ "$ref": "#/components/parameters/UserId" }],
+      "put": {
+        "tags": ["Creators"],
+        "summary": "Lift a creator block",
+        "description": "Idempotent — unblocking a creator who is not blocked succeeds.",
+        "operationId": "unblockCreator",
+        "responses": {
+          "200": { "$ref": "#/components/responses/Ok" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/api/admin/comments": {
+      "get": {
+        "tags": ["Moderation"],
+        "summary": "List comments across all crosswords",
+        "operationId": "listComments",
+        "parameters": [
+          { "$ref": "#/components/parameters/Page" },
+          { "$ref": "#/components/parameters/Count" },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Free-text match against comment text, author name and crossword title.",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paged comments",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/PagedEnvelope" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "items": { "type": "array", "items": { "$ref": "#/components/schemas/Comment" } }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/api/admin/comments/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": { "type": "integer" }
+        }
+      ],
+      "delete": {
+        "tags": ["Moderation"],
+        "summary": "Delete a comment",
+        "description": "Also decrements `crossword_stats.comment_count` for the parent crossword.",
+        "operationId": "deleteComment",
+        "responses": {
+          "200": { "$ref": "#/components/responses/Ok" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/admin/feedback": {
+      "get": {
+        "tags": ["Moderation"],
+        "summary": "List like/dislike feedback submissions",
+        "operationId": "listFeedback",
+        "parameters": [
+          { "$ref": "#/components/parameters/Page" },
+          { "$ref": "#/components/parameters/Count" },
+          {
+            "name": "vote",
+            "in": "query",
+            "schema": { "type": "string", "enum": ["like", "dislike"] }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paged feedback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/PagedEnvelope" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "items": { "type": "array", "items": { "$ref": "#/components/schemas/Feedback" } }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/api/admin/settings": {
+      "get": {
+        "tags": ["Settings"],
+        "summary": "Read all site-wide switches",
+        "description": "Returns every switch, including ones never set (they default to false = not restricted).",
+        "operationId": "getSettings",
+        "responses": {
+          "200": {
+            "description": "Current switches",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Settings" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      },
+      "put": {
+        "tags": ["Settings"],
+        "summary": "Turn one or more switches on or off",
+        "description": "Send only the switches you want to change. Unknown keys are ignored; a body containing no known key returns 400. Each change is written to the audit log as `setting.update`. Responds with the full resulting switch set.",
+        "operationId": "setSettings",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/Settings" },
+              "example": { "comments_locked": true, "sharing_locked": false }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Resulting switches",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Settings" } } }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/api/admin/audit": {
+      "get": {
+        "tags": ["Monitoring"],
+        "summary": "Admin audit log, newest first",
+        "description": "Every write endpoint appends an entry here. `actor` is the value of `X-Admin-Actor` for proxied calls, or the token subject's name/email for direct bearer calls.",
+        "operationId": "listAudit",
+        "parameters": [
+          { "$ref": "#/components/parameters/Page" },
+          { "$ref": "#/components/parameters/Count" },
+          {
+            "name": "action",
+            "in": "query",
+            "description": "Prefix filter, e.g. `crossword.` or `user.block`.",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paged audit entries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/PagedEnvelope" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "items": { "type": "array", "items": { "$ref": "#/components/schemas/AuditEntry" } }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/api/admin/health": {
+      "get": {
+        "tags": ["Monitoring"],
+        "summary": "Connectivity and credential check",
+        "description": "Useful for verifying that the API key or token is accepted and the database is readable. `canWrite` tells the caller whether write endpoints will be permitted.",
+        "operationId": "health",
+        "responses": {
+          "200": {
+            "description": "Health",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": { "type": "boolean" },
+                    "serverTime": { "type": "string", "format": "date-time" },
+                    "actor": { "type": "string" },
+                    "canWrite": { "type": "boolean" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Api-Key",
+        "description": "Shared internal key. Grants full write access — never expose it to a browser."
+      },
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "AuthServer access token. Introspected on each call (cached 60s). Requires the Admin or AdminViewer role."
+      }
+    },
+    "parameters": {
+      "Page": {
+        "name": "page",
+        "in": "query",
+        "description": "1-based page number.",
+        "schema": { "type": "integer", "minimum": 1, "default": 1 }
+      },
+      "Count": {
+        "name": "count",
+        "in": "query",
+        "description": "Page size, clamped to 1..500.",
+        "schema": { "type": "integer", "minimum": 1, "maximum": 500, "default": 50 }
+      },
+      "CrosswordId": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "integer" }
+      },
+      "UserId": {
+        "name": "userId",
+        "in": "path",
+        "required": true,
+        "description": "AuthServer subject id (`sub` claim).",
+        "schema": { "type": "string" }
+      }
+    },
+    "responses": {
+      "Ok": {
+        "description": "Success",
+        "content": {
+          "application/json": {
+            "schema": { "type": "object", "properties": { "ok": { "type": "boolean" } } },
+            "example": { "ok": true }
+          }
+        }
+      },
+      "BadRequest": {
+        "description": "Missing or invalid input (e.g. a required reason was blank)",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "Unauthorized": {
+        "description": "No API key and no valid bearer token",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "Forbidden": {
+        "description": "Authenticated but not permitted — wrong role, or a read-only role attempting a write",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "NotFound": {
+        "description": "No such record",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": { "error": { "type": "string" } },
+        "example": { "error": "Not found" }
+      },
+      "Settings": {
+        "type": "object",
+        "description": "Site-wide switches. `true` means the action is RESTRICTED. All default to false.",
+        "properties": {
+          "all_crosswords_hidden": {
+            "type": "boolean",
+            "description": "Hide every crossword from the public play page. A creator can still open their own."
+          },
+          "creation_locked": {
+            "type": "boolean",
+            "description": "Nobody may create or edit a crossword (draft save, question entry, editing and AI generation all refuse)."
+          },
+          "ai_creation_locked": {
+            "type": "boolean",
+            "description": "AI generation is disabled — /ai_setup and /generate_ai_crossword refuse."
+          },
+          "keyword_creation_locked": {
+            "type": "boolean",
+            "description": "Keyword-mode creation is disabled."
+          },
+          "sharing_locked": {
+            "type": "boolean",
+            "description": "POST /api/crosswords/{id}/share returns 403."
+          },
+          "comments_locked": {
+            "type": "boolean",
+            "description": "POST /api/crosswords/{id}/comments returns 403. Existing comments stay readable."
+          }
+        }
+      },
+      "PagedEnvelope": {
+        "type": "object",
+        "description": "Shared shape of every paged list response.",
+        "properties": {
+          "totalCount": { "type": "integer", "description": "Total matching rows, ignoring paging." },
+          "page": { "type": "integer" },
+          "pageSize": { "type": "integer" },
+          "items": { "type": "array", "items": {} }
+        }
+      },
+      "ReasonBody": {
+        "type": "object",
+        "required": ["reason"],
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Mandatory, non-blank. Stored and shown to admins."
+          }
+        }
+      },
+      "Question": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "question": { "type": "string" },
+          "answer": { "type": "string" }
+        }
+      },
+      "Crossword": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "title": { "type": "string" },
+          "keyword": { "type": "string" },
+          "subject": { "type": "string" },
+          "grade": { "type": "string" },
+          "description": { "type": "string" },
+          "creatorName": { "type": "string" },
+          "creatorId": { "type": "string", "description": "AuthServer sub claim." },
+          "creatorBlocked": { "type": "boolean" },
+          "status": { "type": "string", "enum": ["Visible", "Hidden"] },
+          "isHidden": { "type": "boolean" },
+          "hiddenReason": { "type": "string" },
+          "isAiGenerated": { "type": "boolean" },
+          "isDraft": { "type": "boolean" },
+          "createdAt": { "type": "string" },
+          "questionCount": { "type": "integer" },
+          "participantCount": { "type": "integer" },
+          "completedCount": { "type": "integer" },
+          "viewCount": { "type": "integer" },
+          "likeCount": { "type": "integer" },
+          "dislikeCount": { "type": "integer" },
+          "shareCount": { "type": "integer" },
+          "downloadCount": { "type": "integer" },
+          "printCount": { "type": "integer" },
+          "commentCount": { "type": "integer" }
+        }
+      },
+      "CrosswordUpdate": {
+        "type": "object",
+        "description": "All fields optional; only those present are applied.",
+        "properties": {
+          "title": { "type": "string" },
+          "keyword": { "type": "string" },
+          "subject": { "type": "string" },
+          "grade": { "type": "string" },
+          "description": { "type": "string" },
+          "creatorName": { "type": "string" },
+          "questions": {
+            "type": "array",
+            "description": "If present, replaces the entire question set.",
+            "items": {
+              "type": "object",
+              "required": ["question", "answer"],
+              "properties": {
+                "question": { "type": "string" },
+                "answer": { "type": "string" }
+              }
+            }
+          }
+        }
+      },
+      "ParticipantResult": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "description": "Participant id." },
+          "name": { "type": "string" },
+          "surname": { "type": "string" },
+          "gender": { "type": "string" },
+          "school": { "type": "string" },
+          "grade": { "type": "string" },
+          "startTime": { "type": "string" },
+          "endTime": { "type": "string" },
+          "score": { "type": "integer" },
+          "totalWords": { "type": "integer" },
+          "scorePercent": { "type": "number", "format": "double" },
+          "durationSeconds": { "type": "integer" },
+          "isCompleted": { "type": "boolean" }
+        }
+      },
+      "ResultsResponse": {
+        "type": "object",
+        "properties": {
+          "crosswordId": { "type": "string" },
+          "crosswordTitle": { "type": "string" },
+          "creatorName": { "type": "string" },
+          "totalCount": { "type": "integer" },
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/ParticipantResult" } }
+        }
+      },
+      "Creator": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "description": "AuthServer sub claim." },
+          "creatorName": { "type": "string" },
+          "crosswordCount": { "type": "integer" },
+          "hiddenCount": { "type": "integer" },
+          "aiCount": { "type": "integer" },
+          "participantCount": { "type": "integer" },
+          "firstCreatedAt": { "type": "string" },
+          "lastCreatedAt": { "type": "string" },
+          "isBlocked": { "type": "boolean" },
+          "blockReason": { "type": "string" },
+          "blockedAt": { "type": "string" }
+        }
+      },
+      "Comment": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "crosswordId": { "type": "string" },
+          "crosswordTitle": { "type": "string" },
+          "author": { "type": "string" },
+          "text": { "type": "string" },
+          "createdAt": { "type": "string" }
+        }
+      },
+      "Feedback": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "crosswordId": { "type": "string" },
+          "crosswordTitle": { "type": "string" },
+          "voteType": { "type": "string", "enum": ["like", "dislike"] },
+          "reasons": {
+            "type": "array",
+            "description": "Parsed from the stored JSON list; empty when none were given.",
+            "items": { "type": "string" }
+          },
+          "otherText": { "type": "string", "description": "Free text for the \"other\" like reason." },
+          "message": { "type": "string", "description": "Free text supplied with a dislike." },
+          "createdAt": { "type": "string" }
+        }
+      },
+      "AuditEntry": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "actor": { "type": "string" },
+          "action": {
+            "type": "string",
+            "description": "One of: crossword.update, crossword.hide, crossword.unhide, crossword.delete, user.block, user.unblock, comment.delete."
+          },
+          "entityType": { "type": "string", "enum": ["crossword", "user", "comment"] },
+          "entityId": { "type": "string" },
+          "detail": { "type": "string" },
+          "createdAt": { "type": "string" }
+        }
+      },
+      "DailyPoint": {
+        "type": "object",
+        "properties": {
+          "date": { "type": "string", "format": "date" },
+          "crosswords": { "type": "integer", "description": "Present in crosswordsPerDay." },
+          "participants": { "type": "integer", "description": "Present in participantsPerDay." }
+        }
+      },
+      "Stats": {
+        "type": "object",
+        "properties": {
+          "totalCrosswords": { "type": "integer" },
+          "visibleCrosswords": { "type": "integer" },
+          "hiddenCrosswords": { "type": "integer" },
+          "draftCrosswords": { "type": "integer" },
+          "aiGeneratedCrosswords": { "type": "integer" },
+          "totalQuestions": { "type": "integer" },
+          "totalParticipants": { "type": "integer" },
+          "totalResults": { "type": "integer" },
+          "completedResults": { "type": "integer" },
+          "completionRate": { "type": "number", "format": "double", "description": "Percent, 0-100." },
+          "averageScorePercent": { "type": "number", "format": "double" },
+          "averageDurationSeconds": { "type": "integer" },
+          "totalCreators": { "type": "integer" },
+          "blockedCreators": { "type": "integer" },
+          "totalComments": { "type": "integer" },
+          "totalViews": { "type": "integer" },
+          "totalLikes": { "type": "integer" },
+          "totalDislikes": { "type": "integer" },
+          "totalDownloads": { "type": "integer" },
+          "totalShares": { "type": "integer" },
+          "totalPrints": { "type": "integer" },
+          "crosswordsPerDay": {
+            "type": "array",
+            "description": "Last 30 days; days with no activity are omitted.",
+            "items": { "$ref": "#/components/schemas/DailyPoint" }
+          },
+          "participantsPerDay": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/DailyPoint" }
+          },
+          "topCrosswords": {
+            "type": "array",
+            "description": "Top 10 by participant count, then views.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "title": { "type": "string" },
+                "creatorName": { "type": "string" },
+                "participantCount": { "type": "integer" },
+                "viewCount": { "type": "integer" }
+              }
+            }
+          },
+          "bySubject": {
+            "type": "array",
+            "description": "Top 12 subjects by crossword count; blank subjects group under an em dash.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "subject": { "type": "string" },
+                "count": { "type": "integer" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
