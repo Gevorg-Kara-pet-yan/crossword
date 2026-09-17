@@ -438,7 +438,7 @@ def get_crossword(cw_id):
         conn.close()
 
 
-@admin_bp.route("/crosswords/<int:cw_id>", methods=["PUT"])
+@admin_bp.route("/crosswords/<int:cw_id>/update", methods=["POST"])
 @admin_guard(*WRITE_ROLES)
 def update_crossword(cw_id):
     denied = _require_write()
@@ -485,7 +485,7 @@ def update_crossword(cw_id):
         conn.close()
 
 
-@admin_bp.route("/crosswords/<int:cw_id>/hide", methods=["PUT"])
+@admin_bp.route("/crosswords/<int:cw_id>/hide", methods=["POST"])
 @admin_guard(*WRITE_ROLES)
 def hide_crossword(cw_id):
     denied = _require_write()
@@ -511,7 +511,7 @@ def hide_crossword(cw_id):
         conn.close()
 
 
-@admin_bp.route("/crosswords/<int:cw_id>/unhide", methods=["PUT"])
+@admin_bp.route("/crosswords/<int:cw_id>/unhide", methods=["POST"])
 @admin_guard(*WRITE_ROLES)
 def unhide_crossword(cw_id):
     denied = _require_write()
@@ -533,7 +533,7 @@ def unhide_crossword(cw_id):
         conn.close()
 
 
-@admin_bp.route("/crosswords/<int:cw_id>", methods=["DELETE"])
+@admin_bp.route("/crosswords/<int:cw_id>/delete", methods=["POST"])
 @admin_guard(*WRITE_ROLES)
 def delete_crossword_admin(cw_id):
     denied = _require_write()
@@ -671,7 +671,7 @@ def list_users():
         conn.close()
 
 
-@admin_bp.route("/users/<user_id>/block", methods=["PUT"])
+@admin_bp.route("/users/<user_id>/block", methods=["POST"])
 @admin_guard(*WRITE_ROLES)
 def block_user(user_id):
     denied = _require_write()
@@ -698,7 +698,7 @@ def block_user(user_id):
         conn.close()
 
 
-@admin_bp.route("/users/<user_id>/unblock", methods=["PUT"])
+@admin_bp.route("/users/<user_id>/unblock", methods=["POST"])
 @admin_guard(*WRITE_ROLES)
 def unblock_user(user_id):
     denied = _require_write()
@@ -775,7 +775,7 @@ def list_comments():
         conn.close()
 
 
-@admin_bp.route("/comments/<int:comment_id>", methods=["DELETE"])
+@admin_bp.route("/comments/<int:comment_id>/delete", methods=["POST"])
 @admin_guard(*WRITE_ROLES)
 def delete_comment(comment_id):
     denied = _require_write()
@@ -862,7 +862,7 @@ def get_admin_settings():
     return jsonify(get_settings())
 
 
-@admin_bp.route("/settings", methods=["PUT"])
+@admin_bp.route("/settings", methods=["POST"])
 @admin_guard(*WRITE_ROLES)
 def set_admin_settings():
     denied = _require_write()

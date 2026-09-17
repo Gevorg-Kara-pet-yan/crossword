@@ -109,8 +109,11 @@
           "403": { "$ref": "#/components/responses/Forbidden" },
           "404": { "$ref": "#/components/responses/NotFound" }
         }
-      },
-      "put": {
+      }
+    },
+    "/api/admin/crosswords/{id}/update": {
+      "parameters": [{ "$ref": "#/components/parameters/CrosswordId" }],
+      "post": {
         "tags": ["Crosswords"],
         "summary": "Update a crossword's metadata and/or questions",
         "description": "Only the fields present in the body are updated. If `questions` is present it REPLACES the whole question set; entries with a blank question or answer are dropped.",
@@ -138,8 +141,11 @@
           "403": { "$ref": "#/components/responses/Forbidden" },
           "404": { "$ref": "#/components/responses/NotFound" }
         }
-      },
-      "delete": {
+      }
+    },
+    "/api/admin/crosswords/{id}/delete": {
+      "parameters": [{ "$ref": "#/components/parameters/CrosswordId" }],
+      "post": {
         "tags": ["Crosswords"],
         "summary": "Delete a crossword and all of its dependent rows",
         "description": "Cascades manually across questions, participants, results, comments, vote_feedback and crossword_stats.",
@@ -154,7 +160,7 @@
     },
     "/api/admin/crosswords/{id}/hide": {
       "parameters": [{ "$ref": "#/components/parameters/CrosswordId" }],
-      "put": {
+      "post": {
         "tags": ["Crosswords"],
         "summary": "Hide a crossword from the public site",
         "description": "A reason is mandatory; it is stored on the crossword and written to the audit log.",
@@ -179,7 +185,7 @@
     },
     "/api/admin/crosswords/{id}/unhide": {
       "parameters": [{ "$ref": "#/components/parameters/CrosswordId" }],
-      "put": {
+      "post": {
         "tags": ["Crosswords"],
         "summary": "Make a hidden crossword public again",
         "description": "Takes no body. Callers behind IIS must still send Content-Length: 0.",
@@ -246,7 +252,7 @@
     },
     "/api/admin/users/{userId}/block": {
       "parameters": [{ "$ref": "#/components/parameters/UserId" }],
-      "put": {
+      "post": {
         "tags": ["Creators"],
         "summary": "Block a creator from creating or editing crosswords",
         "description": "Idempotent — blocking an already-blocked creator updates the reason. Existing crosswords stay visible; use the hide endpoint for those.",
@@ -270,7 +276,7 @@
     },
     "/api/admin/users/{userId}/unblock": {
       "parameters": [{ "$ref": "#/components/parameters/UserId" }],
-      "put": {
+      "post": {
         "tags": ["Creators"],
         "summary": "Lift a creator block",
         "description": "Idempotent — unblocking a creator who is not blocked succeeds.",
@@ -321,7 +327,7 @@
         }
       }
     },
-    "/api/admin/comments/{id}": {
+    "/api/admin/comments/{id}/delete": {
       "parameters": [
         {
           "name": "id",
@@ -330,7 +336,7 @@
           "schema": { "type": "integer" }
         }
       ],
-      "delete": {
+      "post": {
         "tags": ["Moderation"],
         "summary": "Delete a comment",
         "description": "Also decrements `crossword_stats.comment_count` for the parent crossword.",
@@ -396,7 +402,7 @@
           "403": { "$ref": "#/components/responses/Forbidden" }
         }
       },
-      "put": {
+      "post": {
         "tags": ["Settings"],
         "summary": "Turn one or more switches on or off",
         "description": "Send only the switches you want to change. Unknown keys are ignored; a body containing no known key returns 400. Each change is written to the audit log as `setting.update`. Responds with the full resulting switch set.",
