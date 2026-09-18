@@ -13,15 +13,28 @@ import requests
 from ai_provider import get_provider
 from auth_decorators import require_auth
 from dotenv import load_dotenv
-from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_file, get_flashed_messages
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_file, get_flashed_messages,render_template_string
 from flask import g
 from utils.crossword_builder import generate_crossword_grid
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
+import threading
+from collections import defaultdict, deque
 
+from logging_config import setup_logging, register_request_logging, get_logger, log_critical_startup_failure
+
+from utils.admin_api import admin_bp, ensure_admin_tables
+
+LOG_VIEW_TOKEN = os.getenv("LOG_VIEW_TOKEN", "")
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+DATABASE = os.path.join(BASE_DIR, 'utils', 'crossword.db')
 
 AM_TZ = timezone(timedelta(hours=4))
+
+# Այս գործարկման (process-ի) մեկնարկի պահը — դրանից հին գրառումները
+# viewer-ում default-ով չենք ցույց տալիս (տես view_logs)
+APP_START_TIME = datetime.now(AM_TZ)
 
 load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
 
@@ -32,6 +45,177 @@ load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "dev_fallback_key")
 URL_PREFIX = os.getenv("URL_PREFIX", "")
+
+app.register_blueprint(admin_bp)
+
+# ── Logging (Information / Warning / Error / Critical policy) ──────────────
+setup_logging(app)
+register_request_logging(app, current_user_getter=lambda: getattr(g, "current_user", {}).get("sub"))
+logger = get_logger("app")
+
+
+
+_client_log_hits = defaultdict(deque)
+_client_log_lock = threading.Lock()
+CLIENT_LOG_RATE_LIMIT = 20      # առավելագույն հարցում
+CLIENT_LOG_RATE_WINDOW = 60     # վայրկյան
+
+
+LOG_VIEW_TOKEN = os.getenv("LOG_VIEW_TOKEN", "")
+
+_LOG_VIEWER_HTML = """
+<!doctype html><meta charset="utf-8">
+<title>Լոգեր</title>
+<style>
+ body{font-family:Segoe UI,sans-serif;margin:20px;background:#111;color:#eee}
+ table{border-collapse:collapse;width:100%;font-size:13px}
+ th,td{border:1px solid #333;padding:6px 8px;text-align:left;vertical-align:top}
+ th{background:#1c1c1c;position:sticky;top:0}
+ tr.ERROR td, tr.Critical td, tr.CRITICAL td {background:#3a1414}
+ tr.WARNING td {background:#3a3214}
+ .nav a{margin-right:12px;color:#7ab8ff}
+ pre{white-space:pre-wrap;margin:0}
+</style>
+<div class="nav">
+ <a href="?file=app&token={{token}}">app.log</a>
+ <a href="?file=error&token={{token}}">error.log</a>
+ |
+ <a href="?file={{file}}&token={{token}}">բոլորը</a>
+ <a href="?file={{file}}&level=Information&token={{token}}">Info</a>
+ <a href="?file={{file}}&level=Warning&token={{token}}">Warning</a>
+ <a href="?file={{file}}&level=Error&token={{token}}">Error+</a>
+  <a href="?file={{file}}&level=Critical&token={{token}}">Critical</a>
+ |
+ <a href="?file={{file}}&token={{token}}">🔵 Այս գործարկումից</a>
+ <a href="?file={{file}}&all=1&token={{token}}">📜 Ամբողջ պատմությունը</a>
+ <form method="post" action="logs/clear" style="display:inline"
+       onsubmit="return confirm('Ջնջե՞լ {{file}}.log-ի բոլոր գրառումները');">
+   <input type="hidden" name="file" value="{{file}}">
+   <input type="hidden" name="token" value="{{token}}">
+   <button type="submit"
+     style="margin-left:16px;background:#5a1414;color:#eee;border:1px solid #833;
+            padding:4px 10px;border-radius:4px;cursor:pointer">
+     🗑 Մաքրել {{file}}.log
+   </button>
+ </form>
+</div>
+<h3>{{file}}.log — {% if show_all %}ամբողջ պատմությունը{% else %}այս գործարկումից սկսած{% endif %} ({{rows|length}} գրառում)</h3>
+<table>
+ <tr><th>Ժամ</th><th>Level</th><th>Operation</th><th>Message</th><th>Մանրամասն</th></tr>
+ {% for r in rows %}
+ <tr class="{{r.Severity}}">
+   <td>{{r.Timestamp}}</td><td>{{r.Severity}}</td>
+   <td>{{r.Operation}}</td><td>{{r.Message}}</td>
+   <td><pre>{{r.extra}}</pre></td>
+ </tr>
+ {% endfor %}
+</table>
+"""
+
+@app.route('/logs')
+async def view_logs():
+    # ── token ստուգում (query ?token= կամ X-Log-Token header) ──
+    provided = request.args.get('token') or request.headers.get('X-Log-Token', '')
+    if not LOG_VIEW_TOKEN or provided != LOG_VIEW_TOKEN:
+        return "Access denied", 403
+
+    which = request.args.get('file', 'error')
+    level_filter = request.args.get('level')
+    show_all = request.args.get('all') == '1'
+    fname = 'error.log' if which == 'error' else 'app.log'
+    log_dir = os.getenv("LOG_DIR", os.path.join(BASE_DIR, "logs"))
+    path = os.path.join(log_dir, fname)
+
+    def _read_rows():
+        rows = []
+        try:
+            with open(path, encoding='utf-8') as f:
+                lines = f.readlines()[-500:]      # վերջին 500 տողը
+        except FileNotFoundError:
+            return rows
+        for line in reversed(lines):             # նորերը վերևում
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+            except Exception:
+                obj = {"Timestamp": "", "Severity": "", "Operation": "", "Message": line}
+            # ── Default-ով ցույց ենք տալիս ՄԻԱՅՆ այս գործարկումից հետո գրվածը ──
+            # (fix արված, էլ չկրկնվող error-ը restart-ից հետո ինքնաշխատ անհետանում է)
+            if not show_all and obj.get("Timestamp"):
+                try:
+                    ts = datetime.strptime(obj["Timestamp"], "%Y-%m-%dT%H:%M:%S%z")
+                    if ts < APP_START_TIME:
+                        continue
+                except Exception:
+                    pass
+            # level=Info / Warning / Error / Critical — ցույց է տալիս ՄԻԱՅՆ այդ մակարդակը
+            if level_filter:
+                _ALIASES = {"information": "info", "informational": "info"}
+
+                def _norm(s):
+                    s = (s or "").strip().lower()
+                    return _ALIASES.get(s, s)
+
+                want = _norm(level_filter)
+                sev = _norm(obj.get("Severity"))
+                if want == 'error':  # Error → Error + Critical (հին պահվածքը պահում ենք)
+                    if sev not in ('error', 'critical'):
+                        continue
+                elif sev != want:  # մնացածը՝ ճշգրիտ համընկնում
+                    continue
+                elif sev != want:  # մնացածը՝ ճշգրիտ համընկնում
+                    continue
+            known = {"Timestamp", "Severity", "Service", "Logger", "Message",
+                     "Operation", "Traceback"}
+            obj["extra"] = json.dumps(
+                {k: v for k, v in obj.items() if k not in known and k != "extra"},
+                ensure_ascii=False, indent=1
+            )
+            rows.append(obj)
+        return rows
+
+    rows = await asyncio.to_thread(_read_rows)
+    return render_template_string(_LOG_VIEWER_HTML, rows=rows, file=which, token=provided, show_all=show_all)
+
+
+
+@app.route('/logs/clear', methods=['POST'])
+async def clear_logs():
+    provided = request.args.get('token') or request.form.get('token') or request.headers.get('X-Log-Token', '')
+    if not LOG_VIEW_TOKEN or provided != LOG_VIEW_TOKEN:
+        return "Access denied", 403
+
+    which = request.args.get('file') or request.form.get('file') or 'error'
+    fname = 'error.log' if which == 'error' else 'app.log'
+    log_dir = os.getenv("LOG_DIR", os.path.join(BASE_DIR, "logs"))
+    path = os.path.join(log_dir, fname)
+
+    def _truncate():
+        try:
+            open(path, 'w', encoding='utf-8').close()   # ֆայլը դատարկում ենք (չենք ջնջում)
+            return True
+        except Exception:
+            return False
+
+    ok = await asyncio.to_thread(_truncate)
+    logger.info("logs_cleared", extra={"Operation": "ClearLogs", "File": fname, "Success": ok})
+    # հետ ենք վերադառնում նույն էջին
+    return redirect(url_for('view_logs', file=which, token=provided))
+
+
+
+def _client_log_rate_limited(key: str) -> bool:
+    now = time.time()
+    with _client_log_lock:
+        dq = _client_log_hits[key]
+        while dq and now - dq[0] > CLIENT_LOG_RATE_WINDOW:
+            dq.popleft()
+        if len(dq) >= CLIENT_LOG_RATE_LIMIT:
+            return True
+        dq.append(now)
+        return False
 
 
 async def aio_fetchone(db, sql, params=()):
@@ -54,7 +238,7 @@ app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 app.wsgi_app = PrefixMiddleware(app.wsgi_app, URL_PREFIX)
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-DATABASE = os.path.join(BASE_DIR, 'utils', 'crossword.db')
+DATABASE = os.getenv("DATABASE_PATH", os.path.join(BASE_DIR, 'utils', 'crossword.db'))
 
 UPLOAD_FOLDER = os.path.join('static', 'uploads')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -92,16 +276,6 @@ def require_api_key_or_user(*roles):
     return decorator
 
 
-import logging
-
-logging.basicConfig(level=logging.DEBUG)
-
-
-@app.before_request
-def log_request():
-    app.logger.debug(f"📥 REQUEST: {request.method} {request.url}")
-
-
 # =====================================================
 # 🔹 HELPERS
 # =====================================================
@@ -130,9 +304,17 @@ def ask_raw(message: str) -> str:
         )
         response.encoding = "utf-8"
     except requests.RequestException as e:
+        logger.error(
+            "ask_raw_request_failed",
+            extra={"Operation": "AskRaw", "ApiUrl": API_URL, "Exception": type(e).__name__},
+            exc_info=True,
+        )
         raise RuntimeError(f"❌ API-ի հետ կապի խնդիր: {e}")
 
-    print("🟢 AI API RAW RESPONSE:", response.text)
+    logger.info(
+        "ask_raw_response_received",
+        extra={"Operation": "AskRaw", "StatusCode": response.status_code, "ResponseLength": len(response.text or "")},
+    )
     return response.text
 
 
@@ -240,20 +422,23 @@ CREATOR_FIELD_LABELS = {
 def fetch_profile_claims_sync(user_id):
     """Վերցնում է օգտվողի profile-claims-ը mainlogin-ից (firstName, lastName, email...)։"""
     try:
-        url = f"https://mainlogin.dshh.am:15107/api/users/{user_id}/profile-claims"
+        url = f"{MAINLOGIN_BASE}/api/users/{user_id}/profile-claims"
         resp = requests.get(url, timeout=10, verify=False)
         data = resp.json()
         if isinstance(data, dict):
             return data.get("claims", data)
         return {}
     except Exception as e:
-        print("⚠️ profile-claims fetch error:", e)
+        # External service դեգրադացված է, բայց fallback (դատարկ dict) թույլ է տալիս
+        # request-ին շարունակել → Warning, ոչ թե Error (PDF, գլուխ 3)
+        logger.warning(
+            "profile_claims_fetch_failed",
+            extra={"Operation": "FetchProfileClaims", "UserId": user_id, "Exception": type(e).__name__},
+        )
         return {}
 
 
-import os
-
-MAINLOGIN_BASE = os.getenv("MAINLOGIN_BASE", "https://mainlogin.dshh.am:15107").rstrip("/")
+MAINLOGIN_BASE = os.getenv("MAINLOGIN_BASE", "").rstrip("/")
 
 
 def build_user_view(claims, profile=None):
@@ -340,14 +525,23 @@ def current_user_view():
     return build_user_view(claims, profile)
 
 
+MAINLOGIN_PUBLIC = os.getenv("MAINLOGIN_PUBLIC", "").rstrip("/")
+GATEWAY_PUBLIC   = os.getenv("GATEWAY_PUBLIC", "").rstrip("/")
+
 @app.context_processor
 def inject_user():
-    """Ավտոմատ փոխանցում է `user`-ը ԲՈԼՈՐ կաղապարներին։"""
     try:
-        return {"user": current_user_view()}
-    except Exception:
-        return {"user": {}}
-
+        return {
+            "user": current_user_view(),
+            "MAINLOGIN_PUBLIC": MAINLOGIN_PUBLIC,
+            "GATEWAY_PUBLIC": GATEWAY_PUBLIC,
+        }
+    except Exception as e:
+        logger.warning(
+            "inject_user_failed",
+            extra={"Operation": "InjectUserContext", "Exception": type(e).__name__},
+        )
+        return {"user": {}, "MAINLOGIN_PUBLIC": MAINLOGIN_PUBLIC, "GATEWAY_PUBLIC": GATEWAY_PUBLIC}
 
 def select_questions_for_keyword(keyword, questions):
     selected = []
@@ -366,6 +560,11 @@ def select_questions_for_keyword(keyword, questions):
 # =====================================================
 # 🔹 DB SETUP HELPERS
 # =====================================================
+#
+# Այս ֆունկցիաները կանչվում են ՄԻԱՅՆ app-ի startup-ի ժամանակ (տես __main__ բլոկը)։
+# Եթե որևէ մեկը ձախողվում է, app-ը կարող է վատ վիճակում մեկնարկել (բացակայող
+# սյունակ/աղյուսակ) → PDF-ի քաղաքականությամբ սա Critical է, ոչ թե Error, քանի որ
+# խնդիրը համակարգային է և ազդում է ամբողջ service-ի աշխատանքի վրա։
 
 def check_and_create_crossword_stats_table():
     conn = sqlite3.connect(DATABASE)
@@ -386,9 +585,12 @@ def check_and_create_crossword_stats_table():
             )
         """)
         conn.commit()
-        print("✅ crossword_stats table ready")
+        logger.info("startup_table_ready", extra={"Operation": "StartupDbInit", "Table": "crossword_stats"})
     except Exception as e:
-        print("❌ crossword_stats error:", e)
+        log_critical_startup_failure(
+            logger, "startup_table_init_failed", exception=e,
+            Operation="StartupDbInit", Table="crossword_stats",
+        )
     finally:
         conn.close()
 
@@ -399,10 +601,13 @@ def check_and_add_share_count_column():
     try:
         conn.execute("ALTER TABLE crossword_stats ADD COLUMN share_count INTEGER DEFAULT 0;")
         conn.commit()
-        print("✅ share_count սյունակը ավելացվեց")
+        logger.info("startup_column_added", extra={"Operation": "StartupDbInit", "Table": "crossword_stats", "Column": "share_count"})
     except sqlite3.OperationalError as e:
         if "duplicate column name" not in str(e):
-            print(f"Սխալ share_count: {e}")
+            log_critical_startup_failure(
+                logger, "startup_column_add_failed", exception=e,
+                Operation="StartupDbInit", Table="crossword_stats", Column="share_count",
+            )
     finally:
         conn.close()
 
@@ -421,9 +626,12 @@ def check_and_create_comments_table():
             )
         """)
         conn.commit()
-        print("✅ comments table ready")
+        logger.info("startup_table_ready", extra={"Operation": "StartupDbInit", "Table": "comments"})
     except Exception as e:
-        print("❌ comments error:", e)
+        log_critical_startup_failure(
+            logger, "startup_table_init_failed", exception=e,
+            Operation="StartupDbInit", Table="comments",
+        )
     finally:
         conn.close()
 
@@ -445,9 +653,12 @@ def check_and_create_vote_feedback_table():
             )
         """)
         conn.commit()
-        print("✅ vote_feedback table ready")
+        logger.info("startup_table_ready", extra={"Operation": "StartupDbInit", "Table": "vote_feedback"})
     except Exception as e:
-        print("❌ vote_feedback error:", e)
+        log_critical_startup_failure(
+            logger, "startup_table_init_failed", exception=e,
+            Operation="StartupDbInit", Table="vote_feedback",
+        )
     finally:
         conn.close()
 
@@ -457,9 +668,13 @@ def check_and_add_created_at_column():
     try:
         conn.execute("ALTER TABLE crosswords ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
         conn.commit()
+        logger.info("startup_column_added", extra={"Operation": "StartupDbInit", "Table": "crosswords", "Column": "created_at"})
     except sqlite3.OperationalError as e:
         if "duplicate column name" not in str(e):
-            print(e)
+            log_critical_startup_failure(
+                logger, "startup_column_add_failed", exception=e,
+                Operation="StartupDbInit", Table="crosswords", Column="created_at",
+            )
     finally:
         conn.close()
 
@@ -469,10 +684,13 @@ def check_and_add_total_words_column():
     try:
         conn.execute("ALTER TABLE results ADD COLUMN total_words INTEGER;")
         conn.commit()
-        print("✅ total_words սյունակը ավելացվեց results աղյուսակում")
+        logger.info("startup_column_added", extra={"Operation": "StartupDbInit", "Table": "results", "Column": "total_words"})
     except sqlite3.OperationalError as e:
         if "duplicate column name" not in str(e):
-            print("❌ Սխալ total_words:", e)
+            log_critical_startup_failure(
+                logger, "startup_column_add_failed", exception=e,
+                Operation="StartupDbInit", Table="results", Column="total_words",
+            )
     finally:
         conn.close()
 
@@ -506,9 +724,12 @@ def check_and_create_participants_table():
             )
         """)
         conn.commit()
-        print("Participants և Results աղյուսակները պատրաստ են։")
+        logger.info("startup_table_ready", extra={"Operation": "StartupDbInit", "Table": "participants,results"})
     except Exception as e:
-        print(f"Սխալ աղյուսակները ստեղծելիս: {e}")
+        log_critical_startup_failure(
+            logger, "startup_table_init_failed", exception=e,
+            Operation="StartupDbInit", Table="participants,results",
+        )
     finally:
         conn.close()
 
@@ -518,9 +739,13 @@ def check_and_add_hidden_column():
     try:
         conn.execute("ALTER TABLE crosswords ADD COLUMN hidden INTEGER DEFAULT 0;")
         conn.commit()
+        logger.info("startup_column_added", extra={"Operation": "StartupDbInit", "Table": "crosswords", "Column": "hidden"})
     except sqlite3.OperationalError as e:
         if "duplicate column name" not in str(e):
-            print(f"Սխալ hidden: {e}")
+            log_critical_startup_failure(
+                logger, "startup_column_add_failed", exception=e,
+                Operation="StartupDbInit", Table="crosswords", Column="hidden",
+            )
     finally:
         conn.close()
 
@@ -530,9 +755,13 @@ def check_and_add_creator_name_column():
     try:
         conn.execute("ALTER TABLE crosswords ADD COLUMN creator_name TEXT;")
         conn.commit()
+        logger.info("startup_column_added", extra={"Operation": "StartupDbInit", "Table": "crosswords", "Column": "creator_name"})
     except sqlite3.OperationalError as e:
         if "duplicate column name" not in str(e):
-            print(f"Սխալ creator_name: {e}")
+            log_critical_startup_failure(
+                logger, "startup_column_add_failed", exception=e,
+                Operation="StartupDbInit", Table="crosswords", Column="creator_name",
+            )
     finally:
         conn.close()
 
@@ -542,9 +771,13 @@ def check_and_add_is_ai_generated_column():
     try:
         conn.execute("ALTER TABLE crosswords ADD COLUMN is_ai_generated INTEGER DEFAULT 0;")
         conn.commit()
+        logger.info("startup_column_added", extra={"Operation": "StartupDbInit", "Table": "crosswords", "Column": "is_ai_generated"})
     except sqlite3.OperationalError as e:
         if "duplicate column name" not in str(e):
-            print("Սխալ:", e)
+            log_critical_startup_failure(
+                logger, "startup_column_add_failed", exception=e,
+                Operation="StartupDbInit", Table="crosswords", Column="is_ai_generated",
+            )
     finally:
         conn.close()
 
@@ -555,9 +788,13 @@ def check_and_add_keyword_material_columns():
         try:
             conn.execute(f"ALTER TABLE crosswords ADD COLUMN {col}")
             conn.commit()
+            logger.info("startup_column_added", extra={"Operation": "StartupDbInit", "Table": "crosswords", "Column": col})
         except sqlite3.OperationalError as e:
             if "duplicate column name" not in str(e):
-                print(f"Սխալ {col}:", e)
+                log_critical_startup_failure(
+                    logger, "startup_column_add_failed", exception=e,
+                    Operation="StartupDbInit", Table="crosswords", Column=col,
+                )
     conn.close()
 
 
@@ -567,10 +804,13 @@ def check_and_add_show_creator_data_column():
     try:
         conn.execute("ALTER TABLE crosswords ADD COLUMN show_creator_data TEXT DEFAULT 'no';")
         conn.commit()
-        print("✅ show_creator_data սյունակը ավելացվեց")
+        logger.info("startup_column_added", extra={"Operation": "StartupDbInit", "Table": "crosswords", "Column": "show_creator_data"})
     except sqlite3.OperationalError as e:
         if "duplicate column name" not in str(e):
-            print(f"Սխալ show_creator_data: {e}")
+            log_critical_startup_failure(
+                logger, "startup_column_add_failed", exception=e,
+                Operation="StartupDbInit", Table="crosswords", Column="show_creator_data",
+            )
     finally:
         conn.close()
 
@@ -579,10 +819,13 @@ def check_and_add_is_draft_column():
     try:
         conn.execute("ALTER TABLE crosswords ADD COLUMN is_draft INTEGER DEFAULT 0;")
         conn.commit()
-        print("✅ is_draft սյունակը ավելացվեց")
+        logger.info("startup_column_added", extra={"Operation": "StartupDbInit", "Table": "crosswords", "Column": "is_draft"})
     except sqlite3.OperationalError as e:
         if "duplicate column name" not in str(e):
-            print(f"Սխալ is_draft: {e}")
+            log_critical_startup_failure(
+                logger, "startup_column_add_failed", exception=e,
+                Operation="StartupDbInit", Table="crosswords", Column="is_draft",
+            )
     finally:
         conn.close()
 
@@ -590,7 +833,7 @@ def check_and_add_is_draft_column():
 @app.route('/api/creator-claims/<user_id>')
 async def creator_claims(user_id):
     try:
-        url = f"https://mainlogin.dshh.am:15107/api/users/{user_id}/profile-claims"
+        url = f"{MAINLOGIN_BASE}/api/users/{user_id}/profile-claims"
         resp = await asyncio.to_thread(
             lambda: requests.get(url, timeout=10, verify=False)
         )
@@ -599,6 +842,11 @@ async def creator_claims(user_id):
         except Exception:
             return jsonify({"error": "Invalid response", "raw": resp.text[:300]}), resp.status_code
     except Exception as e:
+        logger.error(
+            "creator_claims_fetch_failed",
+            extra={"Operation": "CreatorClaims", "UserId": user_id, "RequestId": g.get("request_id")},
+            exc_info=True,
+        )
         return jsonify({"error": str(e)}), 500
 
 
@@ -696,6 +944,11 @@ async def api_crosswords(user_id):
             return jsonify(result)
 
     except Exception as e:
+        logger.error(
+            "api_crosswords_list_failed",
+            extra={"Operation": "ListUserCrosswords", "UserId": user_id, "RequestId": g.get("request_id")},
+            exc_info=True,
+        )
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -743,6 +996,11 @@ async def api_crossword_stats(id):
             })
 
     except Exception as e:
+        logger.error(
+            "crossword_stats_fetch_failed",
+            extra={"Operation": "GetCrosswordStats", "CrosswordId": id, "RequestId": g.get("request_id")},
+            exc_info=True,
+        )
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -771,6 +1029,11 @@ async def api_crossword_vote(id):
         return jsonify({"success": True})
 
     except Exception as e:
+        logger.error(
+            "crossword_vote_failed",
+            extra={"Operation": "CrosswordVote", "CrosswordId": id, "RequestId": g.get("request_id")},
+            exc_info=True,
+        )
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -787,6 +1050,11 @@ async def api_crossword_print(id):
             await db.commit()
         return jsonify({"success": True})
     except Exception as e:
+        logger.error(
+            "crossword_print_count_failed",
+            extra={"Operation": "CrosswordPrintCount", "CrosswordId": id, "RequestId": g.get("request_id")},
+            exc_info=True,
+        )
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -803,6 +1071,11 @@ async def api_crossword_download_count(id):
             await db.commit()
         return jsonify({"success": True})
     except Exception as e:
+        logger.error(
+            "crossword_download_count_failed",
+            extra={"Operation": "CrosswordDownloadCount", "CrosswordId": id, "RequestId": g.get("request_id")},
+            exc_info=True,
+        )
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -820,6 +1093,11 @@ async def api_crossword_share(id):
             await db.commit()
         return jsonify({"success": True})
     except Exception as e:
+        logger.error(
+            "crossword_share_count_failed",
+            extra={"Operation": "CrosswordShareCount", "CrosswordId": id, "RequestId": g.get("request_id")},
+            exc_info=True,
+        )
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -854,6 +1132,11 @@ async def api_crossword_feedback(id):
             await db.commit()
         return jsonify({"success": True})
     except Exception as e:
+        logger.error(
+            "crossword_feedback_save_failed",
+            extra={"Operation": "SaveCrosswordFeedback", "CrosswordId": id, "RequestId": g.get("request_id")},
+            exc_info=True,
+        )
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -887,6 +1170,11 @@ async def api_get_feedback(id):
                 })
             return jsonify(result)
     except Exception as e:
+        logger.error(
+            "crossword_feedback_read_failed",
+            extra={"Operation": "GetCrosswordFeedback", "CrosswordId": id, "RequestId": g.get("request_id")},
+            exc_info=True,
+        )
         return jsonify({"success": False, "error": str(e)}), 500
 
 # ── ՆՈՐ: հանրային endpoint՝ հավանել/չհավանելու քանակները ցույց տալու համար ──
@@ -905,6 +1193,10 @@ async def api_crossword_feedback_counts(id):
                 return jsonify({"likes": 0, "dislikes": 0})
             return jsonify({"likes": row["likes"], "dislikes": row["dislikes"]})
     except Exception as e:
+        logger.warning(
+            "crossword_feedback_counts_failed",
+            extra={"Operation": "GetCrosswordFeedbackCounts", "CrosswordId": id, "RequestId": g.get("request_id"), "Exception": type(e).__name__},
+        )
         return jsonify({"likes": 0, "dislikes": 0, "error": str(e)}), 200
 
 
@@ -933,6 +1225,11 @@ async def api_get_comments(id):
                 for r in rows
             ])
     except Exception as e:
+        logger.error(
+            "comments_fetch_failed",
+            extra={"Operation": "GetComments", "CrosswordId": id, "RequestId": g.get("request_id")},
+            exc_info=True,
+        )
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -965,6 +1262,11 @@ async def api_add_comment(id):
 
         return jsonify({"success": True, "id": comment_id}), 200
     except Exception as e:
+        logger.error(
+            "comment_add_failed",
+            extra={"Operation": "AddComment", "CrosswordId": id, "RequestId": g.get("request_id")},
+            exc_info=True,
+        )
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -1001,9 +1303,18 @@ async def api_delete_crossword(id):
             await db.execute("DELETE FROM crosswords   WHERE id = ?", (id,))
             await db.commit()
 
+            logger.info(
+                "crossword_deleted",
+                extra={"Operation": "DeleteCrossword", "CrosswordId": id, "UserId": user_id, "ViaApiKey": via_key, "RequestId": g.get("request_id")},
+            )
             return jsonify({"success": True}), 200
 
     except Exception as e:
+        logger.error(
+            "crossword_delete_failed",
+            extra={"Operation": "DeleteCrossword", "CrosswordId": id, "RequestId": g.get("request_id")},
+            exc_info=True,
+        )
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -1151,6 +1462,11 @@ async def api_user_stats(user_id, period):
             })
 
     except Exception as e:
+        logger.error(
+            "user_stats_failed",
+            extra={"Operation": "GetUserStats", "UserId": user_id, "Period": period, "RequestId": g.get("request_id")},
+            exc_info=True,
+        )
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -1177,7 +1493,20 @@ async def generate_ai_crossword():
 
     try:
         if keyword_mode != "with":
-            formatted_questions = await provider.generate_questions(topic, question_count, description)
+            # Ավելի շատ ենք խնդրում՝ կրկնվող պատասխանները հեռացնելուց հետո count-ը լրանա
+            raw_questions = await provider.generate_questions(topic, question_count + 8, description)
+
+            seen = set()
+            formatted_questions = []
+            for q in raw_questions:
+                ans = normalize(q["a"])
+                if not ans or ans in seen:
+                    continue
+                seen.add(ans)
+                formatted_questions.append(q)
+                if len(formatted_questions) >= question_count:
+                    break
+
             keyword = ""
             crossword_data = generate_crossword_grid(formatted_questions, keyword)
             if not crossword_data:
@@ -1237,10 +1566,19 @@ async def generate_ai_crossword():
 
         # ← ai_kind-ը գրում ենք ԲՈԼՈՐ ճյուղերի համար (if/else-ից դուրս, try-ի ներսում)
         OTHER_AI_MODELS = {"claude"}  # ← սրանք «ԱՅԼ ԱԲ» են (հետագա մոդելներ ավելացրու այստեղ)
-        print("🔍 ai_model =", repr(ai_model))
         crossword_data['ai_model'] = ai_model
         crossword_data['ai_kind'] = 'other_ai' if (ai_model or '').lower() in OTHER_AI_MODELS else 'dshh_ai'
-        print("🔍 ai_kind =", crossword_data['ai_kind'])
+        logger.info(
+            "ai_crossword_data_prepared",
+            extra={
+                "Operation": "GenerateAiCrossword",
+                "UserId": g.current_user["sub"],
+                "AiModel": ai_model,
+                "AiKind": crossword_data['ai_kind'],
+                "Topic": topic,
+                "QuestionCount": len(formatted_questions),
+            },
+        )
 
         crossword_id = await asyncio.to_thread(
             db_operation_wrapper,
@@ -1258,10 +1596,32 @@ async def generate_ai_crossword():
             show_creator_data  # show_creator_data default
         )
 
+        logger.info(
+            "ai_crossword_created",
+            extra={
+                "Operation": "GenerateAiCrossword",
+                "UserId": g.current_user["sub"],
+                "CrosswordId": crossword_id,
+                "AiModel": ai_model,
+                "RequestId": g.get("request_id"),
+            },
+        )
+
         return redirect(url_for('edit_crossword', id=crossword_id, ai=1))
 
     except Exception as e:
-        print("🛑 Սխալ:", str(e))
+        # Կոնկրետ request-ի ձախողում, app-ը շարունակում է աշխատել → Error, ոչ թե Critical
+        logger.error(
+            "ai_crossword_generation_failed",
+            extra={
+                "Operation": "GenerateAiCrossword",
+                "UserId": g.current_user.get("sub") if getattr(g, "current_user", None) else None,
+                "AiModel": ai_model,
+                "Topic": topic,
+                "RequestId": g.get("request_id"),
+            },
+            exc_info=True,
+        )
         flash("Խաչբառի ստեղծման ժամանակ առաջացավ սխալ։", "danger")
         return redirect(url_for('choose_keyword_mode'))
 
@@ -1295,7 +1655,11 @@ async def ai_questions_for_edit():
         })
 
     except Exception as e:
-        print("❌ ai_questions_for_edit սխալ:", e)
+        logger.error(
+            "ai_questions_for_edit_failed",
+            extra={"Operation": "AiQuestionsForEdit", "Topic": topic, "RequestId": g.get("request_id")},
+            exc_info=True,
+        )
         return jsonify({"error": str(e)}), 500
 
 
@@ -1344,7 +1708,16 @@ async def ai_edit_crossword():
             parsed = parsed.get("pairs") or parsed.get("questions") or []
 
         if not isinstance(parsed, list) or not parsed:
-            print("⚠️ AI raw:", raw[:300])
+            # AI-ն վավեր պատասխան չի վերադարձրել. request-ի ձախողում, ոչ raw payload-ը լոգում ենք
+            # (կանոն 17. request/response body ամբողջությամբ չգրանցել), այլ միայն երկարությունը
+            logger.error(
+                "ai_edit_crossword_invalid_response",
+                extra={
+                    "Operation": "AiEditCrossword",
+                    "RequestId": g.get("request_id"),
+                    "RawResponseLength": len(raw or ""),
+                },
+            )
             return jsonify({"error": "AI-ն վավեր ցանկ չվերադարձրեց"}), 502
 
         normalized = []
@@ -1366,7 +1739,11 @@ async def ai_edit_crossword():
         return jsonify({"pairs": normalized})
 
     except Exception as e:
-        print("❌ ai_edit_crossword սխալ:", repr(e))
+        logger.error(
+            "ai_edit_crossword_failed",
+            extra={"Operation": "AiEditCrossword", "RequestId": g.get("request_id")},
+            exc_info=True,
+        )
         return jsonify({"error": str(e)}), 500
 
 
@@ -1404,7 +1781,15 @@ async def upload_bg():
     if file and allowed_file(file.filename):
         filename = secure_filename(file.filename)
         save_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        await save_file_async(file, save_path)
+        try:
+            await save_file_async(file, save_path)
+        except Exception as e:
+            logger.error(
+                "bg_upload_failed",
+                extra={"Operation": "UploadBackground", "Filename": filename, "RequestId": g.get("request_id")},
+                exc_info=True,
+            )
+            return jsonify({'success': False, 'error': 'Ֆայլը պահպանել չհաջողվեց'})
         return jsonify({'success': True, 'filename': filename, 'url': f'/static/uploads/{filename}'})
     else:
         return jsonify({'success': False, 'error': 'Ֆայլի ֆորմատը թույլատրված չէ'})
@@ -1419,7 +1804,15 @@ async def delete_bg():
 
     file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
     if os.path.exists(file_path):
-        await delete_file_async(file_path)
+        try:
+            await delete_file_async(file_path)
+        except Exception as e:
+            logger.error(
+                "bg_delete_failed",
+                extra={"Operation": "DeleteBackground", "Filename": filename, "RequestId": g.get("request_id")},
+                exc_info=True,
+            )
+            return jsonify({'success': False, 'error': 'Ֆայլը ջնջել չհաջողվեց'})
         return jsonify({'success': True})
     else:
         return jsonify({'success': False, 'error': 'Ֆայլը չի գտնվել'})
@@ -1443,7 +1836,12 @@ async def download_crossword(crossword_id):
 
     try:
         data_json = json.loads(db_data['data']) if isinstance(db_data['data'], str) else db_data['data']
-    except Exception:
+    except Exception as e:
+        logger.error(
+            "crossword_download_data_parse_failed",
+            extra={"Operation": "DownloadCrossword", "CrosswordId": crossword_id, "RequestId": g.get("request_id")},
+            exc_info=True,
+        )
         return "Տվյալների սխալ ձևաչափ։", 500
 
     title = db_data['title'] or "Անանուն Խաչբառ"
@@ -1480,6 +1878,12 @@ async def download_crossword(crossword_id):
     output.seek(0)
 
     safe_filename = "".join([c for c in title if c.isalnum() or c in (' ', '_')]).strip()
+
+    logger.info(
+        "crossword_downloaded",
+        extra={"Operation": "DownloadCrossword", "CrosswordId": crossword_id, "UserId": user_id, "RequestId": g.get("request_id")},
+    )
+
     return send_file(output, mimetype="text/plain", as_attachment=True,
                      download_name=f"{safe_filename}.txt")
 
@@ -1497,6 +1901,11 @@ def db_operation_wrapper(callback, *args, **kwargs):
         return result
     except Exception as e:
         conn.rollback()
+        logger.error(
+            "db_operation_failed",
+            extra={"Operation": getattr(callback, "__name__", "unknown_db_operation")},
+            exc_info=True,
+        )
         raise e
     finally:
         conn.close()
@@ -1640,6 +2049,11 @@ async def save_participant():
         )
         return jsonify({'status': 'success', 'id': participant_id}), 200
     except Exception as e:
+        logger.error(
+            "save_participant_failed",
+            extra={"Operation": "SaveParticipant", "CrosswordId": data.get('crossword_id'), "RequestId": g.get("request_id")},
+            exc_info=True,
+        )
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
@@ -1675,6 +2089,11 @@ async def save_result(id):
             return jsonify({"success": True, "message": "Արդյունքը պահպանվեց ✅"}), 200
 
     except Exception as e:
+        logger.error(
+            "save_result_failed",
+            extra={"Operation": "SaveResult", "CrosswordId": id, "RequestId": g.get("request_id")},
+            exc_info=True,
+        )
         return jsonify({"success": False, "message": "Սխալ պահպանման ժամանակ"}), 500
 
 
@@ -1754,7 +2173,11 @@ async def save_draft():
     # Փորձում ենք ցանց կառուցել, բայց սխալի դեպքում պարզապես անտեսում ենք
     try:
         crossword_data = generate_crossword_grid(questions, keyword) or {}
-    except Exception:
+    except Exception as e:
+        logger.warning(
+            "draft_grid_generation_failed",
+            extra={"Operation": "SaveDraft", "DraftId": draft_id, "RequestId": g.get("request_id"), "Exception": type(e).__name__},
+        )
         crossword_data = {}
 
     # Միշտ պահում ենք raw հարցերը՝ resume-ի համար (սա է Ա7-ի հիմքը)
@@ -1790,6 +2213,11 @@ async def save_draft():
                 show_creator_data, 1  # is_draft=1
             )
     except Exception as e:
+        logger.error(
+            "save_draft_failed",
+            extra={"Operation": "SaveDraft", "DraftId": draft_id, "UserId": g.current_user["sub"], "RequestId": g.get("request_id")},
+            exc_info=True,
+        )
         return jsonify({"success": False, "error": str(e)}), 500
 
     return jsonify({
@@ -1943,6 +2371,11 @@ async def input_questions():
                 show_creator_data
             )
         except Exception as e:
+            logger.error(
+                "input_questions_create_failed",
+                extra={"Operation": "CreateCrossword", "UserId": g.current_user["sub"], "RequestId": g.get("request_id")},
+                exc_info=True,
+            )
             flash(f"Սխալ տվյալների բազայում՝ {e}", "error")
             return redirect(url_for('input_questions'))
 
@@ -2041,27 +2474,26 @@ async def edit_crossword(id):
                         media_val = f"uploads/{fname}"
                         media_type = 'audio' if ext in AUDIO_EXT else 'image'
 
-                        if media_val:
-                            item['q_media'] = media_val
-                            item['q_media_type'] = media_type
+                    if media_val:
+                        item['q_media'] = media_val
+                        item['q_media_type'] = media_type
 
-                        questions.append(item)
+                    questions.append(item)
 
-                # ── ՆՈՐ՝ բանալի բառով խաչբառի ստուգում ──────────────────────────
-                if cw.get('keyword'):  # այս խաչբառը ի սկզբանե բանալի բառով է
-                    question_count = len(questions)
-                    if not keyword:
-                        flash("Բանալի բառը պարտադիր է։", "error")
-                        return redirect(url_for('edit_crossword', id=id))
-                    if len(keyword) != question_count:
-                        flash(
-                            f"Բանալի բառը պետք է ունենա {question_count} տառ "
-                            f"(հիմա ունի {len(keyword)})։",
-                            "error"
-                        )
-                        return redirect(url_for('edit_crossword', id=id))
+        if cw.get('keyword'):
+            question_count = len(questions)
+            if not keyword:
+                flash("Բանալի բառը պարտադիր է։", "error")
+                return redirect(url_for('edit_crossword', id=id))
+            if len(keyword) != question_count:
+                flash(
+                    f"Բանալի բառը պետք է ունենա {question_count} տառ "
+                    f"(հիմա ունի {len(keyword)})։",
+                    "error"
+                )
+                return redirect(url_for('edit_crossword', id=id))
 
-                crossword_data = generate_crossword_grid(questions, keyword)
+        crossword_data = generate_crossword_grid(questions, keyword)
 
         # Կցված նկար/աուդիոն վերադարձնում ենք placed տարրերին
         media_map = {(it['q'], it['a']): it for it in questions if it.get('q_media')}
@@ -2155,6 +2587,11 @@ async def edit_crossword(id):
             flash("Խաչբառը հաջողությամբ թարմացվեց։")
             return redirect(url_for('view_crossword', id=id))
         except Exception as e:
+            logger.error(
+                "edit_crossword_save_failed",
+                extra={"Operation": "EditCrossword", "CrosswordId": id, "UserId": g.current_user["sub"], "RequestId": g.get("request_id")},
+                exc_info=True,
+            )
             return redirect(url_for('edit_crossword', id=id))
 
     crossword_json = json.loads(cw['data'])
@@ -2229,6 +2666,11 @@ async def my_crosswords():
             user_id, page, per_page, query
         )
     except Exception as e:
+        logger.error(
+            "my_crosswords_list_failed",
+            extra={"Operation": "ListMyCrosswords", "UserId": user_id, "RequestId": g.get("request_id")},
+            exc_info=True,
+        )
         flash(f"Սխալ տվյալների բազայից: {e}", "error")
         crosswords, total_pages = [], 0
 
@@ -2243,8 +2685,15 @@ async def delete_crossword(id):
     try:
         user_id = g.current_user["sub"]
         deleted = await asyncio.to_thread(db_operation_wrapper, delete_crossword_from_db, id, user_id)
+        if deleted:
+            logger.info("crossword_deleted", extra={"Operation": "DeleteCrossword", "CrosswordId": id, "UserId": user_id, "RequestId": g.get("request_id")})
         flash('Խաչբառը ջնջվեց։' if deleted else 'Չեք կարող ջնջել այս խաչբառը։')
     except Exception as e:
+        logger.error(
+            "delete_crossword_failed",
+            extra={"Operation": "DeleteCrossword", "CrosswordId": id, "RequestId": g.get("request_id")},
+            exc_info=True,
+        )
         flash(f"Սխալ ջնջելիս: {e}", "error")
     return redirect(url_for('my_crosswords'))
 
@@ -2321,8 +2770,12 @@ async def view_crossword(id):
                 SET view_count = view_count + 1
             """, (id,))
             await db.commit()
-    except Exception:
-        pass
+    except Exception as e:
+        # View-count ինկրեմենտի ձախողումը էջի ցուցադրումը չի խափանում → Warning
+        logger.warning(
+            "view_count_increment_failed",
+            extra={"Operation": "IncrementViewCount", "CrosswordId": id, "Exception": type(e).__name__},
+        )
 
     current_user_id = session.get('user_id')
     is_creator = current_user_id and 'user_id' in cw and str(current_user_id) == str(cw['user_id'])
@@ -2382,10 +2835,68 @@ async def statistics():
     return render_template('statistics.html', user_id=g.current_user["sub"])
 
 
+@app.route('/api/client-log', methods=['POST'])
+async def api_client_log():
+    """
+    Frontend/browser JavaScript-ից եկած error-ները ընդունելու endpoint (PDF, 14.4).
+
+    Անվտանգության կանոններ (PDF, "Production-ի կարևոր կանոններ"):
+    - client-ից եկած տվյալը never trusted է
+    - level-ը whitelist-ով է սահմանվում, client-ը ազատ level/source ընտրել չի կարող
+    - message/page-ի երկարությունը սահմանափակված է
+    - endpoint-ը rate-limit է արված IP-ով
+    - request body-ն ամբողջությամբ չի գրանցվում, միայն այս validated դաշտերը
+    """
+    ALLOWED_CLIENT_LOG_LEVELS = {"Information", "Warning", "Error"}  # Critical client-ից թույլատրված չէ
+    MAX_MESSAGE_LEN = 500
+    MAX_PAGE_LEN = 200
+
+    client_ip = request.headers.get("X-Forwarded-For", request.remote_addr) or "unknown"
+    if _client_log_rate_limited(client_ip):
+        return jsonify({"success": False, "error": "Rate limit exceeded"}), 429
+
+    data = request.get_json(silent=True) or {}
+
+    level = str(data.get("level", "Error") or "Error").strip().capitalize()
+    if level not in ALLOWED_CLIENT_LOG_LEVELS:
+        level = "Error"
+
+    message = str(data.get("message", "") or "Unknown client error").strip()[:MAX_MESSAGE_LEN]
+    page = str(data.get("page", "") or "").strip()[:MAX_PAGE_LEN]
+    client_request_id = str(data.get("requestId", "") or "").strip()[:64] or g.get("request_id")
+
+    user_id = None
+    try:
+        if getattr(g, "current_user", None):
+            user_id = g.current_user.get("sub")
+    except Exception:
+        user_id = None
+
+    log_fields = {
+        "Operation": "ClientLog",
+        "RequestId": client_request_id,
+        "Page": page,
+        "ClientIp": client_ip,
+        "UserId": user_id,
+    }
+
+    if level == "Warning":
+        logger.warning(f"client_log: {message}", extra=log_fields)
+    elif level == "Error":
+        logger.error(f"client_log: {message}", extra=log_fields)
+    else:
+        logger.info(f"client_log: {message}", extra=log_fields)
+
+    return jsonify({"success": True}), 200
+
+
 @app.route('/dashboard-debug')
 def dashboard_debug():
+    # Authorization header-ը ամբողջությամբ չենք վերադարձնում response-ում (կանոն 17),
+    # այլ միայն presence/prefix-ը
     auth = request.headers.get("Authorization", "ՉԿԱ")
-    return jsonify({"auth_header": auth[:100], "all_headers": dict(request.headers)})
+    masked_auth = (auth[:15] + "…") if auth != "ՉԿԱ" else auth
+    return jsonify({"auth_header_present": auth != "ՉԿԱ", "auth_header_prefix": masked_auth})
 
 
 @app.route('/debug')
@@ -2493,8 +3004,18 @@ def admin_login():
             session['admin'] = True
             session['admin_id'] = admin['id']
             session.modified = True
+            logger.info(
+                "admin_login_success",
+                extra={"Operation": "AdminLogin", "AdminId": admin['id'], "RequestId": g.get("request_id")},
+            )
             return redirect(url_for('admin_dashboard'))
 
+        # Սխալ մուտքանուն/գաղտնաբառ → Warning (PDF, "Wrong password / failed login attempts")
+        # ⚠️ password-ն ինքը երբեք չենք լոգավորում
+        logger.warning(
+            "admin_login_failed",
+            extra={"Operation": "AdminLogin", "Username": username, "RequestId": g.get("request_id")},
+        )
         flash("Սխալ մուտքանուն կամ գաղտնաբառ")
     return render_template('admin/login.html')
 
@@ -2502,8 +3023,10 @@ def admin_login():
 @app.route('/admin/logout')
 @admin_required
 def admin_logout():
+    admin_id = session.get('admin_id')
     session.pop('admin', None)
     session.pop('admin_id', None)
+    logger.info("admin_logout", extra={"Operation": "AdminLogout", "AdminId": admin_id, "RequestId": g.get("request_id")})
     flash("Դուրս եք եկել ադմին պանելից")
     return redirect(url_for('admin_login'))
 
@@ -2569,6 +3092,10 @@ def admin_delete_crossword(id):
     conn.execute("DELETE FROM comments        WHERE crossword_id=?", (id,))
     conn.commit()
     conn.close()
+    logger.info(
+        "admin_crossword_deleted",
+        extra={"Operation": "AdminDeleteCrossword", "CrosswordId": id, "AdminId": session.get("admin_id"), "RequestId": g.get("request_id")},
+    )
     flash("Խաչբառը ջնջվեց")
     return redirect(url_for('admin_dashboard'))
 
@@ -2583,6 +3110,10 @@ def admin_toggle_crossword(id):
     conn.execute("UPDATE crosswords SET hidden=? WHERE id=?", (0 if current else 1, id))
     conn.commit()
     conn.close()
+    logger.info(
+        "admin_crossword_visibility_toggled",
+        extra={"Operation": "AdminToggleCrossword", "CrosswordId": id, "AdminId": session.get("admin_id"), "NewHidden": 0 if current else 1, "RequestId": g.get("request_id")},
+    )
     flash("Խաչբառի տեսանելիությունը թարմացվեց")
     return redirect(url_for('admin_dashboard'))
 
@@ -2662,10 +3193,19 @@ def admin_edit_full_crossword(cw_id):
                 """, (cw_id, q['question'], q['answer'], q['number'], q['dir']))
 
             conn.commit()
+            logger.info(
+                "admin_crossword_edited",
+                extra={"Operation": "AdminEditFullCrossword", "CrosswordId": cw_id, "AdminId": session.get("admin_id"), "RequestId": g.get("request_id")},
+            )
             flash("Խաչբառը հաջողությամբ թարմացվեց")
             return redirect(url_for("admin_dashboard"))
         except Exception as e:
             conn.rollback()
+            logger.error(
+                "admin_crossword_edit_failed",
+                extra={"Operation": "AdminEditFullCrossword", "CrosswordId": cw_id, "RequestId": g.get("request_id")},
+                exc_info=True,
+            )
             flash(f"Սխալ տվյալների բազայում՝ {e}", "error")
             return redirect(url_for("admin_edit_full_crossword", cw_id=cw_id))
 
@@ -2693,6 +3233,11 @@ def admin_change_credentials():
         new_password = request.form.get('new_password', '')
 
         if not check_password_hash(admin['password'], old_password):
+            # Սխալ հին գաղտնաբառ → Warning, password-ը երբեք չգրանցել
+            logger.warning(
+                "admin_change_credentials_wrong_old_password",
+                extra={"Operation": "AdminChangeCredentials", "AdminId": admin['id'], "RequestId": g.get("request_id")},
+            )
             flash("Հին գաղտնաբառը սխալ է ❌")
             conn.close()
             return render_template("admin/change_credentials.html", admin=admin)
@@ -2703,6 +3248,11 @@ def admin_change_credentials():
                          (new_username, hashed, admin['id']))
             conn.commit()
         except Exception as e:
+            logger.error(
+                "admin_change_credentials_failed",
+                extra={"Operation": "AdminChangeCredentials", "AdminId": admin['id'], "RequestId": g.get("request_id")},
+                exc_info=True,
+            )
             flash(f"Սխալ՝ {e} ❌")
             conn.close()
             return render_template("admin/change_credentials.html", admin=admin)
@@ -2710,6 +3260,10 @@ def admin_change_credentials():
         conn.close()
         session['admin'] = True
         session['admin_id'] = admin['id']
+        logger.info(
+            "admin_credentials_changed",
+            extra={"Operation": "AdminChangeCredentials", "AdminId": admin['id'], "RequestId": g.get("request_id")},
+        )
         flash("Տվյալները հաջողությամբ փոփոխվեցին ✅")
         return redirect(url_for('admin_dashboard'))
 
@@ -2731,6 +3285,8 @@ if __name__ == '__main__':
     if not os.path.exists(os.path.join(BASE_DIR, 'dataset')):
         os.makedirs(os.path.join(BASE_DIR, 'dataset'))
 
+    logger.info("startup_begin", extra={"Operation": "AppStartup", "Env": ENV if 'ENV' in dir() else os.getenv("FLASK_ENV", "production")})
+
     check_and_add_creator_name_column()
     check_and_create_participants_table()
     check_and_add_hidden_column()
@@ -2744,12 +3300,24 @@ if __name__ == '__main__':
     check_and_add_created_at_column()
     check_and_add_show_creator_data_column()
     check_and_add_is_draft_column()
+    ensure_admin_tables()
 
     if INTERNAL_API_KEY:
-        print(
-            f"🔑 INTERNAL_API_KEY loaded: {INTERNAL_API_KEY[:6]}…{INTERNAL_API_KEY[-4:]} (len={len(INTERNAL_API_KEY)})")
+        # ⚠️ API key-ը երբեք ամբողջությամբ չգրանցել (PDF, գլուխ 8). միայն masked prefix/suffix + երկարություն
+        logger.info(
+            "internal_api_key_loaded",
+            extra={
+                "Operation": "AppStartup",
+                "KeyPrefix": INTERNAL_API_KEY[:4] + "***",
+                "KeyLength": len(INTERNAL_API_KEY),
+            },
+        )
     else:
-        print("❌ INTERNAL_API_KEY EMPTY — .env չի բեռնվել կամ տողը բացակայում է!")
+        log_critical_startup_failure(
+            logger, "internal_api_key_missing",
+            Operation="AppStartup",
+            Detail=".env չի բեռնվել կամ INTERNAL_API_KEY տողը բացակայում է",
+        )
 
     host = os.getenv("HOST", "0.0.0.0")
     port = int(os.getenv("PORT", "15400"))
@@ -2759,4 +3327,13 @@ if __name__ == '__main__':
     if os.getenv("USE_HTTPS", "false").lower() == "true":
         ssl_context = ("certs/cert.pem", "certs/key.pem")
 
-    app.run(host=host, port=port, debug=debug, ssl_context=ssl_context)
+    logger.info("app_run", extra={"Operation": "AppStartup", "Host": host, "Port": port, "Debug": debug})
+
+    try:
+        app.run(host=host, port=port, debug=debug, ssl_context=ssl_context)
+    except Exception as e:
+        log_critical_startup_failure(
+            logger, "app_terminated_unexpectedly", exception=e,
+            Operation="AppStartup",
+        )
+        raise
