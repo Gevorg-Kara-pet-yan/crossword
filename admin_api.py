@@ -297,7 +297,18 @@ def admin_stats():
         shares = one("SELECT SUM(share_count) FROM crossword_stats")
         prints = one("SELECT SUM(print_count) FROM crossword_stats")
 
-        since = (datetime.now(AM_TZ) - timedelta(days=29)).strftime("%Y-%m-%d")
+        # Activity window for the per-day series and the in-period counts.
+        # Default 30 keeps the previous behaviour; the engagement totals above
+        # come from counter columns without timestamps, so they stay all-time.
+        days = request.args.get("days", 30, type=int) or 30
+        days = max(1, min(days, 365))
+        since = (datetime.now(AM_TZ) - timedelta(days=days - 1)).strftime("%Y-%m-%d")
+
+        crosswords_in_period = one(
+            "SELECT COUNT(*) FROM crosswords WHERE created_at >= ?", (since,))
+        participants_in_period = one(
+            "SELECT COUNT(*) FROM participants WHERE start_time >= ?", (since,))
+
         daily = [
             {"date": r["d"], "crosswords": r["n"]}
             for r in conn.execute(
@@ -359,6 +370,9 @@ def admin_stats():
             "totalDownloads": downloads,
             "totalShares": shares,
             "totalPrints": prints,
+            "periodDays": days,
+            "crosswordsInPeriod": crosswords_in_period,
+            "participantsInPeriod": participants_in_period,
             "crosswordsPerDay": daily,
             "participantsPerDay": daily_p,
             "topCrosswords": top,
