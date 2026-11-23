@@ -6,8 +6,10 @@ import anthropic
 import requests
 from abc import ABC, abstractmethod
 from dotenv import load_dotenv
+from logging_config import get_logger
 
 load_dotenv()
+logger = get_logger("ai_provider")
 
 # ─── Shared helpers ────────────────────────────────────────────────
 
@@ -66,14 +68,22 @@ class AIProvider(ABC):
             parsed = clean_json_response(raw)
             items = parsed.get("questions", []) if isinstance(parsed, dict) else parsed
         except Exception as e:
-            print("❌ JSON parse սխալ:", e, "\nRAW:", raw[:300])
+            logger.error(
+                "ai_json_parse_failed",
+                extra={"Operation": "GenerateQuestions", "Exception": type(e).__name__,
+                       "RawLength": len(raw or ""), "RawTail": (raw or "")[-150:]},
+            )
             return []
 
-        return [
-            {"q": item["q"].strip(), "a": normalize(item["a"])}
-            for item in items
-            if len(item.get("a", "").strip()) >= 3
-        ]
+        result = []
+        for item in items or []:
+            if not isinstance(item, dict):
+                continue
+            q = str(item.get("q") or item.get("question") or "").strip()
+            a = normalize(str(item.get("a") or item.get("answer") or ""))
+            if q and len(a) >= 3:
+                result.append({"q": q, "a": a})
+        return result
 
     def call_for_json(self, prompt: str) -> list | dict:
         """Sync կանչ, JSON վերադարձ (spell-check route-ի համար)"""
@@ -95,17 +105,24 @@ class ClaudeProvider(AIProvider):
         if not api_key:
             raise RuntimeError("ANTHROPIC_API_KEY is not set")
         self._client = anthropic.Anthropic(api_key=api_key)
-        # Մոդելը .env-ից (default՝ ընթացիկ վավեր claude-sonnet-4-6)
         self._model = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6")
+        self._max_tokens = int(os.getenv("ANTHROPIC_MAX_TOKENS", "8000"))
 
     async def ask_async(self, prompt: str) -> str:
         message = await asyncio.to_thread(
             self._client.messages.create,
             model=self._model,
-            max_tokens=1500,
+            max_tokens=self._max_tokens,
             messages=[{"role": "user", "content": prompt}],
         )
-        return message.content[0].text.strip()
+        if message.stop_reason == "max_tokens":
+            logger.warning(
+                "claude_response_truncated",
+                extra={"Operation": "ClaudeAsk", "Model": self._model, "MaxTokens": self._max_tokens},
+            )
+        return "".join(
+            b.text for b in message.content if getattr(b, "type", "") == "text"
+        ).strip()
 
 # ─── Custom / DSH AI ──────────────────────────────────────────────
 

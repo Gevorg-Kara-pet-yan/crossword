@@ -3,9 +3,13 @@ load_dotenv()
 
 import os
 
+# AUTHSERVER_BASE_URL = os.environ.get(
+#     "AUTHSERVER_BASE_URL",
+#     "{{ MAINLOGIN_PUBLIC }}"
+# )
 AUTHSERVER_BASE_URL = os.environ.get(
     "AUTHSERVER_BASE_URL",
-    "https://mainlogin.dshh.am:15107"
+    ""
 )
 
 INTROSPECT_CLIENT_ID = os.environ.get(

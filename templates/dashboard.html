@@ -371,15 +371,15 @@
                     <div class="tb-user-name" id="userName">{{ user.get('name', '') }}</div>
                     <div class="tb-user-mail" id="userMail">{{ user.get('email', '') }}</div>
                 </div>
-                <a href="https://mainlogin.dshh.am:15107/Profiles/UserProfile">
+                <a href="{{ MAINLOGIN_PUBLIC }}/Profiles/UserProfile">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                     Անձնական Էջ
                 </a>
-                <a href="https://mainlogin.dshh.am:15107/Settings">
+                <a href="{{ MAINLOGIN_PUBLIC }}/Settings">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
                     Կարգավորումներ
                 </a>
-                <a href="https://mainlogin.dshh.am:15107/Account/Logout" class="tb-logout">
+                <a href="{{ MAINLOGIN_PUBLIC }}/Account/Logout" class="tb-logout">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
                     Դուրս գալ
                 </a>
@@ -416,10 +416,10 @@
                 <span class="chevron">▼</span>
             </div>
             <div class="group-children">
-                <a href="https://gatewayapi.dshh.am:15106/ibook/">թղթապանակ</a>
+                <a href="{{ GATEWAY_PUBLIC }}/ibook/">թղթապանակ</a>
                 <a href="{{ url_for('choose_keyword_mode') }}" class="active">խաչբառ</a>
-                <a href="https://gatewayapi.dshh.am:15106/ibook/digital-book">Նյութերի թվայնացում</a>
-                <a href="https://gatewayapi.dshh.am:15106/pairmatch">Գտիր զույգը</a>
+                <a href="{{ GATEWAY_PUBLIC }}/ibook/ibook/digital-book">Նյութերի թվայնացում</a>
+                <a href="{{ GATEWAY_PUBLIC }}/pairmatch">Գտիր զույգը</a>
             </div>
         </div>
 
@@ -436,7 +436,7 @@
             </div>
             <div class="group-children">
                 <a href="https://gatewayapi.dshh.am:15106/ibook/">Թղթապանակներ</a>
-                <a href="https://mainlogin.dshh.am:15107/Materials/Crosswords">Խաչբառներ</a>
+                <a href="{{ MAINLOGIN_PUBLIC }}/Materials/Crosswords">Խաչբառներ</a>
                 <a href="#">Թվայնացված նյութերը</a>
                 <a href="#"><<Գտիր զույգը>> խաղեր</a>
             </div>
@@ -445,19 +445,19 @@
         <div class="sidebar-divider"></div>
 
         <!-- Վիճակագրություն -->
-        <a class="rail-item" href="https://mainlogin.dshh.am:15107/Profiles/UserStatistics" title="Վիճակագրություն">
+        <a class="rail-item" href="{{ MAINLOGIN_PUBLIC }}/Profiles/UserStatistics" title="Վիճակագրություն">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="20" x2="6" y2="13"/><line x1="12" y1="20" x2="12" y2="7"/><line x1="18" y1="20" x2="18" y2="10"/></svg>
             <span class="rail-label">Վիճակագրություն</span>
         </a>
 
         <!-- Կարգավորումներ -->
-        <a class="rail-item" href="https://mainlogin.dshh.am:15107/Settings" title="Կարգավորումներ">
+        <a class="rail-item" href="{{ MAINLOGIN_PUBLIC }}/Settings" title="Կարգավորումներ">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
             <span class="rail-label">Կարգավորումներ</span>
         </a>
 
         <!-- Անձնական էջ -->
-        <a class="rail-item" href="https://mainlogin.dshh.am:15107/Profiles/UserProfile" title="Անձնական էջ">
+        <a class="rail-item" href="{{ MAINLOGIN_PUBLIC }}/Profiles/UserProfile" title="Անձնական էջ">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
             <span class="rail-label">Անձնական էջ</span>
         </a>
@@ -468,13 +468,13 @@
         <div class="flyout-header">Կրթական գործիքներ</div>
         <a href="https://gatewayapi.dshh.am:15106/ibook/">թղթապանակ</a>
         <a href="{{ url_for('choose_keyword_mode') }}" class="active">խաչբառ</a>
-        <a href="https://gatewayapi.dshh.am:15106/ibook/digital-book">նյութերի թվայնացում</a>
+        <a href="{{ GATEWAY_PUBLIC }}/ibook/ibook/digital-book">նյութերի թվայնացում</a>
         <a href="#">զույգերի խաղ</a>
     </div>
     <div class="flyout" id="flyout-mine">
         <div class="flyout-header">Իմ ստեղծած նյութերը</div>
         <a href="https://gatewayapi.dshh.am:15106/ibook/">Թղթապանակներ</a>
-        <a href="https://mainlogin.dshh.am:15107/Materials/Crosswords">Խաչբառներ</a>
+        <a href="{{ MAINLOGIN_PUBLIC }}/Materials/Crosswords">Խաչբառներ</a>
         <a href="#">Թվայնացված նյութեր</a>
         <a href="#"><<Գտիր զույգը>> խաղեր</a>
     </div>
@@ -511,7 +511,7 @@
             <span class="close-btn" onclick="closeGuide()">✕</span>
             <h2>📖 </h2>
 
-            <h3>➕ «Ստեղծել նոր խաչբառ» բաժին</h3>
+            <h3><span class="plus-ic"></span>«Ստեղծել նոր խաչբառ» բաժին</h3>
             <ol>
                 <li>Աշխատանքը սկսելու համար սեղմե՛ք «Ստեղծել նոր խաչբառ» կոճակը։</li>
                 <li>Ընտրե՛ք խաչբառի տեսակը՝ բանալի բառով կամ առանց բանալի բառի։ (💡 Մանրամասների համար սեղմե՛ք «Ի՞նչ է սա նշանակում» կոճակը)։</li>

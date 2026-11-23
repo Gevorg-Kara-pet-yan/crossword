@@ -12,7 +12,7 @@ The current implementation **does not include real authentication or authorizati
 
 ### Current State
 - **Model:**  
-  `user_id ` is hardcoded in all DB operations  
+  `user_id = 1` is hardcoded in all DB operations  
   *(e.g., `insert_new_crossword_db`, `fetch_crossword_by_id`)*
 
 - **Session Layer:**  

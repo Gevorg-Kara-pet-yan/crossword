@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ title }}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="{{ url_for('static', filename='js/client-logger.js') }}"
+        data-log-endpoint="{{ url_for('api_client_log') }}"
+        data-request-id="{{ g.get('request_id', '') }}"></script>
     <style>
         /* ==== Խաչբառի մանրամասներ popup ==== */
 .xb-overlay{
@@ -57,7 +60,7 @@
             --card-shadow: 0 18px 50px rgba(232, 216, 234, 0.75), 0 2px 8px rgba(0, 0, 0, 0.04);
         }
 
-        @media print {
+                @media print {
             .top-actions, #timer, #hintBtn, #checkBtn,
             #actionToolbar, #qrcode,
             #commentsSection, #backBtn, #feedbackBox,
@@ -71,7 +74,47 @@
             }
             body { background: none !important; padding: 0 !important; }
             .grid-card { box-shadow: none !important; }
-            #printQuestions { display: block !important; }
+
+            /* Վերնագիր՝ մաքուր, սև */
+            .cw-header { display: flex !important; min-height: 0; margin: 0 0 12px !important; }
+            .cw-header h2 {
+                color: #000 !important;
+                text-shadow: none !important;
+                font-size: 24px;
+                max-width: none;
+            }
+
+            /* Ցանցը մեկ էջում, չկիսվի */
+            .grid-card { break-inside: avoid; page-break-inside: avoid; }
+
+            /* Հարցերը՝ միշտ նոր էջից (ինչպես PDF-ում) */
+            #printQuestions {
+                display: block !important;
+                width: 100%;
+                text-align: left;
+                break-before: page;          /* ժամանակակից դիտարկիչներ */
+                page-break-before: always;   /* հին դիտարկիչներ */
+            }
+                        /* 1-ին էջը՝ ամբողջ բարձրությամբ, footer-ը՝ ներքևում */
+            .print-page1 {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                width: 100%;
+                /* A4 բարձրություն − body-ի վերևի/ներքևի 1.5cm լուսանցքներ − փոքր պաշար */
+                min-height: calc(297mm - 3cm - 8mm);   /* A4 − լուսանցքներ − պաշար */
+                box-sizing: border-box;
+            }
+                        .print-page1 .cw-footer {
+                margin-top: auto !important;   /* հրում է էջի ամենաներքև */
+            }
+
+            /* body-ն flex չլինի, որ 1-ին էջը չտեղափոխվի հաջորդ էջ */
+            body {
+                display: block !important;
+                min-height: 0 !important;
+            }
+            .print-page1 .grid-card { margin: 10px auto !important; }
         }
 
         /* ===== ստեղծողի տվյալների պատուհան ===== */
@@ -152,6 +195,10 @@
             border: 2px solid #f3b8b8 !important;
             box-shadow: none !important;
             animation: wrongShake 0.4s ease-in-out;
+        }
+        .cell input.first-cell-clickable {
+            pointer-events: auto;
+            cursor: pointer;
         }
 
         body {
@@ -513,6 +560,31 @@
             border-radius:16px; width:90%; max-width:480px; z-index:4000;
             overflow:hidden; box-shadow:0 0 30px rgba(0,0,0,0.5);
         }
+
+        .round-icon-btn[data-tip] { position: relative; }
+.round-icon-btn[data-tip]::after {
+    content: attr(data-tip);
+    position: absolute;
+    top: calc(100% + 10px);
+    left: 50%;
+    transform: translateX(-50%) translateY(-4px);
+    background: linear-gradient(90deg, #B853E2, #E35DB4);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    white-space: nowrap;
+    padding: 10px 22px;
+    border-radius: 22px;
+    box-shadow: 0 6px 16px rgba(184, 83, 226, 0.35);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .18s ease, transform .18s ease;
+    z-index: 100;
+}
+.round-icon-btn[data-tip]:hover::after {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
         /* ===== Toolbar կոճակների gradient tooltip (ըստ SVG-ի) ===== */
 /* ===== Toolbar կոճակների gradient tooltip (ներքևից) ===== */
 .tool-btn[data-tip] { position: relative; }
@@ -735,8 +807,27 @@
     pointer-events: none;
 }
 @media (max-width: 600px) {
-    .cw-footer { padding: 10px 16px; gap: 20px; flex-wrap: wrap; }
-    .cw-footer p { font-size: 10px; }
+    .cw-footer {
+        flex-direction: column;
+        flex-wrap: wrap;
+        justify-content: center;
+        align-items: center;
+        gap: 4px;
+        padding: 16px 16px;
+        text-align: center;
+    }
+    .cw-footer .footer-col {
+        gap: 4px;
+        align-items: center;
+        text-align: center;
+        width: 100%;
+    }
+    .cw-footer p {
+        font-size: 11px;
+        line-height: 1.5;
+        text-align: center;
+        white-space: normal;
+    }
 }
     .cw-footer p { font-size: 11px; }
 
@@ -792,9 +883,19 @@
         #printQuestions .pq-group { margin-bottom: 12px; }
         #printQuestions .pq-title { font-weight: 700; color: #6c3483; margin: 6px 0 4px; }
         #printQuestions .pq-item { margin: 3px 0; line-height: 1.4; }
+                #printQuestions .pq-item { break-inside: avoid; page-break-inside: avoid; }
+        #printQuestions .pq-img {
+            display: block;
+            max-width: 220px;
+            max-height: 160px;
+            margin: 6px 0 8px 22px;
+            border-radius: 6px;
+        }
+        #printQuestions .pq-audio { color: #888; font-size: 13px; }
         @page {
-    margin: 0;
-}
+            size: A4;
+            margin: 0;
+        }
 @media print {
     body {
         margin: 1.5cm;
@@ -929,9 +1030,280 @@
 .cell input:focus {
     box-shadow: none !important;
 }
+@media (hover: none), (max-width: 600px) {
+    .tool-btn[data-tip]::after,
+    .round-icon-btn[data-tip]::after {
+        display: none !important;
+    }
+}
+        /* ===== Լայն խաչբառ՝ էջը չլայնանա, ցանցը սահի իր ներսում ===== */
+body{
+    box-sizing:border-box;
+    min-height:100vh;
+    min-height:100dvh;      /* հեռախոսի իրական բարձրությունը */
+    overflow-x:clip;        /* ոչինչ չլայնացնի էջը */
+}
+
+.grid-card{
+    display:block;
+    width:max-content;      /* փոքր ցանցը՝ կենտրոնում, ինչպես հիմա */
+    max-width:100%;         /* մեծը՝ ոչ ավելի, քան էկրանը */
+    box-sizing:border-box;
+    overflow-x:auto;        /* մեծ ցանցը՝ հորիզոնական սահում է */
+    overflow-y:hidden;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:thin;
+    scrollbar-color:#E05DB7 transparent;
+}
+.grid-card::-webkit-scrollbar{ height:5px; }
+.grid-card::-webkit-scrollbar-thumb{ background:#E05DB7; border-radius:3px; }
+
+/* Տպելիս՝ ամբողջ ցանցը, առանց սահելու */
+@media print{
+    .grid-card{ overflow:visible !important; max-width:none !important; width:auto; }
+}
+        /* ===== Հարցի պատուհան՝ կոճակները չկտրվեն ===== */
+/* Կոճակների շարքը՝ #questionText-ի վերջին տարրն է */
+#questionText > div:last-child{ gap:12px !important; }
+#questionText > div:last-child button{ margin:0 !important; }
+
+@media (max-width:600px){
+    #questionPopup{
+        width:94%;
+        max-height:90vh;
+        max-height:90dvh;          /* հեռախոսի իրական բարձրությունը */
+        overflow-y:auto;           /* երկար հարցը՝ սահում է, ոչ թե կտրվում */
+    }
+    #popupBody{ padding:16px 14px; }
+    #popupHeader{ padding:12px 14px; font-size:14px; }
+
+    /* Երկու կոճակն էլ՝ հավասար լայնքով, պատուհանի մեջ */
+    #questionText > div:last-child button{
+        flex:1 1 0;
+        min-width:0;
+        padding:13px 10px !important;
+        font-size:16px !important;
+    }
+
+    /* Տառերի վանդակները՝ մի փոքր փոքր, որ շատ տառ տեղավորվի */
+    .qp-letter{ width:38px; height:38px; font-size:18px; }
+
+    /* Հարցի նկարը՝ ավելի ցածր, որ կոճակները երևան */
+    #questionText img{ max-height:180px !important; }
+}
+        /* ===== Մեկնաբանություններ՝ կենտրոնում ===== */
+#commentsSection{ box-sizing:border-box; }
+
+@media (max-width:600px){
+    #commentsSection{
+        width:100%;
+        padding:18px 16px;
+        border-radius:20px;
+    }
+    .comment-form input,
+    .comment-form textarea{ padding:12px 16px; }
+    .comment-form-buttons button{ flex:1; padding:12px 10px; }
+}
+
+/* ===== Խաչբառի մանրամասներ՝ ոչինչ դուրս չգա ===== */
+.xb-card{
+    max-height:90vh;
+    max-height:90dvh;
+    overflow-y:auto;
+}
+.xb-title{ overflow-wrap:anywhere; }
+
+.xb-tags{ gap:12px 16px; }
+.xb-tag-group{
+    flex:1 1 0;          /* երկու սյունը՝ հավասար, կողք կողքի */
+    min-width:0;         /* թույլ է տալիս նեղանալ */
+}
+.xb-tag{
+    white-space:normal;  /* երկար անունը՝ փաթաթվում է */
+    overflow-wrap:anywhere;
+    line-height:1.35;
+}
+
+@media (max-width:600px){
+    .xb-card{ padding:20px 18px 22px; }
+    .xb-title{ font-size:18px; }
+    .xb-tag{ font-size:13px; padding:6px 12px; }
+}
+        /* ===== Ստեղծողի տվյալներ՝ կոմպակտ, չկտրվի, հեշտ սահի ===== */
+#creatorDataPopup{
+    box-sizing:border-box;
+    flex-direction:column;
+    max-height:80vh;
+    max-height:80dvh;
+}
+#creatorDataContent{
+    flex:1 1 auto;
+    min-height:0;
+    overflow-y:auto;
+    overscroll-behavior:contain;      /* սքրոլը չի անցնում հետևի էջին */
+    -webkit-overflow-scrolling:touch;
+    touch-action:pan-y;
+    padding-right:4px;
+    scrollbar-width:thin;
+    scrollbar-color:#E05DB7 transparent;
+}
+#creatorDataContent::-webkit-scrollbar{ width:5px; }
+#creatorDataContent::-webkit-scrollbar-thumb{ background:#E05DB7; border-radius:3px; }
+
+.creator-close{ flex-shrink:0; align-self:center; margin-top:14px; }
+.creator-name, .field-value{ min-width:0; overflow-wrap:anywhere; }
+
+@media (max-width:600px){
+    #creatorDataPopup{ width:92%; padding:16px 14px 14px; border-radius:16px; }
+
+    /* Գլուխ՝ փոքր նկար + անուն */
+    .creator-head{ gap:12px; margin-bottom:10px; }
+    .creator-photo{ width:56px; height:56px; }
+    .creator-name{ font-size:18px; }
+
+    /* Դաշտեր՝ պիտակը վերևում, արժեքը տակը (ամբողջ լայնքով) */
+    .creator-fields{ margin-bottom:10px; }
+    .field-row{
+        display:grid;
+        grid-template-columns:22px 1fr;
+        column-gap:10px; row-gap:2px;
+        padding:8px 2px;
+        align-items:start;
+    }
+    .field-icon{ grid-row:1 / span 2; width:22px; height:22px; }
+    .field-icon svg{ width:18px; height:18px; }
+    .field-label{ font-size:9.5px; letter-spacing:.05em; }
+    .field-value{ font-size:14px; }
+
+    /* Նվաճումներ և նկարագրություն */
+    .creator-achievements{ margin-bottom:10px; }
+    .ach-title{ margin-bottom:6px; }
+    .ach-list li{ font-size:13px; line-height:1.45; padding:8px 10px; margin-bottom:6px; }
+    .creator-desc{ font-size:13px; line-height:1.5; padding:10px 12px; margin-bottom:0; }
+
+    .creator-close{ padding:11px 36px; font-size:15px; margin-top:10px; }
+}
+        /* ===== Կանոնների պատուհան՝ չկտրվի, սահի իր ներսում ===== */
+#rulesPopup > div{
+    display:flex;
+    flex-direction:column;
+    max-height:85vh;
+    max-height:85dvh;
+    box-sizing:border-box;
+}
+#rulesPopup > div > h3,
+#rulesPopup > div > div:last-child{ flex-shrink:0; }
+
+/* Սահում է միայն կանոնների շրջանակը */
+#rulesPopup > div > div:nth-child(2){
+    flex:1 1 auto;
+    min-height:0;
+    overflow-y:auto;
+    overscroll-behavior:contain;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:thin;
+    scrollbar-color:#E05DB7 transparent;
+}
+#rulesPopup > div > div:nth-child(2)::-webkit-scrollbar{ width:5px; }
+#rulesPopup > div > div:nth-child(2)::-webkit-scrollbar-thumb{ background:#E05DB7; border-radius:3px; }
+
+@media (max-width:600px){
+    #rulesPopup{ width:92% !important; border-radius:16px !important; }
+    #rulesPopup > div{ padding:18px 14px 14px !important; }
+    #rulesPopup h3{ font-size:19px !important; margin:0 0 12px !important; }
+    #rulesPopup > div > div:nth-child(2){ padding:14px 12px !important; border-radius:12px !important; }
+    #rulesPopup ul{ font-size:14px !important; line-height:1.45 !important; }
+    #rulesPopup ul li{ gap:8px !important; margin-bottom:10px !important; }
+    #rulesPopup ul li:last-child{ margin-bottom:0 !important; }
+    #rulesPopup ul li svg{ width:14px; height:11px; margin-top:4px !important; }
+    #rulesPopup > div > div:last-child{ margin-top:12px !important; }
+    #rulesPopup > div > div:last-child button{ padding:11px 36px !important; font-size:15px !important; margin:0 !important; }
+}
+
+        /* ===== Հուշման պատուհան՝ նեղ, չկտրվի ===== */
+#hintPopup{
+    box-sizing:border-box;            /* padding-ը/border-ը՝ լայնքի մեջ */
+    width:360px;
+    max-width:86%;
+    max-height:85vh;
+    max-height:85dvh;
+    overflow-y:auto;                  /* մեծ նկար/վիդեո՝ սահում է ներսում */
+    overscroll-behavior:contain;
+    padding:18px 16px 16px;
+    border:1px solid #E8D8EA;
+    border-radius:16px;
+    box-shadow:0 18px 50px rgba(60,40,90,.25);
+    z-index:4000;                     /* մյուս պատուհանների մակարդակով */
+}
+#hintPopup p{ margin:0 0 4px; font-size:15px; line-height:1.55; color:#2c3e50; overflow-wrap:anywhere; }
+#hintPopup audio{ width:100%; max-width:100%; display:block; }
+#hintPopup video,
+#hintPopup img{ max-width:100%; max-height:55vh; max-height:55dvh; display:block; margin:0 auto; border-radius:10px; }
+
+#hintPopup .hint-close-btn{
+    width:auto; height:auto;
+    padding:12px 40px;
+    font-size:15px;
+    margin:14px 0 0;
+}
+
+@media (max-width:600px){
+    #hintPopup{ max-width:82%; padding:14px 12px 12px; }
+    #hintPopup .hint-close-btn{ padding:11px 34px; font-size:14px; margin-top:12px; }
+}
+        .other-error{
+    display:none;
+    color:#E63950;
+    font-size:13px;
+    margin-top:6px;
+    padding-left:4px;
+}
+        /* ===== Լայն խաչբառ՝ ձախ սյուները չկտրվեն ===== */
+.grid{
+    width: max-content;          /* ցանցը՝ իր իրական լայնքով */
+    justify-content: start;      /* ձախից է սկսվում, ոչինչ չի կտրվում */
+    margin: 0 auto;              /* փոքր ցանցը՝ էլի կենտրոնում */
+}
+.grid-card{
+    margin-left: auto;
+    margin-right: auto;
+}
+/* ===== «Արդեն քվեարկել եք» ծանուցում՝ նեղ, մյուսների նման ===== */
+#voteNoticePopup{
+    box-sizing:border-box;
+    width:86% !important;
+    max-width:340px !important;
+    padding:22px 18px 18px !important;
+    border-radius:16px !important;
+}
+#voteNoticeIcon{
+    width:50px !important;
+    height:50px !important;
+    font-size:22px !important;
+    margin-bottom:12px !important;
+}
+#voteNoticeText{
+    font-size:16px !important;
+    margin-bottom:16px !important;
+    overflow-wrap:anywhere;
+}
+#voteNoticePopup button{
+    padding:11px 36px !important;
+    font-size:15px !important;
+}
+
+@media (max-width:600px){
+    #voteNoticePopup{
+        width:82% !important;
+        padding:18px 14px 14px !important;
+    }
+    #voteNoticeText{ font-size:15px !important; }
+    #voteNoticePopup button{ padding:10px 32px !important; font-size:14px !important; }
+}
     </style>
 </head>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <body>
     <a href="https://dshh.am/am" target="_blank">
         <img src="{{ url_for('static', filename='dshh.png') }}" alt="Dshh.am" style="width:87px; height:57px; display:block; margin:10px auto 0;">
@@ -999,7 +1371,7 @@
         <h2>{{ title }}</h2>
 
         <div class="top-actions top-actions-right">
-            <button class="round-icon-btn" onclick="toggleRules()" title="Կանոններ" aria-label="Կանոններ">
+            <button class="round-icon-btn" onclick="toggleRules()" data-tip="Կանոններ" aria-label="Կանոններ">
                 <svg viewBox="0 0 24 24" fill="none" stroke="#BB51DD" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="22" height="22">
                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
                     <polyline points="14 2 14 8 20 8"/>
@@ -1009,7 +1381,7 @@
             </button>
 
             {% if hint_type and hint_value %}
-            <button class="round-icon-btn" id="hintBtn" onclick="toggleHint()" title="Հուշում" aria-label="Հուշում">
+            <button class="round-icon-btn" id="hintBtn" onclick="toggleHint()" data-tip="Հուշում" aria-label="Հուշում">
                 <svg width="18" height="22" viewBox="0 0 17 21" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M12.3751 20.0648C12.3751 20.214 12.3159 20.3571 12.2104 20.4626C12.1049 20.5681 11.9618 20.6273 11.8126 20.6273H4.31263C4.16344 20.6273 4.02037 20.5681 3.91488 20.4626C3.80939 20.3571 3.75013 20.214 3.75013 20.0648C3.75013 19.9157 3.80939 19.7726 3.91488 19.6671C4.02037 19.5616 4.16344 19.5023 4.31263 19.5023H11.8126C11.9618 19.5023 12.1049 19.5616 12.2104 19.6671C12.3159 19.7726 12.3751 19.9157 12.3751 20.0648ZM16.1251 8.06484C16.1283 9.28679 15.8522 10.4933 15.318 11.5923C14.7838 12.6913 14.0055 13.6537 13.0426 14.4061C12.8361 14.5648 12.6687 14.7686 12.553 15.0019C12.4373 15.2352 12.3765 15.4919 12.3751 15.7523V16.3148C12.3751 16.6629 12.2368 16.9968 11.9907 17.2429C11.7446 17.4891 11.4107 17.6273 11.0626 17.6273H5.06263C4.71453 17.6273 4.38069 17.4891 4.13455 17.2429C3.88841 16.9968 3.75013 16.6629 3.75013 16.3148V15.7523C3.74987 15.4946 3.69059 15.2404 3.57684 15.0091C3.46308 14.7779 3.29787 14.5758 3.09388 14.4183C2.13396 13.6707 1.35661 12.7146 0.820627 11.6224C0.284648 10.5301 0.00407275 9.33026 0.000125489 8.11359C-0.0242495 3.7439 3.50544 0.107336 7.86856 0.00233602C8.94356 -0.0235465 10.0129 0.165874 11.0136 0.559448C12.0143 0.953023 12.9261 1.5428 13.6955 2.29406C14.4648 3.04533 15.0761 3.9429 15.4934 4.93396C15.9106 5.92501 16.1254 6.98952 16.1251 8.06484ZM15.0001 8.06484C15.0004 7.1395 14.8155 6.22345 14.4565 5.37063C14.0974 4.5178 13.5713 3.74543 12.9092 3.09899C12.2471 2.45254 11.4624 1.94507 10.6012 1.60647C9.74008 1.26786 8.81988 1.10495 7.89481 1.12734C4.14106 1.22109 1.1045 4.34671 1.12513 8.10421C1.12868 9.15118 1.37021 10.1836 1.83147 11.1235C2.29273 12.0634 2.96164 12.8862 3.78763 13.5295C4.1268 13.7922 4.40121 14.1292 4.58974 14.5145C4.77828 14.8999 4.87591 15.3233 4.87513 15.7523V16.3148C4.87513 16.3646 4.89488 16.4123 4.93004 16.4474C4.96521 16.4826 5.0129 16.5023 5.06263 16.5023H7.50013V12.0483L4.66513 9.21234C4.56577 9.1057 4.51167 8.96467 4.51424 8.81894C4.51682 8.67322 4.57585 8.53418 4.67891 8.43112C4.78197 8.32806 4.92101 8.26903 5.06673 8.26645C5.21246 8.26388 5.35349 8.31798 5.46013 8.41734L8.06263 11.0198L10.6651 8.41734C10.7718 8.31798 10.9128 8.26388 11.0585 8.26645C11.2042 8.26903 11.3433 8.32806 11.4463 8.43112C11.5494 8.53418 11.6084 8.67322 11.611 8.81894C11.6136 8.96467 11.5595 9.1057 11.4601 9.21234L8.62513 12.0483V16.5023H11.0626C11.1124 16.5023 11.16 16.4826 11.1952 16.4474C11.2304 16.4123 11.2501 16.3646 11.2501 16.3148V15.7523C11.2513 15.3218 11.3507 14.8971 11.5408 14.5108C11.7308 14.1245 12.0066 13.7866 12.347 13.523C13.1761 12.8756 13.8461 12.0473 14.3059 11.1013C14.7658 10.1553 15.0032 9.11667 15.0001 8.06484Z" fill="#BB51DD"/>
                 </svg>
@@ -1017,7 +1389,7 @@
             {% endif %}
 
             {% if description %}
-            <button class="round-icon-btn" onclick="toggleDescription()" title="Խաչբառի մանրամասներ" aria-label="Խաչբառի մանրամասներ">
+            <button class="round-icon-btn" onclick="toggleDescription()" data-tip="Խաչբառի մանրամասներ" aria-label="Խաչբառի մանրամասներ">
                 <svg width="8" height="22" viewBox="0 0 9 26" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M0.901099 21.9001C0.679583 21.9001 0.5 22.0797 0.5 22.3012V24.2582C0.5 24.4797 0.679583 24.6593 0.901099 24.6593H7.54395C7.76546 24.6593 7.94505 24.4797 7.94505 24.2582V22.3012C7.94505 22.0797 7.76546 21.9001 7.54395 21.9001H6.38078V9.90113C6.38078 9.78766 6.33273 9.67948 6.24849 9.60342C6.16425 9.52736 6.05186 9.49049 5.93887 9.5021L0.860323 10.0212C0.655648 10.0421 0.5 10.2145 0.5 10.4202V12.1173C0.5 12.3389 0.679583 12.5185 0.901099 12.5185H2.06427V21.9001H0.901099ZM2.46537 11.7162H1.3022V10.7824L5.57851 10.3454V22.3012C5.57851 22.5227 5.7581 22.7023 5.97961 22.7023H7.14278V23.857H1.3022V22.7023H2.46537C2.68688 22.7023 2.86647 22.5227 2.86647 22.3012V12.1173C2.8665 11.8958 2.68692 11.7162 2.46537 11.7162Z" stroke="#BB51DD"/>
                     <path d="M7.09851 3.37642C7.09851 1.79036 5.80819 0.5 4.22212 0.5C2.63606 0.5 1.3457 1.79036 1.3457 3.37642C1.3457 4.96248 2.63606 6.25284 4.22212 6.25284C5.80819 6.25284 7.09851 4.96248 7.09851 3.37642ZM2.14793 3.37642C2.14793 2.23271 3.07841 1.30227 4.22212 1.30227C5.36583 1.30227 6.29628 2.23275 6.29628 3.37642C6.29628 4.5201 5.36583 5.45057 4.22212 5.45057C3.07841 5.45057 2.14793 4.52013 2.14793 3.37642Z" stroke="#BB51DD"/>
@@ -1026,8 +1398,7 @@
             {% endif %}
 
             {% if crossword.show_creator_data == 'yes' %}
-            <button class="round-icon-btn" onclick="toggleCreatorData()" title="Ստեղծողի տվյալները"
-                    aria-label="Ստեղծողի տվյալները">
+            <button class="round-icon-btn" onclick="toggleCreatorData()" data-tip="Ստեղծողի տվյալները" aria-label="Ստեղծողի տվյալները">
                 <svg width="20" height="22" viewBox="0 0 19 21" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M17.1 21C17.1 21 19 21 19 19.25C19 17.5 17.1 12.25 9.5 12.25C1.9 12.25 0 17.5 0 19.25C0 21 1.9 21 1.9 21H17.1ZM1.9418 19.25L1.9 19.243C1.9019 18.781 2.2173 17.4405 3.344 16.233C4.3928 15.1007 6.2358 14 9.5 14C12.7623 14 14.6053 15.1025 15.656 16.233C16.7827 17.4405 17.0962 18.7828 17.1 19.243L17.0848 19.2465L17.0582 19.25H1.9418ZM9.5 8.75C10.5078 8.75 11.4744 8.38125 12.187 7.72487C12.8996 7.0685 13.3 6.17826 13.3 5.25C13.3 4.32174 12.8996 3.4315 12.187 2.77513C11.4744 2.11875 10.5078 1.75 9.5 1.75C8.49218 1.75 7.52563 2.11875 6.81299 2.77513C6.10036 3.4315 5.7 4.32174 5.7 5.25C5.7 6.17826 6.10036 7.0685 6.81299 7.72487C7.52563 8.38125 8.49218 8.75 9.5 8.75ZM15.2 5.25C15.2 5.93944 15.0526 6.62213 14.7661 7.25909C14.4797 7.89605 14.0598 8.4748 13.5305 8.96231C13.0012 9.44982 12.3729 9.83653 11.6813 10.1004C10.9897 10.3642 10.2485 10.5 9.5 10.5C8.75146 10.5 8.01026 10.3642 7.3187 10.1004C6.62715 9.83653 5.99878 9.44982 5.46949 8.96231C4.9402 8.4748 4.52034 7.89605 4.23389 7.25909C3.94743 6.62213 3.8 5.93944 3.8 5.25C3.8 3.85761 4.40053 2.52226 5.46949 1.53769C6.53845 0.553124 7.98827 0 9.5 0C11.0117 0 12.4616 0.553124 13.5305 1.53769C14.5995 2.52226 15.2 3.85761 15.2 5.25Z"
                           fill="#BB51DD"/>
@@ -1050,18 +1421,18 @@
             </h3>
 
             <div style="border:1.5px solid #E8D8EA; border-radius:14px; padding:22px 22px 18px;">
-                <ul style="list-style:none; margin:0; padding:0; font-size:16px; color:#2c3e50; line-height:1.55;">
+                                <ul style="list-style:none; margin:0; padding:0; font-size:16px; color:#2c3e50; line-height:1.55;">
                     <li style="display:flex; align-items:flex-start; gap:12px; margin-bottom:16px;">
                         <svg width="18" height="14" viewBox="0 0 18 14" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0; margin-top:5px;">
                             <path d="M1 7L6 12L17 1" stroke="#E05DB7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                         </svg>
-                        <span>Բացե՛ք հարցը՝ սեղմելով համապատասխան տողի առաջին վանդակում նշված հարցի համարի վրա։</span>
+                        <span>Բացե՛ք հարցը՝ սեղմելով համապատասխան տողի առաջին վանդակի վրա։</span>
                     </li>
                     <li style="display:flex; align-items:flex-start; gap:12px; margin-bottom:16px;">
                         <svg width="18" height="14" viewBox="0 0 18 14" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0; margin-top:5px;">
                             <path d="M1 7L6 12L17 1" stroke="#E05DB7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                         </svg>
-                        <span>Բացված պատուհանում տառ առ տառ մուտքագրե՛ք պատասխանը և սեղմե՛ք «<span style="color:#E05DB7; font-weight:600;">Հաստատել</span>» կոճակը։ Հիշե՛ք․ «<span style="color:#E05DB7; font-weight:600;">ՈՒ</span>» և «<span style="color:#E05DB7; font-weight:600;">ԵՎ</span>» տառերը գրվում են երկու վանդակում։</span>
+                        <span>Բացված պատուհանում տառ առ տառ մուտքագրե՛ք պատասխանը և սեղմե՛ք «<span style="color:#E05DB7; font-weight:600;">Հաստատել</span>» կոճակը։<br>Հիշե՛ք. «<span style="color:#E05DB7; font-weight:600;">ՈՒ</span>» և «<span style="color:#E05DB7; font-weight:600;">ԵՎ</span>» տառերը գրվում են երկու վանդակում։</span>
                     </li>
                     <li style="display:flex; align-items:flex-start; gap:12px; margin-bottom:0;">
                         <svg width="18" height="14" viewBox="0 0 18 14" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0; margin-top:5px;">
@@ -1187,7 +1558,7 @@
         <button class="tool-btn" onclick="scrollToComments()" data-tip="Մեկնաբանել" aria-label="Մեկնաբանել">
             <svg width="22" height="22" viewBox="38 44 20 21" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M51.8984 48.55H56.9984M54.4484 46L56.9984 48.55L54.4484 51.1" stroke="#BB51DD" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M49.35 46.042C49.0704 46.0142 48.7869 46 48.5 46C43.8056 46 40 49.8056 40 54.5C40 56.0482 40.4139 57.4997 41.1371 58.75L40.425 62.575L44.25 61.8629C45.5002 62.5861 46.9518 63 48.5 63C53.1944 63 57 59.1944 57 54.5C57 54.2131 56.9858 53.9296 56.958 53.65" stroke="#BB51DD" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
-        <button class="tool-btn" id="downloadImageBtn" data-tip="Ներբեռնել որպես նկար" aria-label="Ներբեռնել որպես նկար">
+        <button class="tool-btn" id="downloadImageBtn" data-tip="Ներբեռնել PDF" aria-label="Ներբեռնել PDF">
             <svg width="22" height="22" viewBox="31 45 20 19" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M33 58.4922V60.5195C33 61.0572 33.2107 61.5729 33.5858 61.9531C33.9609 62.3333 34.4696 62.5469 35 62.5469H47C47.5305 62.5469 48.0392 62.3333 48.4142 61.9531C48.7893 61.5729 49 61.0572 49 60.5195V58.4922" stroke="#BB51DD" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M36.0078 54.0977L41.0078 59.166L46.0078 54.0977" stroke="#BB51DD" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M41.0078 47V59.164" stroke="#BB51DD" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
         <button class="tool-btn" onclick="printCrossword()" data-tip="Տպել" aria-label="Տպել">
@@ -1268,13 +1639,15 @@
             </label>
             <label class="reason-option like-option">
                 <input type="checkbox" class="like-reason" value="Այլ"
-                       onchange="document.getElementById('likeOtherText').style.display = this.checked ? 'block' : 'none'">
+       onchange="const t=document.getElementById('likeOtherText'); t.style.display = this.checked ? 'block' : 'none'; if(this.checked) t.focus();">
                 <span class="reason-circle"></span>
                 <span>Այլ</span>
             </label>
             <textarea id="likeOtherText" placeholder="Գրեք ձեր կարծիքը..." maxlength="1000"
                       style="display:none; width:100%; margin-top:8px; padding:9px 11px; border:1px solid #ccc;
                              border-radius:8px; font-size:15px; resize:vertical; font-family:inherit; box-sizing:border-box;"></textarea>
+            <div id="likeOtherError" class="other-error">Պարտադիր դաշտ</div>
+            <div id="likeReasonError" class="other-error">Ընտրեք գոնե մեկ տարբերակ</div>
             <div style="text-align:center; margin-top:18px;">
                 <button onclick="submitLike()" style="background:linear-gradient(90deg,#00BC7B,#00A741); border-radius:25px; padding:14px 40px;">Հաստատել</button>
             </div>
@@ -1320,18 +1693,31 @@
             </label>
             <label class="reason-option dislike-option">
                 <input type="checkbox" class="dislike-reason" value="Այլ"
-                       onchange="document.getElementById('dislikeOtherText').style.display = this.checked ? 'block' : 'none'">
+       onchange="const t=document.getElementById('dislikeOtherText'); t.style.display = this.checked ? 'block' : 'none'; if(this.checked) t.focus();">
                 <span class="reason-circle"></span>
                 <span>Այլ</span>
             </label>
             <textarea id="dislikeOtherText" placeholder="Գրեք ձեր կարծիքը..." maxlength="1000"
                       style="display:none; width:100%; margin-top:8px; padding:9px 11px; border:1px solid #ccc;
                              border-radius:8px; font-size:15px; resize:vertical; font-family:inherit; box-sizing:border-box;"></textarea>
+            <div id="dislikeOtherError" class="other-error">Պարտադիր դաշտ</div>
+            <div id="dislikeReasonError" class="other-error">Ընտրեք գոնե մեկ տարբերակ</div>
             <div style="text-align:center; margin-top:18px;">
                 <button onclick="submitDislike()" style="background:linear-gradient(90deg,#FF5A6E,#E63950); border-radius:25px; padding:14px 40px;">Հաստատել</button>
             </div>
         </div>
     </div>
+
+    <!-- ===== ԱՐԴԵՆ ՔՎԵԱՐԿԵԼ ԵՔ — ԾԱՆՈՒՑՈՒՄ ===== -->
+<div id="voteNoticeOverlay" onclick="closeVoteNotice()" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:3999;"></div>
+<div id="voteNoticePopup" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
+        background:#fff; border-radius:18px; width:90%; max-width:380px; z-index:4000;
+        padding:26px 24px 22px; text-align:center; box-shadow:0 20px 60px rgba(0,0,0,0.35);">
+    <div id="voteNoticeIcon" style="width:56px; height:56px; margin:0 auto 14px; border-radius:16px;
+         display:flex; align-items:center; justify-content:center; font-size:26px; color:#fff;"></div>
+    <p id="voteNoticeText" style="font-size:17px; color:#2c3e50; margin:0 0 20px; line-height:1.5; font-weight:600;"></p>
+    <button onclick="closeVoteNotice()" style="background:linear-gradient(90deg,#BB54E0,#E15DB6); border-radius:26px; padding:12px 42px; font-size:15px; margin:0;">Հասկացա</button>
+</div>
 
     <!-- ===== SHARE POPUP (icon grid) ===== -->
     <div id="shareOverlay" onclick="closeShareMenu()"></div>
@@ -1450,24 +1836,30 @@
         let creatorDataLoaded = false;
 
         function toggleCreatorData() {
-            document.getElementById('creatorDataOverlay').style.display = 'block';
-            document.getElementById('creatorDataPopup').style.display = 'block';
-            if (!creatorDataLoaded) loadCreatorData();
-        }
-        function closeCreatorData() {
-            document.getElementById('creatorDataOverlay').style.display = 'none';
-            document.getElementById('creatorDataPopup').style.display = 'none';
-        }
+    document.getElementById('creatorDataOverlay').style.display = 'block';
+    document.getElementById('creatorDataPopup').style.display = 'flex';   // block → flex
+    document.body.style.overflow = 'hidden';                              // հետևի էջը կանգնում է
+    document.getElementById('creatorDataContent').scrollTop = 0;
+    if (!creatorDataLoaded) loadCreatorData();
+}
+function closeCreatorData() {
+    document.getElementById('creatorDataOverlay').style.display = 'none';
+    document.getElementById('creatorDataPopup').style.display = 'none';
+    document.body.style.overflow = '';
+}
 
-        // ===== Կանոնների պատուհան =====
         function toggleRules() {
-            document.getElementById('rulesOverlay').style.display = 'block';
-            document.getElementById('rulesPopup').style.display = 'block';
-        }
-        function closeRules() {
-            document.getElementById('rulesOverlay').style.display = 'none';
-            document.getElementById('rulesPopup').style.display = 'none';
-        }
+    document.getElementById('rulesOverlay').style.display = 'block';
+    document.getElementById('rulesPopup').style.display = 'block';
+    document.body.style.overflow = 'hidden';
+    const box = document.querySelector('#rulesPopup > div > div:nth-child(2)');
+    if (box) box.scrollTop = 0;
+}
+function closeRules() {
+    document.getElementById('rulesOverlay').style.display = 'none';
+    document.getElementById('rulesPopup').style.display = 'none';
+    document.body.style.overflow = '';
+}
 
         // ===== Խաչբառի մանրամասներ =====
         function toggleDescription() {
@@ -1483,7 +1875,7 @@
             const content = document.getElementById('creatorDataContent');
             content.textContent = 'Բեռնվում է...';
             try {
-                const res = await fetch(`${PREFIX}/api/creator-claims/${CREATOR_USER_ID}`);
+                const res = await fetch("{{ url_for('crossword_creator', id=cw_id) }}");
                 if (!res.ok) throw new Error('HTTP ' + res.status);
                 const data = await res.json();
                 content.innerHTML = renderCreatorClaims(data);
@@ -1496,7 +1888,7 @@
 
         const VISIBLE_FIELDS = {{ creator_visible_fields | tojson }};
         const FIELD_LABELS   = {{ creator_field_labels | tojson }};
-        const AVATAR_BASE = "https://mainlogin.dshh.am:15107";
+        const AVATAR_BASE = "{{ MAINLOGIN_PUBLIC }}";
         const FIELD_ICON_SVGS = {
     subject: `<svg viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M8.59291 2.82767C9.30876 2.79251 9.8476 3.3815 9.8476 4.05362V7.12523C9.8476 7.8346 9.27461 8.3775 8.60749 8.42723C8.3301 8.44794 8.05002 8.48164 7.83785 8.53352C7.42273 8.6349 6.87495 8.89974 6.53196 9.0804C6.23061 9.23924 5.86895 9.23924 5.56759 9.0804C5.22461 8.89974 4.67682 8.6349 4.2617 8.53352C4.04952 8.48164 3.76944 8.44794 3.49209 8.42723C2.82492 8.3775 2.25195 7.8346 2.25195 7.12523V4.07892C2.25195 3.39181 2.81347 2.79704 3.54149 2.85034C3.83716 2.87199 4.17779 2.90992 4.46202 2.97936C4.98065 3.10608 5.59882 3.40936 5.94468 3.59089C6.00235 3.62116 6.0742 3.61996 6.13209 3.58647C6.44464 3.40563 6.98798 3.11243 7.45621 2.98264C7.80674 2.88548 8.23868 2.84507 8.59291 2.82767ZM9.00364 4.05362C9.00364 3.81865 8.82438 3.66127 8.63427 3.67061C8.29511 3.68727 7.93924 3.72453 7.6816 3.79594C7.32675 3.89431 6.86488 4.13755 6.55475 4.31697C6.52763 4.33267 6.49995 4.34705 6.47176 4.36012V8.16487C6.81446 7.99828 7.25344 7.80749 7.63755 7.71364C7.91769 7.64522 8.25246 7.60741 8.5447 7.58564C8.81217 7.56566 9.00364 7.35304 9.00364 7.12523V4.05362ZM5.5524 4.33816C5.57716 4.35115 5.60231 4.36308 5.6278 4.37392V8.16487C5.28509 7.99828 4.84613 7.80749 4.46202 7.71364C4.18186 7.64522 3.84708 7.60741 3.55485 7.58564C3.28739 7.56566 3.09591 7.35304 3.09591 7.12523V4.07892C3.09591 3.83881 3.28314 3.67765 3.47986 3.69205C3.7609 3.71263 4.0462 3.74656 4.2617 3.79921C4.67021 3.89902 5.20779 4.15726 5.5524 4.33816Z" fill="#E04AAB"/><path fill-rule="evenodd" clip-rule="evenodd" d="M4.89136 1.66543e-07C3.85737 -8.27307e-06 3.03837 -1.50325e-05 2.3974 0.0861607C1.73775 0.174849 1.20383 0.361711 0.782768 0.782768C0.361711 1.20383 0.174846 1.73775 0.086163 2.3974C-1.6659e-05 3.03837 -1.09978e-05 3.85736 2.5499e-07 4.89136V7.2054C-1.09978e-05 8.23942 -1.6659e-05 9.0584 0.086163 9.69936C0.174846 10.359 0.361711 10.8929 0.782768 11.314C1.20383 11.7351 1.73775 11.9219 2.3974 12.0106C3.03836 12.0968 3.85735 12.0968 4.89134 12.0968H7.2054C8.23942 12.0968 9.0584 12.0968 9.69936 12.0106C10.359 11.9219 10.8929 11.7351 11.314 11.314C11.7351 10.8929 11.9219 10.359 12.0106 9.69936C12.0968 9.0584 12.0968 8.23942 12.0968 7.20546V4.89137C12.0968 3.85738 12.0968 3.03836 12.0106 2.3974C11.9219 1.73775 11.7351 1.20383 11.314 0.782768C10.8929 0.361711 10.359 0.174849 9.69936 0.0861607C9.0584 -1.50325e-05 8.23942 -8.27307e-06 7.2054 1.66543e-07H4.89136ZM1.37954 1.37954C1.61765 1.14142 1.94379 0.998704 2.50986 0.922596C3.08806 0.844856 3.85025 0.843961 4.92311 0.843961H7.17367C8.24651 0.843961 9.00872 0.844856 9.58695 0.922596C10.153 0.998704 10.4791 1.14142 10.7172 1.37954C10.9553 1.61765 11.0981 1.94379 11.1742 2.50986C11.2519 3.08806 11.2528 3.85025 11.2528 4.92311V7.17367C11.2528 8.24651 11.2519 9.00872 11.1742 9.58695C11.0981 10.153 10.9553 10.4791 10.7172 10.7172C10.4791 10.9553 10.153 11.0981 9.58695 11.1742C9.00872 11.2519 8.24651 11.2528 7.17367 11.2528H4.92311C3.85025 11.2528 3.08806 11.2519 2.50986 11.1742C1.94379 11.0981 1.61765 10.9553 1.37954 10.7172C1.14142 10.4791 0.998704 10.153 0.922596 9.58695C0.844856 9.00872 0.843961 8.24651 0.843961 7.17367V4.92311C0.843961 3.85025 0.844856 3.08806 0.922596 2.50986C0.998704 1.94379 1.14142 1.61765 1.37954 1.37954Z" fill="#E04AAB"/></svg>`,
 
@@ -1676,184 +2068,313 @@ if(achKey && (VISIBLE_FIELDS.length === 0 || VISIBLE_FIELDS.includes(achKey))){
             ctx.closePath();
         }
 
-        document.getElementById('downloadImageBtn').addEventListener('click', () => {
-            const name      = document.getElementById('user-name-modal').value;
-            const surname   = document.getElementById('user-surname-modal').value;
-            const gender    = document.getElementById('user-gender-modal').value;
-            const school    = document.getElementById('user-school-modal').value;
-            const userClass = document.getElementById('user-class-modal').value;
+        document.getElementById('downloadImageBtn').addEventListener('click', async () => {
+    if (!window.jspdf) { alert('PDF գրադարանը չբեռնվեց։ Թարմացրեք էջը և փորձեք կրկին։'); return; }
 
-            const userInfo   = `Լրացնող՝ ${name} ${surname}`.trim();
+    const name    = document.getElementById('user-name-modal').value;
+    const surname = document.getElementById('user-surname-modal').value;
 
-            const grid     = document.getElementById('grid');
-            const cellSize = 42;       // վանդակի քայլ (ներառյալ բացատը)
-            const gap      = 6;        // վանդակների միջև բացատ
-            const radius   = 11;
-            const rows     = {{ crossword.rows }};
-            const cols     = {{ crossword.cols }};
+    const grid     = document.getElementById('grid');
+    const cellSize = 42;
+    const gap      = 6;
+    const radius   = 11;
+    const rows     = {{ crossword.rows }};
+    const cols     = {{ crossword.cols }};
 
-            const paddingSides  = 30;
-            const paddingTop    = 90;
-            const paddingBottom = 20;
-            const footerHeight  = 80;   // տեղ ֆութերի համար
+    const paddingSides  = 30;
+    let   paddingTop    = 90;   // ներքևում կհաշվենք՝ ըստ վերնագրի երկարության
+    const paddingBottom = 20;
+    const footerHeight  = 80;
+    const SCALE         = 2;     // որակ՝ PDF-ում չպղտորվելու համար
 
-            const footerColLeft = [
-                '© 2026 ԴՇՀ: Բոլոր իրավունքները պաշտպանված են:',
-                '© Հեղինակ՝ Գևորգ Կարապետյան'
-            ];
-            const footerColRight = [
-                '© UI/UX ձևավորող՝ Էրիկ Մկրտչյան',
-                '© Մասնագիտական խորհրդատու՝ Հայաստան Գրիգորյան'
-            ];
-            const footerColGap = 50;
+    const footerColLeft = [
+        '© 2026 ԴՇՀ: Բոլոր իրավունքները պաշտպանված են:',
+        '© Հեղինակ՝ Գևորգ Կարապետյան'
+    ];
+    const footerColRight = [
+        '© UI/UX ձևավորող՝ Էրիկ Մկրտչյան',
+        '© Մասնագիտական խորհրդատու՝ Հայաստան Գրիգորյան'
+    ];
+    const footerColGap = 50;
 
-            const measureCtx = document.createElement('canvas').getContext('2d');
-            measureCtx.font = '11px Segoe UI';
-            const leftColWidth  = Math.max(...footerColLeft.map(t => measureCtx.measureText(t).width));
-            const rightColWidth = Math.max(...footerColRight.map(t => measureCtx.measureText(t).width));
-            const footerTotalWidth = leftColWidth + footerColGap + rightColWidth;
+    const measureCtx = document.createElement('canvas').getContext('2d');
+    measureCtx.font = '11px Segoe UI';
+    const leftColWidth  = Math.max(...footerColLeft.map(t => measureCtx.measureText(t).width));
+    const rightColWidth = Math.max(...footerColRight.map(t => measureCtx.measureText(t).width));
+    const footerTotalWidth = leftColWidth + footerColGap + rightColWidth;
 
-            const canvasWidth = Math.max(
-                cols * cellSize + paddingSides * 2,
-                Math.ceil(footerTotalWidth) + paddingSides * 2,
-                500
-            );
-            const questionBlockHeight = words.length * 20 + 40;
-            const canvasHeight = rows * cellSize + paddingTop + paddingBottom + questionBlockHeight + footerHeight;
+    const W = Math.max(
+        cols * cellSize + paddingSides * 2,
+        Math.ceil(footerTotalWidth) + paddingSides * 2,
+        500
+    );
 
-            const canvas = document.createElement('canvas');
-            canvas.width  = canvasWidth;
-            canvas.height = canvasHeight;
-            const ctx = canvas.getContext('2d');
+        // ── Վերնագիր (երկար լինելու դեպքում՝ մի քանի տողով) ──
+    const TITLE_FONT   = 'bold 22px Segoe UI';
+    const TITLE_LINE_H = 28;
+    measureCtx.font = TITLE_FONT;
+    const titleLines  = CW_TITLE ? wrapCanvasText(measureCtx, CW_TITLE, W - paddingSides * 2) : [];
+    const titleBlockH = titleLines.length * TITLE_LINE_H;
+    const timerH      = isChecked ? 30 : 0;
+    paddingTop = 20 + titleBlockH + (titleLines.length ? 6 : 0) + timerH + 20;
 
-            function drawImageCover(context, img, w, h) {
-                const ir = img.width / img.height;
-                const cr = w / h;
-                let dw, dh, dx, dy;
-                if (ir > cr) { dh = h; dw = h * ir; dx = (w - dw) / 2; dy = 0; }
-                else { dw = w; dh = w / ir; dx = 0; dy = (h - dh) / 2; }
-                context.drawImage(img, dx, dy, dw, dh);
+    // ── Օգնական ֆունկցիաներ ──
+    function wrapCanvasText(ctx, text, maxWidth) {
+        const tokens = String(text || '').split(/\s+/).filter(Boolean);
+        const lines = [];
+        let line = '';
+        tokens.forEach(tok => {
+            while (ctx.measureText(tok).width > maxWidth && tok.length > 1) {
+                let cut = tok.length - 1;
+                while (cut > 1 && ctx.measureText(tok.slice(0, cut)).width > maxWidth) cut--;
+                if (line) { lines.push(line); line = ''; }
+                lines.push(tok.slice(0, cut));
+                tok = tok.slice(cut);
             }
+            const test = line ? line + ' ' + tok : tok;
+            if (line && ctx.measureText(test).width > maxWidth) { lines.push(line); line = tok; }
+            else { line = test; }
+        });
+        lines.push(line);
+        return lines;
+    }
 
-            function drawContent() {
-            if (isChecked) {
-            ctx.fillStyle = '#2c3e50';
-            ctx.font = 'bold 18px Segoe UI';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'top';
-            const minutes = String(Math.floor(secondsPassed / 60)).padStart(2, '0');
-            const seconds = String(secondsPassed % 60).padStart(2, '0');
-            ctx.fillText(`⏱️ Ժամանակ՝ ${minutes}:${seconds}`, canvasWidth / 2, 10);
-        }
+    function newPage(w, h) {
+        const c = document.createElement('canvas');
+        c.width  = w * SCALE;
+        c.height = h * SCALE;
+        const ctx = c.getContext('2d');
+        ctx.scale(SCALE, SCALE);
+        return { canvas: c, ctx, w, h };
+    }
 
-            ctx.fillStyle = '#555';
-            ctx.font = '14px Segoe UI';
-            ctx.fillText(userInfo, canvasWidth / 2, 40);
+    function loadImage(src) {
+        return new Promise(resolve => {
+            if (!src) return resolve(null);
+            const img = new Image();
+            img.onload  = () => resolve(img);
+            img.onerror = () => resolve(null);
+            img.src = src;
+        });
+    }
 
-            ctx.font = 'bold 18px Segoe UI';
-            const inner = cellSize - gap;
-            for (let i = 0; i < rows; i++) {
-                for (let j = 0; j < cols; j++) {
-                    const cell  = grid.children[i * cols + j];
-                    const input = cell ? cell.querySelector('input') : null;
-                    if (!input) continue; // դատարկ վանդակները չենք գծում
+    function drawImageCover(ctx, img, w, h) {
+        const ir = img.width / img.height, cr = w / h;
+        let dw, dh, dx, dy;
+        if (ir > cr) { dh = h; dw = h * ir; dx = (w - dw) / 2; dy = 0; }
+        else         { dw = w; dh = w / ir; dx = 0; dy = (h - dh) / 2; }
+        ctx.drawImage(img, dx, dy, dw, dh);
+    }
 
-                    const x = j * cellSize + paddingSides + gap / 2;
-                    const y = i * cellSize + paddingTop + gap / 2;
-
-                    let cellColor = '#FFF9FE';
-                    if (input.classList.contains('keyword-cell'))                cellColor = '#ffed99';
-                    if (input.parentElement.classList.contains('found-keyword')) cellColor = 'mediumorchid';
-                    if (input.classList.contains('correct'))                     cellColor = '#d9f7e3';
-                    if (input.classList.contains('wrong'))                       cellColor = '#fbdcdc';
-
-                    roundRectPath(ctx, x, y, inner, inner, radius);
-                    ctx.fillStyle = cellColor;
-                    ctx.fill();
-                    ctx.strokeStyle = '#E8D8EA';
-                    ctx.lineWidth = 1.5;
-                    ctx.stroke();
-
-                    const letter = input.value.toUpperCase() || '';
-                    if (letter) {
-                        ctx.fillStyle = input.parentElement.classList.contains('found-keyword') ? 'white' : '#2c3e50';
-                        ctx.textAlign = 'center';
-                        ctx.textBaseline = 'middle';
-                        ctx.fillText(letter, x + inner / 2, y + inner / 2 + 1);
-                    }
-
-                    const numberDiv = cell.querySelector('.number');
-                    if (numberDiv) {
-                        ctx.font = 'bold 10px Segoe UI';
-                        ctx.textAlign = 'left';
-                        ctx.textBaseline = 'top';
-                        ctx.fillStyle = '#E04AAB';
-                        ctx.fillText(numberDiv.textContent, x + 4, y + 3);
-                        ctx.font = 'bold 18px Segoe UI';
-                    }
-                }
-            }
-
-            // ================= DRAW QUESTIONS =================
-            let yStart = rows * cellSize + paddingTop + 20;
-            ctx.fillStyle = '#000';
-            ctx.font = 'bold 16px Segoe UI';
-            ctx.textAlign = 'left';
-            ctx.textBaseline = 'top';
-            ctx.fillText('Հարցեր՝', paddingSides, yStart);
-            ctx.font = '14px Segoe UI';
-            let lineY = yStart + 24;
-            words.forEach(word => {
-                if (word.question === 'Բանալի բառ') return;
-                const text = `${word.number}. (${word.dir === 'h' ? 'Հորիզոնական' : 'Ուղղահայաց'}) - ${word.question}`;
-                ctx.fillText(text, paddingSides, lineY);
-                lineY += 20;
-            });
-            // ================= DRAW FOOTER =================
-        const footerY = canvasHeight - footerHeight + 14;
-
+    function drawFooter(ctx, w, h) {
+        const footerY = h - footerHeight + 14;
         ctx.strokeStyle = 'rgba(0,0,0,0.15)';
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.moveTo(paddingSides, footerY - 10);
-        ctx.lineTo(canvasWidth - paddingSides, footerY - 10);
+        ctx.lineTo(w - paddingSides, footerY - 10);
         ctx.stroke();
 
         ctx.font = '11px Segoe UI';
         ctx.fillStyle = '#6b6b8a';
         ctx.textAlign = 'left';
         ctx.textBaseline = 'top';
+        const startX = (w - footerTotalWidth) / 2;
+        const rightX = startX + leftColWidth + footerColGap;
+        footerColLeft.forEach((t, i)  => ctx.fillText(t, startX, footerY + i * 16));
+        footerColRight.forEach((t, i) => ctx.fillText(t, rightX, footerY + i * 16));
+    }
 
-        const footerStartX = (canvasWidth - footerTotalWidth) / 2;
-        const colRightX    = footerStartX + leftColWidth + footerColGap;
+    function drawGrid(ctx) {
+        const gridOffsetX = Math.max(paddingSides, (W - cols * cellSize) / 2);
+        const inner = cellSize - gap;
 
-        footerColLeft.forEach((line, idx) => {
-            ctx.fillText(line, footerStartX, footerY + idx * 16);
-        });
-        footerColRight.forEach((line, idx) => {
-            ctx.fillText(line, colRightX, footerY + idx * 16);
-        });
+                let topY = 20;
 
-            const url = canvas.toDataURL('image/png');
-            const a   = document.createElement('a');
-            a.href     = url;
-            a.download = `crossword_${name}_${surname}_${Date.now()}.png`;
-            a.click();
+        // Վերնագիր՝ սպիտակ եզրագծով, որ ֆոնային նկարի վրա էլ կարդացվի
+        if (titleLines.length) {
+            ctx.font = TITLE_FONT;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            ctx.lineJoin = 'round';
+            ctx.lineWidth = 5;
+            ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+            ctx.fillStyle = '#2c3e50';
+            titleLines.forEach((ln, i) => {
+                const y = topY + i * TITLE_LINE_H;
+                ctx.strokeText(ln, W / 2, y);
+                ctx.fillText(ln, W / 2, y);
+            });
+            topY += titleBlockH + 6;
+        }
 
-            fetch(`${PREFIX}/api/crosswords/${CW_ID}/download`, { method: 'POST' }).catch(() => {});
+        if (isChecked) {
+            ctx.fillStyle = '#2c3e50';
+            ctx.font = 'bold 18px Segoe UI';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            const mm = String(Math.floor(secondsPassed / 60)).padStart(2, '0');
+            const ss = String(secondsPassed % 60).padStart(2, '0');
+            ctx.fillText(`⏱️ Ժամանակ՝ ${mm}:${ss}`, W / 2, topY);
+        }
+
+        for (let i = 0; i < rows; i++) {
+            for (let j = 0; j < cols; j++) {
+                const cell  = grid.children[i * cols + j];
+                const input = cell ? cell.querySelector('input') : null;
+                if (!input) continue;
+
+                const x = j * cellSize + gridOffsetX + gap / 2;
+                const y = i * cellSize + paddingTop + gap / 2;
+                const isKeywordCell = input.classList.contains('keyword-cell');
+                const isFound = input.parentElement.classList.contains('found-keyword');
+
+                let cellColor = '#FFF9FE';
+                if (isKeywordCell) cellColor = '#EBC7F0';
+                if (isFound)       cellColor = '#BB51DD';
+                if (input.classList.contains('correct') && !isKeywordCell) cellColor = '#d9f7e3';
+                if (input.classList.contains('wrong')   && !isKeywordCell) cellColor = '#fbdcdc';
+
+                roundRectPath(ctx, x, y, inner, inner, radius);
+                ctx.fillStyle = cellColor;
+                ctx.fill();
+                ctx.strokeStyle = isKeywordCell ? '#BB51DD' : '#E8D8EA';
+                ctx.lineWidth   = isKeywordCell ? 2.5 : 1.5;
+                ctx.stroke();
+
+                const letter = (input.value || '').toUpperCase();
+                if (letter) {
+                    ctx.font = 'bold 18px Segoe UI';
+                    ctx.fillStyle = isFound ? 'white' : '#2c3e50';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(letter, x + inner / 2, y + inner / 2 + 1);
+                }
+
+                const numberDiv = cell.querySelector('.number');
+                if (numberDiv) {
+                    ctx.font = 'bold 10px Segoe UI';
+                    ctx.textAlign = 'left';
+                    ctx.textBaseline = 'top';
+                    ctx.fillStyle = '#E04AAB';
+                    ctx.fillText(numberDiv.textContent, x + 4, y + 3);
+                }
             }
+        }
+    }
 
-            if (BG_URL) {
-                const bgImg = new Image();
-                bgImg.onload = () => { drawImageCover(ctx, bgImg, canvasWidth, canvasHeight); drawContent(); };
-                bgImg.onerror = () => { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvasWidth, canvasHeight); drawContent(); };
-                bgImg.src = BG_URL;
-            } else {
-                ctx.fillStyle = '#fff';
-                ctx.fillRect(0, 0, canvasWidth, canvasHeight);
-                drawContent();
+    // ── 1-ին էջ՝ ցանցը ──
+    const H1 = rows * cellSize + paddingTop + paddingBottom + footerHeight;
+    const p1 = newPage(W, H1);
+    const bgImg = await loadImage(BG_URL);
+    if (bgImg) { drawImageCover(p1.ctx, bgImg, W, H1); }
+    else { p1.ctx.fillStyle = '#fff'; p1.ctx.fillRect(0, 0, W, H1); }
+    drawGrid(p1.ctx);
+    drawFooter(p1.ctx, W, H1);
+
+    // ── Հարցերը՝ բլոկներով (մեկ հարց = մեկ բլոկ, չի կիսվում էջերի միջև) ──
+    const Q_LINE_H = 20;
+    const Q_GAP    = 6;
+    const qMaxWidth = W - paddingSides * 2;
+    measureCtx.font = '14px Segoe UI';
+
+        const IMG_MAX_H = 160;   // նկարի առավելագույն բարձրությունը PDF-ում
+    const blocks = [];
+    for (const word of words) {
+        if (word.question === 'Բանալի բառ') continue;
+        const prefix  = `${word.number}. (${word.dir === 'h' ? 'Հորիզոնական' : 'Ուղղահայաց'}) - `;
+        const prefixW = measureCtx.measureText(prefix).width;
+
+        let qText = word.question || '';
+        if (word.q_media && word.q_media_type === 'audio') {
+            qText = (qText ? qText + ' ' : '') + '(աուդիո հարց)';
+        }
+        const lines = wrapCanvasText(measureCtx, qText, qMaxWidth - prefixW);
+
+        // Կցված նկար (եթե կա)
+        let img = null, imgW = 0, imgH = 0;
+        if (word.q_media && word.q_media_type === 'image') {
+            img = await loadImage(`${PREFIX}/static/${word.q_media}`);
+            if (img) {
+                const maxW = qMaxWidth - prefixW;
+                const k = Math.min(maxW / img.width, IMG_MAX_H / img.height, 1);
+                imgW = img.width * k;
+                imgH = img.height * k;
             }
+        }
+
+        blocks.push({
+            lines: lines.map((ln, idx) => ({
+                text:   idx === 0 ? prefix + ln : ln,
+                indent: idx === 0 ? 0 : prefixW
+            })),
+            prefixW, img, imgW, imgH
         });
+    }
+
+    // ── Բաշխում ենք էջերի վրա (A4 համամասնությամբ) ──
+    const PAGE_H  = Math.round(W * 1.414);
+    const Q_TOP   = 40;
+    const TITLE_H = 34;
+    const usable  = PAGE_H - Q_TOP - TITLE_H - footerHeight - 10;
+
+    const pagesOfBlocks = [];
+    let cur = [], curH = 0;
+    blocks.forEach(b => {
+        const bh = b.lines.length * Q_LINE_H + (b.img ? b.imgH + 8 : 0) + Q_GAP;
+        if (cur.length && curH + bh > usable) { pagesOfBlocks.push(cur); cur = []; curH = 0; }
+        cur.push(b);
+        curH += bh;
+    });
+    if (cur.length) pagesOfBlocks.push(cur);
+
+    const questionPages = pagesOfBlocks.map((pageBlocks, pi) => {
+        const p = newPage(W, PAGE_H);
+        const ctx = p.ctx;
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, W, PAGE_H);
+
+        ctx.fillStyle = '#000';
+        ctx.font = 'bold 16px Segoe UI';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        ctx.fillText(pi === 0 ? 'Հարցեր՝' : 'Հարցեր (շարունակություն)՝', paddingSides, Q_TOP);
+
+        ctx.font = '14px Segoe UI';
+        let y = Q_TOP + TITLE_H;
+                pageBlocks.forEach(b => {
+            b.lines.forEach(l => {
+                ctx.fillText(l.text, paddingSides + l.indent, y);
+                y += Q_LINE_H;
+            });
+            if (b.img) {
+                ctx.drawImage(b.img, paddingSides + b.prefixW, y + 2, b.imgW, b.imgH);
+                y += b.imgH + 8;
+            }
+            y += Q_GAP;
+        });
+
+        drawFooter(ctx, W, PAGE_H);
+        return p;
+    });
+
+    // ── PDF ──
+    const { jsPDF } = window.jspdf;
+    const all = [p1, ...questionPages];
+    const orient = p => (p.w > p.h ? 'landscape' : 'portrait');
+
+    const pdf = new jsPDF({ unit: 'pt', format: [all[0].w, all[0].h], orientation: orient(all[0]) });
+    all.forEach((p, i) => {
+        if (i > 0) pdf.addPage([p.w, p.h], orient(p));
+        pdf.addImage(p.canvas.toDataURL('image/png'), 'PNG', 0, 0, p.w, p.h);
+    });
+        // Ֆայլի անվան մեջ արգելված նշանները հանում ենք
+    const safeTitle = (CW_TITLE || 'Խաչբառ').replace(/[\\/:*?"<>|]+/g, '').trim().slice(0, 60) || 'Խաչբառ';
+    const fileName  = [safeTitle, name.trim(), surname.trim()].filter(Boolean).join('_');
+    pdf.save(`${fileName}.pdf`);
+
+    fetch(`${PREFIX}/api/crosswords/${CW_ID}/download`, { method: 'POST' }).catch(() => {});
+});
 
         window.addEventListener('DOMContentLoaded', () => { startCrossword(); });
 
@@ -1881,6 +2402,7 @@ if(achKey && (VISIBLE_FIELDS.length === 0 || VISIBLE_FIELDS.includes(achKey))){
         const cols         = {{ crossword.cols }};
         const crosswordUrl = "{{ url_for('view_crossword', id=cw_id, _external=True) }}";
         const BG_URL = "{% if bg %}{{ url_for('static', filename=bg) }}{% endif %}";
+        const CW_TITLE = {{ (title or '') | tojson }};
         const grid         = document.getElementById('grid');
 
         const cells = [];
@@ -1909,8 +2431,25 @@ if(achKey && (VISIBLE_FIELDS.length === 0 || VISIBLE_FIELDS.includes(achKey))){
                 input.setAttribute('data-letter', word.word[k]);
                 input.setAttribute('data-dir', word.dir);
                 input.setAttribute('readonly', 'readonly');   // ← վանդակներն անակտիվ դարձնող տողը
-                if (word.question === 'Բանալի բառ') input.classList.add('keyword-cell');
+                                if (word.question === 'Բանալի բառ') input.classList.add('keyword-cell');
                 cell.appendChild(input);
+            }
+            // Առաջին վանդակի սեղմումով բացել հարցը (բացի բանալի բառից)
+            if (k === 0 && word.question !== 'Բանալի բառ') {
+                const firstInput = cell.querySelector('input');
+                if (firstInput) {
+                    firstInput.style.cursor = 'pointer';
+                    firstInput.classList.add('first-cell-clickable');
+                    firstInput.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const numberDiv = cell.querySelector('.number');
+                        if (numberDiv) {
+                            showNumberMenu(numberDiv);
+                        } else {
+                            showQuestion(word.number);
+                        }
+                    });
+                }
             }
                             if (k === 0 && word.type !== 'keyword') {
                     let numberDiv = cell.querySelector('.number');
@@ -1955,7 +2494,15 @@ if(achKey && (VISIBLE_FIELDS.length === 0 || VISIBLE_FIELDS.includes(achKey))){
 
             const renderGroup = (title, arr) => {
                 if (!arr.length) return '';
-                const items = arr.map(w => `<div class="pq-item"><strong>${w.number}.</strong> ${escapeHtml(w.question)}</div>`).join('');
+                                const items = arr.map(w => {
+                    let media = '';
+                    if (w.q_media && w.q_media_type === 'image') {
+                        media = `<img class="pq-img" src="${PREFIX}/static/${w.q_media}" alt="">`;
+                    } else if (w.q_media && w.q_media_type === 'audio') {
+                        media = ' <em class="pq-audio">(աուդիո հարց)</em>';
+                    }
+                    return `<div class="pq-item"><strong>${w.number}.</strong> ${escapeHtml(w.question || '')}${media}</div>`;
+                }).join('');
                 return `<div class="pq-group"><div class="pq-title">${title}</div><div class="pq-list">${items}</div></div>`;
             };
 
@@ -2166,7 +2713,7 @@ if (word.q_media && word.q_media_type) {
 }
 
 questionText.innerHTML = `
-    <div style="font-size:18px; margin-bottom:10px;">${word.question}</div>
+        <div style="font-size:18px; margin-bottom:10px;">${escapeHtml(word.question || '')}</div>
     ${mediaHTML}
     ${inputsHTML}
     <div style="margin-top:20px; display:flex; gap:14px; justify-content:center;">
@@ -2440,6 +2987,11 @@ function showCopied() {
             otherBox.style.display = 'none';
         }
     }
+    const err = document.getElementById(type + 'OtherError');
+if (err) err.style.display = 'none';
+if (otherBox) otherBox.style.borderColor = '#ccc';
+const rErr = document.getElementById(type + 'ReasonError');
+if (rErr) rErr.style.display = 'none';
 }
 
         function applyStoredVotes() {
@@ -2452,7 +3004,28 @@ function showCopied() {
         }
 
         // ===== Հավանել / Չհավանել (անկախ միմյանցից) =====
-        function castVote(type) { if (type === 'like') openLikePopup(); else openDislikePopup(); }
+                function hasVoted(type) { return localStorage.getItem(voteKey(type)) === '1'; }
+
+        function castVote(type) {
+            if (hasVoted(type)) { showVoteNotice(type); return; }   // արդեն քվեարկել է
+            if (type === 'like') openLikePopup(); else openDislikePopup();
+        }
+
+        function showVoteNotice(type) {
+            const isLike = type === 'like';
+            document.getElementById('voteNoticeText').textContent = isLike
+                ? 'Դուք արդեն հավանել եք այս խաչբառը։'
+                : 'Դուք արդեն նշել եք, որ այս խաչբառը Ձեզ դուր չի եկել։';
+            const icon = document.getElementById('voteNoticeIcon');
+            icon.style.background = isLike ? '#40CD9A' : '#FF5A7B';
+            icon.textContent = isLike ? '👍' : '👎';
+            document.getElementById('voteNoticeOverlay').style.display = 'block';
+            document.getElementById('voteNoticePopup').style.display = 'block';
+        }
+        function closeVoteNotice() {
+            document.getElementById('voteNoticeOverlay').style.display = 'none';
+            document.getElementById('voteNoticePopup').style.display = 'none';
+        }
         function openLikePopup() {
             restoreVoteSelection('like');
             document.getElementById('likeOverlay').style.display = 'block';
@@ -2466,39 +3039,61 @@ function showCopied() {
         }
                 function closeDislikePopup() { document.getElementById('dislikeOverlay').style.display = 'none'; document.getElementById('dislikePopup').style.display = 'none'; }
 
-        async function submitLike() {
-            const reasons = Array.from(document.querySelectorAll('.like-reason:checked')).map(c => c.value);
-            const other   = document.getElementById('likeOtherText').value.trim();
-            if (reasons.length === 0) { alert('Խնդրում ենք ընտրել գոնե մեկ պատճառ։'); return; }
-            document.getElementById('likeBtn').classList.add('liked');
-            localStorage.setItem(voteKey('like'), '1');
-            localStorage.setItem(voteKey('like') + '_data', JSON.stringify({ reasons, other }));
+                let voteSending = false;   // կրկնակի սեղմումից պաշտպանություն
+
+        async function submitVote(type) {
+            const reasonClass = type === 'like' ? 'like-reason' : 'dislike-reason';
+            const otherId     = type === 'like' ? 'likeOtherText' : 'dislikeOtherText';
+            const closeFn     = type === 'like' ? closeLikePopup : closeDislikePopup;
+            const btnId       = type === 'like' ? 'likeBtn' : 'dislikeBtn';
+            const btnClass    = type === 'like' ? 'liked' : 'disliked';
+
+            if (voteSending) return;
+            if (hasVoted(type)) { closeFn(); showVoteNotice(type); return; }
+
+            const reasons  = Array.from(document.querySelectorAll('.' + reasonClass + ':checked')).map(c => c.value);
+const otherBox = document.getElementById(otherId);
+const other    = reasons.includes('Այլ') ? otherBox.value.trim() : '';   // «Այլ»-ը նշված չէ → տեքստը չի ուղարկվում
+if (reasons.length === 0) {
+    document.getElementById(type + 'ReasonError').style.display = 'block';
+    return;
+}
+
+// «Այլ» ընտրելիս տեքստը պարտադիր է
+if (reasons.includes('Այլ') && !other) {
+    otherBox.style.display = 'block';
+    otherBox.style.borderColor = '#E63950';
+    document.getElementById(type + 'OtherError').style.display = 'block';
+    otherBox.focus();
+    return;
+}
+
+            voteSending = true;
             try {
-                await fetch(`${PREFIX}/api/crosswords/${CW_ID}/feedback`, {
+                const res = await fetch(`${PREFIX}/api/crosswords/${CW_ID}/feedback`, {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ type: 'like', reasons, other })
+                    body: JSON.stringify({ type, reasons, other })   // ← ՄԵԿ քվե՝ բոլոր կետերով
                 });
-            } catch {}
-            await loadVoteCounts();
-            closeLikePopup();
+                // 409 = սերվերն ասում է՝ արդեն քվեարկել է (եթե սերվերում էլ ստուգում ավելացնես)
+                if (res.ok || res.status === 409) {
+                    localStorage.setItem(voteKey(type), '1');
+                    localStorage.setItem(voteKey(type) + '_data', JSON.stringify({ reasons, other }));
+                    document.getElementById(btnId).classList.add(btnClass);
+                    closeFn();
+                    if (res.status === 409) showVoteNotice(type);
+                    await loadVoteCounts();
+                } else {
+                    alert('Չհաջողվեց պահպանել։ Փորձեք կրկին։');
+                }
+            } catch {
+                alert('Կապի սխալ։ Փորձեք կրկին։');
+            } finally {
+                voteSending = false;
+            }
         }
-        async function submitDislike() {
-            const reasons = Array.from(document.querySelectorAll('.dislike-reason:checked')).map(c => c.value);
-            const other   = document.getElementById('dislikeOtherText').value.trim();
-            if (reasons.length === 0) { alert('Խնդրում ենք ընտրել գոնե մեկ պատճառ։'); return; }
-            // Independent toggle: does not clear like state
-            document.getElementById('dislikeBtn').classList.add('disliked');
-            localStorage.setItem(voteKey('dislike'), '1');
-            localStorage.setItem(voteKey('dislike') + '_data', JSON.stringify({ reasons, other }));
-            try {
-                await fetch(`${PREFIX}/api/crosswords/${CW_ID}/feedback`, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ type: 'dislike', reasons, other })
-                });
-            } catch {}
-            await loadVoteCounts();
-            closeDislikePopup();
-        }
+
+        function submitLike()    { submitVote('like'); }
+        function submitDislike() { submitVote('dislike'); }
 
         // ===== Մեկնաբանություններ =====
         function escapeHtml(s) {
@@ -2598,6 +3193,84 @@ function closeCommentForm() {
         document.getElementById('dislikeCount').textContent = data.dislikes ?? 0;
     } catch {}
 }
+// ===== Տպելիս՝ 1-ին էջ = վերնագիր + ցանց + footer (էջի ներքևում), հարցերը՝ հաջորդ էջից =====
+(function () {
+    const footer = document.querySelector('.cw-footer');
+    const pq     = document.getElementById('printQuestions');
+    if (!footer || !pq) return;
+
+    // Footer-ի իրական տեղը, որ տպելուց հետո վերադարձնենք
+        // Ցանցը փոքրացնում ենք, որ վերնագրի ու footer-ի հետ մեկ A4 էջում տեղավորվի
+    const MM = 96 / 25.4;                       // 1 մմ՝ պիքսելներով
+    function fitGridForPrint() {
+        const card = document.querySelector('.grid-card');
+        const g    = document.getElementById('grid');
+        if (!card || !g) return;
+        card.style.zoom = '';
+        const PAD = 56;                         // .grid-card-ի padding-ը (28 × 2)
+        const gw = g.scrollWidth  + PAD;
+        const gh = g.scrollHeight + PAD;
+        const fb  = document.getElementById('feedbackBox');
+        const fbH = (fb && fb.style.display !== 'none') ? fb.offsetHeight + 15 : 0;
+        const availW = 180 * MM;                          // A4 210մմ − 2 × 1.5սմ
+        const availH = (297 - 30 - 8) * MM - 260 - fbH;   // − լոգո, վերնագիր, footer
+        const k = Math.min(1, availW / gw, availH / gh);
+        if (k < 1) card.style.zoom = k.toFixed(3);
+    }
+    function resetGridPrintSize() {
+        const card = document.querySelector('.grid-card');
+        if (card) card.style.zoom = '';
+    }
+    const marker = document.createComment('footer-place');
+    footer.parentNode.insertBefore(marker, footer);
+
+    let page1 = null;
+
+    window.addEventListener('beforeprint', function () {
+        if (page1) return;
+        page1 = document.createElement('div');
+        page1.className = 'print-page1';
+        document.body.insertBefore(page1, document.body.firstChild);
+        // #printQuestions-ից առաջ եղած ամեն ինչ՝ 1-ին էջի բլոկի մեջ
+        while (page1.nextSibling && page1.nextSibling !== pq) {
+            page1.appendChild(page1.nextSibling);
+        }
+        page1.appendChild(footer);               // footer-ը՝ բլոկի վերջում
+        fitGridForPrint();
+    });
+
+    window.addEventListener('afterprint', function () {
+        if (!page1) return;
+        while (page1.firstChild) {
+            const node = page1.firstChild;
+            if (node === footer) {
+                marker.parentNode.insertBefore(footer, marker);   // footer → իր տեղը
+            } else {
+                document.body.insertBefore(node, page1);          // մնացածը → նույն հերթականությամբ
+            }
+        }
+        page1.remove();
+        page1 = null;
+        resetGridPrintSize();
+    });
+})();
+['like', 'dislike'].forEach(type => {
+    const box = document.getElementById(type + 'OtherText');
+    const err = document.getElementById(type + 'OtherError');
+    const cb  = document.querySelector(`.${type}-reason[value="Այլ"]`);
+    if (!box || !err) return;
+
+    const clearError = () => { box.style.borderColor = '#ccc'; err.style.display = 'none'; };
+
+    box.addEventListener('input', clearError);                     // սկսեց գրել
+    if (cb) cb.addEventListener('change', () => { if (!cb.checked) clearError(); });  // հանեց «Այլ»-ի նշումը
+});
+['like', 'dislike'].forEach(type => {
+    const err = document.getElementById(type + 'ReasonError');
+    document.querySelectorAll(`.${type}-reason`).forEach(cb => {
+        cb.addEventListener('change', () => { if (err) err.style.display = 'none'; });
+    });
+});
     </script>
 </body>
 </html>

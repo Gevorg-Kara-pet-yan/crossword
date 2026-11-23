@@ -8,7 +8,9 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Armenian:wght@400;500;600;700;900&display=swap" rel="stylesheet">
-
+     <script src="{{ url_for('static', filename='js/client-logger.js') }}"
+        data-log-endpoint="{{ url_for('api_client_log') }}"
+        data-request-id="{{ g.get('request_id', '') }}"></script>
     <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -80,9 +82,9 @@
 
     .sidebar-link {
         display: flex; align-items: center; gap: 8px;
-        padding: 7px 8px; border-radius: 10px;
+        padding: 5px 8px; border-radius: 10px;
         text-decoration: none; color: #6b6b8a;
-        font-size: 13px; font-weight: 500; margin-bottom: 2px;
+        font-size: 13px; font-weight: 500; margin-bottom: 0px;
         transition: background 0.15s, color 0.15s;
         white-space: nowrap; overflow: hidden; cursor: pointer;
     }
@@ -450,13 +452,17 @@
     @media (max-width: 768px) {
         .sidebar { width: var(--sidebar-collapsed-width); }
         .app-topbar { left: var(--sidebar-collapsed-width); padding: 0 0.75rem; }
-        .app-main { margin-left: var(--sidebar-collapsed-width); width: calc(100% - var(--sidebar-collapsed-width)); padding: 1rem; }
+        .app-main {
+            margin-left: var(--sidebar-collapsed-width);
+            width: calc(100% - var(--sidebar-collapsed-width));
+            padding: 1rem;
+            align-items: flex-start;      /* ← ավելացրու */
+        }
         .app-footer { margin-left: var(--sidebar-collapsed-width); }
         .sidebar-label, .sidebar-chevron { opacity: 0; width: 0; overflow: hidden; }
         .sidebar-logo { display: none; }
         .sidebar-group-items { max-height: 0 !important; }
         .sidebar-header { justify-content: center; padding: 0; }
-        .sidebar-collapse-btn { display: none; }
         .sidebar-nav { padding: 0.5rem 0; display: flex; flex-direction: column; align-items: center; gap: 2px; }
         .sidebar-link, .sidebar-group-btn {
             width: var(--icon-size); height: var(--icon-size); min-width: var(--icon-size);
@@ -466,7 +472,7 @@
     }
 
     @media (max-width: 760px) {
-        :root { --footer-height: 82px; }
+        :root { --footer-height: 140px; }
         .card {
             grid-template-columns: 1fr;
             gap: 24px;
@@ -482,17 +488,45 @@
         .help-bubble { padding: 12px 16px; font-size: .88rem; border-radius: 14px; }
         .btn-continue { height: 54px; margin-top: 18px; border-radius: 16px; font-size: 1rem; }
 
-        .app-footer {
+                        .app-footer {
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            gap: 2px;
-            padding: 6px 14px;
+            gap: 5px;
+            padding: 14px;
+            text-align: center;
         }
-        .footer-col { gap: 2px; align-items: flex-start; text-align: left; }
-        .footer-col.right { text-align: left; align-items: flex-start; }
-        .app-footer p { font-size: 11px; line-height: 1.4; text-align: left; }
-    }
+        .footer-col,
+        .footer-col.right {
+            gap: 4px;
+            align-items: center;
+            text-align: center;
+            width: 100%;
+        }
+        .app-footer p {
+            font-size: 12px;
+            line-height: 1.5;
+            text-align: center;
+        }
+                /* ՄՈԲԱՅԼ — ֆութերը ֆիքսված չէ, հոսում է էջի տակ */
+        html, body {
+            height: auto;
+            min-height: 100dvh;
+            overflow-y: auto;      /* էջն ինքը սքրոլվում է */
+            overflow-x: hidden;
+        }
+        .app-main {
+            height: auto;
+            min-height: calc(100dvh - var(--topbar-height));
+            overflow: visible;     /* ներքին սքրոլը հանում ենք */
+        }
+        .app-footer {
+            position: static;      /* այլևս ֆիքսված չէ */
+            height: auto;          /* բարձրությունը՝ ըստ բովանդակության */
+            margin-left: var(--sidebar-collapsed-width);
+            padding: 16px 14px;
+        }
+        }
 
     /* Ցածր էկրաններում (landscape հեռախոս) footer-ը փոքրացնում ենք */
     @media (max-height: 560px) {
@@ -515,6 +549,18 @@
     .goog-te-gadget { font-size: 0 !important; }
     body { top: 0 !important; position: static !important; }
     .goog-text-highlight { background: none !important; box-shadow: none !important; }
+
+    /* ===== «Ուղեցույց» վերնագիր՝ բոլոր էջերում նույնը ===== */
+.guide-title{
+    font-family:'Noto Sans Armenian', sans-serif !important;
+    font-size:1.4rem !important;
+    font-weight:700 !important;
+    color:#3b1f7a !important;
+    text-align:center !important;
+    line-height:1.3 !important;
+    margin:0 0 16px !important;
+}
+body.dark .guide-title{ color:#b99cff !important; }
     </style>
 </head>
 <body class="has-sidebar">
@@ -524,7 +570,7 @@
     <!-- SIDEBAR -->
     <aside class="sidebar" id="sidebar">
         <div class="sidebar-header">
-            <a href="https://mainlogin.dshh.am:15107/Tools" class="sidebar-logo notranslate" translate="no" target="_blank">
+            <a href="{{ GATEWAY_PUBLIC }}/Tools" class="sidebar-logo notranslate" translate="no" target="_blank">
                 <img src="{{ url_for('static', filename='dshh.png') }}" alt="ԴՇՀ">
             </a>
             <button class="sidebar-collapse-btn" id="collapseBtn" onclick="toggleSidebar()" title="Փակել">
@@ -552,19 +598,19 @@
 
                 <div class="sidebar-flyout">
                     <div class="sidebar-flyout-title">Կրթական գործիքներ</div>
-                    <a href="https://gatewayapi.dshh.am:15106/ibook/" class="sidebar-flyout-link">Թղթապանակ</a>
+                    <a href="{{ GATEWAY_PUBLIC }}/ibook/" class="sidebar-flyout-link">Թղթապանակ</a>
                     <a href="{{ url_for('choose_keyword_mode') }}" class="sidebar-flyout-link active">Խաչբառ</a>
-                    <a href="https://gatewayapi.dshh.am:15106/ibook/digital-book" class="sidebar-flyout-link">Նյութերի թվայնացում</a>
-                    <a href="https://gatewayapi.dshh.am:15106/pairmatch" class="sidebar-flyout-link">Գտիր զույգը</a>
-                    <a href="https://gatewayapi.dshh.am:15106/learn/" class="sidebar-flyout-link">ՀարցԱԲան</a>
+                    <a href="{{ GATEWAY_PUBLIC }}/ibook/digital-book" class="sidebar-flyout-link">Նյութերի թվայնացում</a>
+                    <a href="{{ GATEWAY_PUBLIC }}/pairmatch" class="sidebar-flyout-link">Գտիր զույգը</a>
+                    <a href="{{ GATEWAY_PUBLIC }}/learn/" class="sidebar-flyout-link">ՀարցԱԲան</a>
                 </div>
 
                 <div class="sidebar-group-items open" id="group-tools">
-                    <a href="https://gatewayapi.dshh.am:15106/ibook/" class="sidebar-link sidebar-sub"><span class="sidebar-label">Թղթապանակ</span></a>
+                    <a href="{{ GATEWAY_PUBLIC }}/ibook/" class="sidebar-link sidebar-sub"><span class="sidebar-label">Թղթապանակ</span></a>
                     <a href="{{ url_for('choose_keyword_mode') }}" class="sidebar-link sidebar-sub active"><span class="sidebar-label">Խաչբառ</span></a>
-                    <a href="https://gatewayapi.dshh.am:15106/ibook/digital-book" class="sidebar-link sidebar-sub"><span class="sidebar-label">Նյութերի թվայնացում</span></a>
-                    <a href="https://gatewayapi.dshh.am:15106/pairmatch" class="sidebar-link sidebar-sub"><span class="sidebar-label">Գտիր զույգը</span></a>
-                    <a href="https://gatewayapi.dshh.am:15106/learn/" class="sidebar-link sidebar-sub"><span class="sidebar-label">ՀարցԱԲան</span></a>
+                    <a href="{{ GATEWAY_PUBLIC }}/ibook/digital-book" class="sidebar-link sidebar-sub"><span class="sidebar-label">Նյութերի թվայնացում</span></a>
+                    <a href="{{ GATEWAY_PUBLIC }}/pairmatch" class="sidebar-link sidebar-sub"><span class="sidebar-label">Գտիր զույգը</span></a>
+                    <a href="{{ GATEWAY_PUBLIC }}/learn/" class="sidebar-link sidebar-sub"><span class="sidebar-label">ՀարցԱԲան</span></a>
                 </div>
             </div>
 
@@ -581,24 +627,23 @@
 
                 <div class="sidebar-flyout">
                     <div class="sidebar-flyout-title">Իմ ստեղծած նյութերը</div>
-                    <a href="https://mainlogin.dshh.am:15107/Materials/Folders" class="sidebar-flyout-link">Թղթապանակներ</a>
-                    <a href="https://mainlogin.dshh.am:15107/Materials/Crosswords" class="sidebar-flyout-link">Խաչբառներ</a>
-                    <a href="https://mainlogin.dshh.am:15107/Materials/Digitized" class="sidebar-flyout-link">Թվայնացված նյութեր</a>
-                    <a href="https://mainlogin.dshh.am:15107/Materials/PairsGame" class="sidebar-flyout-link">«Գտիր զույգը» խաղեր</a>
+                    <a href="{{ MAINLOGIN_PUBLIC }}/Materials/Folders" class="sidebar-flyout-link">Թղթապանակներ</a>
+                    <a href="{{ MAINLOGIN_PUBLIC }}/Materials/Crosswords" class="sidebar-flyout-link">Խաչբառներ</a>
+                    <a href="{{ MAINLOGIN_PUBLIC }}/Materials/Digitized" class="sidebar-flyout-link">Թվայնացված նյութեր</a>
+                    <a href="{{ MAINLOGIN_PUBLIC }}/Materials/PairsGame" class="sidebar-flyout-link">«Գտիր զույգը» խաղեր</a>
                 </div>
 
                 <div class="sidebar-group-items" id="group-materials">
-                    <a href="https://mainlogin.dshh.am:15107/Materials/Folders" class="sidebar-link sidebar-sub"><span class="sidebar-label">Թղթապանակներ</span></a>
-                    <a href="https://mainlogin.dshh.am:15107/Materials/Crosswords" class="sidebar-link sidebar-sub"><span class="sidebar-label">Խաչբառներ</span></a>
-                    <a href="https://mainlogin.dshh.am:15107/Materials/Digitized" class="sidebar-link sidebar-sub"><span class="sidebar-label">Թվայնացված նյութեր</span></a>
-                    <a href="https://mainlogin.dshh.am:15107/Materials/PairsGame" class="sidebar-link sidebar-sub"><span class="sidebar-label">«Գտիր զույգը» խաղեր</span></a>
+                    <a href="{{ MAINLOGIN_PUBLIC }}/Materials/Folders" class="sidebar-link sidebar-sub"><span class="sidebar-label">Թղթապանակներ</span></a>
+                    <a href="{{ MAINLOGIN_PUBLIC }}/Materials/Crosswords" class="sidebar-link sidebar-sub"><span class="sidebar-label">Խաչբառներ</span></a>
+                    <a href="{{ MAINLOGIN_PUBLIC }}/Materials/Digitized" class="sidebar-link sidebar-sub"><span class="sidebar-label">Թվայնացված նյութեր</span></a>
+                    <a href="{{ MAINLOGIN_PUBLIC }}/Materials/PairsGame" class="sidebar-link sidebar-sub"><span class="sidebar-label">«Գտիր զույգը» խաղեր</span></a>
                 </div>
             </div>
 
             <div class="sidebar-divider"></div>
 
-            <a href="https://mainlogin.dshh.am:15107/Settings" class="sidebar-link">
-            <a href="https://mainlogin.dshh.am:15107/Profiles/UserStatistics" class="sidebar-link">
+            <a href="{{ MAINLOGIN_PUBLIC }}/Profiles/UserStatistics" class="sidebar-link">
                 <span class="sidebar-icon">
                     <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M.9.9V15.3c0 .48.19.93.53 1.27.34.34.79.53 1.27.53H17.1"/>
@@ -608,7 +653,7 @@
                 <span class="sidebar-label">Վիճակագրություն</span>
             </a>
 
-            <a href="https://mainlogin.dshh.am:15107/Settings" class="sidebar-link">
+            <a href="{{ MAINLOGIN_PUBLIC }}/Settings" class="sidebar-link">
                 <span class="sidebar-icon">
                     <svg width="19" height="20" viewBox="0 0 19 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M9.21185 0.899902H8.81592C8.33861 0.899902 7.88085 1.08951 7.54334 1.42702C7.20583 1.76453 7.01622 2.22229 7.01622 2.6996V2.86158C7.0159 3.17718 6.93258 3.48714 6.77464 3.76038C6.6167 4.03362 6.38969 4.26052 6.11637 4.41832L5.72943 4.64328C5.45584 4.80124 5.1455 4.88439 4.82958 4.88439C4.51367 4.88439 4.20332 4.80124 3.92973 4.64328L3.79475 4.57129C3.38178 4.33307 2.89116 4.26844 2.43058 4.3916C1.97001 4.51476 1.57712 4.81563 1.33816 5.22818L1.1402 5.57013C0.901972 5.9831 0.837346 6.47372 0.960503 6.9343C1.08366 7.39487 1.38454 7.78776 1.79709 8.02672L1.93206 8.1167C2.20407 8.27374 2.43024 8.49922 2.5881 8.77074C2.74596 9.04227 2.83002 9.35037 2.83191 9.66445V10.1234C2.83317 10.4405 2.75061 10.7523 2.59259 11.0273C2.43457 11.3022 2.20671 11.5305 1.93206 11.6891L1.79709 11.7701C1.38454 12.0091 1.08366 12.4019 0.960503 12.8625C0.837346 13.3231 0.901972 13.8137 1.1402 14.2267L1.33816 14.5686C1.57712 14.9812 1.97001 15.2821 2.43058 15.4052C2.89116 15.5284 3.38178 15.4637 3.79475 15.2255L3.92973 15.1535C4.20332 14.9956 4.51367 14.9124 4.82958 14.9124C5.1455 14.9124 5.45584 14.9956 5.72943 15.1535L6.11637 15.3785C6.38969 15.5363 6.6167 15.7632 6.77464 16.0364C6.93258 16.3097 7.0159 16.6196 7.01622 16.9352V17.0972C7.01622 17.5745 7.20583 18.0323 7.54334 18.3698C7.88085 18.7073 8.33861 18.8969 8.81592 18.8969H9.21185C9.68917 18.8969 10.1469 18.7073 10.4844 18.3698C10.8219 18.0323 11.0116 17.5745 11.0116 17.0972V16.9352C11.0119 16.6196 11.0952 16.3097 11.2531 16.0364C11.4111 15.7632 11.6381 15.5363 11.9114 15.3785L12.2983 15.1535C12.5719 14.9956 12.8823 14.9124 13.1982 14.9124C13.5141 14.9124 13.8245 14.9956 14.098 15.1535L14.233 15.2255C14.646 15.4637 15.1366 15.5284 15.5972 15.4052C16.0578 15.2821 16.4507 14.9812 16.6896 14.5686L16.8876 14.2177C17.1258 13.8047 17.1904 13.3141 17.0673 12.8535C16.9441 12.3929 16.6432 12.0001 16.2307 11.7611L16.0957 11.6891C15.8211 11.5305 15.5932 11.3022 15.4352 11.0273C15.2772 10.7523 15.1946 10.4405 15.1959 10.1234V9.67344C15.1946 9.35632 15.2772 9.04449 15.4352 8.76954C15.5932 8.49458 15.8211 8.26627 16.0957 8.1077L16.2307 8.02672C16.6432 7.78776 16.9441 7.39487 17.0673 6.9343C17.1904 6.47372 17.1258 5.9831 16.8876 5.57013L16.6896 5.22818C16.4507 4.81563 16.0578 4.51476 15.5972 4.3916C15.1366 4.26844 14.646 4.33307 14.233 4.57129L14.098 4.64328C13.8245 4.80124 13.5141 4.88439 13.1982 4.88439C12.8823 4.88439 12.5719 4.80124 12.2983 4.64328L11.9114 4.41832C11.6381 4.26052 11.4111 4.03362 11.2531 3.76038C11.0952 3.48714 11.0119 3.17718 11.0116 2.86158V2.6996C11.0116 2.22229 10.8219 1.76453 10.4844 1.42702C10.1469 1.08951 9.68917 0.899902 9.21185 0.899902Z" stroke="currentColor" stroke-width="1.7997" stroke-linecap="round" stroke-linejoin="round"/>
@@ -618,7 +663,7 @@
                 <span class="sidebar-label">Կարգավորումներ</span>
             </a>
 
-            <a href="https://mainlogin.dshh.am:15107/Profiles/UserProfile" class="sidebar-link">
+            <a href="{{ MAINLOGIN_PUBLIC }}/Profiles/UserProfile" class="sidebar-link">
                 <span class="sidebar-icon">
                     <svg width="15" height="18" viewBox="0 0 15 18" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M13.4973 17.0964V15.2967C13.4973 14.342 13.1181 13.4265 12.4431 12.7515C11.7681 12.0765 10.8525 11.6973 9.89792 11.6973H4.49882C3.5442 11.6973 2.62867 12.0765 1.95365 12.7515C1.27864 13.4265 0.899414 14.342 0.899414 15.2967V17.0964" stroke="currentColor" stroke-width="1.7997" stroke-linecap="round" stroke-linejoin="round"/>
@@ -673,17 +718,17 @@
                         <div class="avatar-dropdown-email">{{ (user or {}).get('email', '') }}</div>
                     </div>
                     <div class="avatar-dropdown-links">
-                        <a href="https://mainlogin.dshh.am:15107/Profiles/UserProfile" class="avatar-dropdown-link">
+                        <a href="{{ MAINLOGIN_PUBLIC }}/Profiles/UserProfile" class="avatar-dropdown-link">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                             Անձնական էջ
                         </a>
-                        <a href="https://mainlogin.dshh.am:15107/Settings" class="avatar-dropdown-link">
+                        <a href="{{ MAINLOGIN_PUBLIC }}/Settings" class="avatar-dropdown-link">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
                             Կարգավորումներ
                         </a>
                         <div class="avatar-dropdown-divider"></div>
                         <!-- Դուրս գալ — GET հղում -->
-                        <a href="https://mainlogin.dshh.am:15107/Login/Logout" class="avatar-dropdown-link danger">
+                        <a href="{{ MAINLOGIN_PUBLIC }}/Login/Logout" class="avatar-dropdown-link danger">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
                             Դուրս գալ
                         </a>
@@ -698,7 +743,7 @@
     <main class="app-main">
         <div class="card">
             <div class="heading">
-                Բարի գալուստ <br><span class="accent">խաչբառի<br></span>ստեղծման<br>ծրագիր
+                Բարի գալուստ <br><span class="accent">խաչբառի <br></span>ստեղծման <br>ծրագիր
             </div>
 
             <div class="options-card">
@@ -755,15 +800,15 @@
     <div id="guideModal" class="modal">
         <div class="modal-content">
             <span class="close-btn" onclick="closeGuide()">✕</span>
-            <h2>📖 Ուղեցույց</h2>
-            <p>Խաչբառը ստեղծելուց առաջ ընտրե՛ք առաջարկվող երեք տեսակներից մեկը․</p>
+            <h2 class="guide-title">Ուղեցույց</h2>
+            <p>Խաչբառը ստեղծելուց առաջ ընտրե՛ք առաջարկվող երեք եղանակներից մեկը․  </p>
             <h3>Բանալի բառով</h3>
             <p>Խաչբառ, որը լուծելիս որոշ վանդակների տառերը միասին կազմում են «թաքնված» բանալի բառ։ Բանալի բառը բացահայտվում է խաչբառն ամբողջությամբ ճիշտ լուծելու դեպքում։</p>
             <h3>Առանց բանալի բառի</h3>
-            <p>Սովորական խաչբառ՝ առանց թաքնված բառի։</p>
+            <p>սովորական խաչբառ, որտեղ թաքնված բառ չկա։</p>
             <h3>ԱԲ օգնությամբ</h3>
             <p>Արհեստական բանականության օգնությամբ ստեղծված խաչբառ։</p>
-            <p>Ընտրե՛ք տեսակը և սեղմե՛ք <strong>«Շարունակել»</strong>։</p>
+            <p>Ընտրե՛ք խաչբառի ստեղծման եղանակը և սեղմե՛ք <strong>«Շարունակել»</strong>։</p>
         </div>
     </div>
 

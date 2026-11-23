@@ -4,7 +4,7 @@ import asyncio
 from werkzeug.security import generate_password_hash
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-db_path = os.path.join(BASE_DIR, 'crossword.db')
+db_path = os.getenv("DATABASE_PATH", os.path.join(BASE_DIR, 'crossword.db'))
 
 async def init_db():
     print("Սկսվում է տվյալների բազայի ինիցիալիզացիան...")

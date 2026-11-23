@@ -1,34 +1,107 @@
+import os
+from dotenv import load_dotenv
+
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+load_dotenv(os.path.join(BASE_DIR, ".env"))
+
 import asyncio
 import io
 import json
-import os
 import re
 import sqlite3
 import time
 from datetime import datetime, timezone, timedelta
 from functools import wraps
+import uuid
+from utils.public_stats import public_stats_bp
 
 import aiosqlite
 import requests
 from ai_provider import get_provider
 from auth_decorators import require_auth
-from dotenv import load_dotenv
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_file, get_flashed_messages,render_template_string
 from flask import g
 from utils.crossword_builder import generate_crossword_grid
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
+from werkzeug.exceptions import RequestEntityTooLarge
 import threading
 from collections import defaultdict, deque
 
 from logging_config import setup_logging, register_request_logging, get_logger, log_critical_startup_failure
 
-from utils.admin_api import admin_bp, ensure_admin_tables
+from utils.admin_api import admin_bp, ensure_admin_tables, get_settings, is_user_blocked
 
+# =====================================================
+# 🔹 CONFIG (ամբողջը՝ .env-ից)
+# =====================================================
+
+def env_bool(name, default=False):
+    return os.getenv(name, str(default)).strip().lower() in ("1", "true", "yes", "on")
+
+
+def env_int(name, default):
+    try:
+        return int(os.getenv(name, default))
+    except (TypeError, ValueError):
+        return default
+
+
+def env_set(name, default=""):
+    return {x.strip().lower() for x in os.getenv(name, default).split(",") if x.strip()}
+
+def abs_path(p):
+    """Relative ուղին հաշվում է app.py-ի թղթապանակից, ոչ թե այն տեղից, որտեղից գործարկվել է python-ը։"""
+    return p if os.path.isabs(p) else os.path.join(BASE_DIR, p)
+
+# ── Գաղտնիքներ ──
+SECRET_KEY = os.getenv("SECRET_KEY", "")
 LOG_VIEW_TOKEN = os.getenv("LOG_VIEW_TOKEN", "")
-BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-DATABASE = os.path.join(BASE_DIR, 'utils', 'crossword.db')
+X_API_KEY = os.getenv("X_API_KEY", "")
+INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY", "")
+
+# ── Ներքին API-ներ ──
+API_URL = os.getenv("API_URL", "http://localhost:5000/api/ask")
+API_TIMEOUT = env_int("API_TIMEOUT", 15)
+
+MAINLOGIN_BASE = os.getenv("MAINLOGIN_BASE", "").rstrip("/")
+MAINLOGIN_PROFILE_CLAIMS_PATH = os.getenv("MAINLOGIN_PROFILE_CLAIMS_PATH",
+                                          "/api/users/{user_id}/profile-claims")
+MAINLOGIN_TIMEOUT = env_int("MAINLOGIN_TIMEOUT", 10)
+MAINLOGIN_VERIFY_SSL = env_bool("MAINLOGIN_VERIFY_SSL", False)
+
+# ── Հանրային (browser-ի) հասցեներ՝ main / demo ──
+MAINLOGIN_PUBLIC_MAIN = (os.getenv("MAINLOGIN_PUBLIC_MAIN") or os.getenv("MAINLOGIN_PUBLIC", "")).rstrip("/")
+MAINLOGIN_PUBLIC_DEMO = os.getenv("MAINLOGIN_PUBLIC_DEMO", "").rstrip("/")
+GATEWAY_PUBLIC_MAIN = (os.getenv("GATEWAY_PUBLIC_MAIN") or os.getenv("GATEWAY_PUBLIC", "")).rstrip("/")
+GATEWAY_PUBLIC_DEMO = os.getenv("GATEWAY_PUBLIC_DEMO", "").rstrip("/")
+PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "").rstrip("/")
+DEMO_HOST_MARKER = os.getenv("DEMO_HOST_MARKER", "demo").lower()
+
+# ── AI ──
+DEFAULT_AI_MODEL = os.getenv("DEFAULT_AI_MODEL", "claude")
+OTHER_AI_MODELS = env_set("OTHER_AI_MODELS", "claude")  # «ԱՅԼ ԱԲ» մոդելներ
+
+# ── App / server ──
+URL_PREFIX = os.getenv("URL_PREFIX", "")
+# Վերբեռնման սահմանաչափ. պետք է համընկնի gateway/nginx-ի սահմանի հետ (կամ փոքր լինի)
+MAX_UPLOAD_MB = env_int("MAX_UPLOAD_MB", 25)
+DATABASE = abs_path(os.getenv("DATABASE_PATH") or os.path.join("utils", "crossword.db"))
+LOG_DIR = abs_path(os.getenv("LOG_DIR") or "logs")
+HOST = os.getenv("HOST", "0.0.0.0")
+PORT = env_int("PORT", 15400)
+FLASK_DEBUG = env_bool("FLASK_DEBUG", False)
+FLASK_ENV = os.getenv("FLASK_ENV", "production")
+USE_HTTPS = env_bool("USE_HTTPS", False)
+SSL_CERT_FILE = abs_path(os.getenv("SSL_CERT_FILE", "certs/cert.pem"))
+SSL_KEY_FILE = abs_path(os.getenv("SSL_KEY_FILE", "certs/key.pem"))
+
+
+def profile_claims_url(user_id):
+    """mainlogin-ի profile-claims endpoint-ի լրիվ հասցեն (path-ը՝ .env-ից)։"""
+    return MAINLOGIN_BASE + MAINLOGIN_PROFILE_CLAIMS_PATH.format(user_id=user_id)
+
 
 AM_TZ = timezone(timedelta(hours=4))
 
@@ -36,17 +109,40 @@ AM_TZ = timezone(timedelta(hours=4))
 # viewer-ում default-ով չենք ցույց տալիս (տես view_logs)
 APP_START_TIME = datetime.now(AM_TZ)
 
-load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
-
 # =====================================================
-# 🔹 APP + CONFIG
+# 🔹 APP
 # =====================================================
 
 app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY", "dev_fallback_key")
-URL_PREFIX = os.getenv("URL_PREFIX", "")
+app.secret_key = SECRET_KEY or "dev_fallback_key"
 
+app.config['MAX_CONTENT_LENGTH'] = MAX_UPLOAD_MB * 1024 * 1024
+# Ադմին պանելը սպասարկվում է AuthServer-ից (Pages/Admin/Crossword/*):
+# Այստեղ միայն JSON API-ն է՝ /api/admin/*
 app.register_blueprint(admin_bp)
+
+# Public ստատիստիկա dshh.am կայքի համար՝ /api/public/stats (առանց մուտքի)
+app.config["CROSSWORD_DB"] = DATABASE
+app.register_blueprint(public_stats_bp)
+
+# Import-ի պահին, ոչ թե __main__-ում. gunicorn/waitress-ի տակ __main__-ը
+# չի կատարվում, իսկ առանց այս աղյուսակների admin API-ն կփլուզվեր:
+ensure_admin_tables()
+
+@app.errorhandler(RequestEntityTooLarge)
+def handle_upload_too_large(e):
+    limit_mb = app.config['MAX_CONTENT_LENGTH'] // (1024 * 1024)
+    msg = f"Կցված ֆայլերի ընդհանուր չափը գերազանցում է թույլատրելի {limit_mb} ՄԲ-ը։"
+    logger.warning(
+        "upload_too_large",
+        extra={"Operation": "UploadTooLarge", "Endpoint": request.endpoint,
+               "ContentLength": request.content_length, "RequestId": g.get("request_id")},
+    )
+    # fetch-ով եկող հարցումներին (սևագիր, ստուգումներ)՝ JSON
+    if request.endpoint in ('save_draft', 'check_crossword') or request.is_json:
+        return jsonify({"success": False, "error": msg}), 413
+    flash(msg, "error")
+    return redirect(request.referrer or url_for('choose_keyword_mode'))
 
 # ── Logging (Information / Warning / Error / Critical policy) ──────────────
 setup_logging(app)
@@ -60,8 +156,6 @@ _client_log_lock = threading.Lock()
 CLIENT_LOG_RATE_LIMIT = 20      # առավելագույն հարցում
 CLIENT_LOG_RATE_WINDOW = 60     # վայրկյան
 
-
-LOG_VIEW_TOKEN = os.getenv("LOG_VIEW_TOKEN", "")
 
 _LOG_VIEWER_HTML = """
 <!doctype html><meta charset="utf-8">
@@ -123,8 +217,7 @@ async def view_logs():
     level_filter = request.args.get('level')
     show_all = request.args.get('all') == '1'
     fname = 'error.log' if which == 'error' else 'app.log'
-    log_dir = os.getenv("LOG_DIR", os.path.join(BASE_DIR, "logs"))
-    path = os.path.join(log_dir, fname)
+    path = os.path.join(LOG_DIR, fname)
 
     def _read_rows():
         rows = []
@@ -165,8 +258,6 @@ async def view_logs():
                         continue
                 elif sev != want:  # մնացածը՝ ճշգրիտ համընկնում
                     continue
-                elif sev != want:  # մնացածը՝ ճշգրիտ համընկնում
-                    continue
             known = {"Timestamp", "Severity", "Service", "Logger", "Message",
                      "Operation", "Traceback"}
             obj["extra"] = json.dumps(
@@ -189,8 +280,7 @@ async def clear_logs():
 
     which = request.args.get('file') or request.form.get('file') or 'error'
     fname = 'error.log' if which == 'error' else 'app.log'
-    log_dir = os.getenv("LOG_DIR", os.path.join(BASE_DIR, "logs"))
-    path = os.path.join(log_dir, fname)
+    path = os.path.join(LOG_DIR, fname)
 
     def _truncate():
         try:
@@ -237,19 +327,11 @@ class PrefixMiddleware:
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 app.wsgi_app = PrefixMiddleware(app.wsgi_app, URL_PREFIX)
 
-BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-DATABASE = os.getenv("DATABASE_PATH", os.path.join(BASE_DIR, 'utils', 'crossword.db'))
-
-UPLOAD_FOLDER = os.path.join('static', 'uploads')
+UPLOAD_FOLDER = os.path.join(BASE_DIR, 'static', 'uploads')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 
-API_URL = os.getenv("API_URL", "http://localhost:5000/api/ask")
-X_API_KEY = os.getenv("X_API_KEY", "")
-
-INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY", "")
-PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "").rstrip("/")
 
 def user_has_role(*names):
     cu = getattr(g, "current_user", None) or {}
@@ -258,6 +340,34 @@ def user_has_role(*names):
         roles = [roles]
     roles = {str(r).strip().lower() for r in roles}
     return any(n.lower() in roles for n in names)
+
+
+def _deny(message, redirect_endpoint="my_crosswords"):
+    """403 JSON API-ի համար, flash + redirect՝ սովորական էջերի համար:"""
+    if request.is_json or request.accept_mimetypes.best == "application/json":
+        return jsonify(error=message), 403
+    flash(message)
+    return redirect(url_for(redirect_endpoint))
+
+
+def blocked_response(mode=None):
+    """Ստուգում է՝ արդյոք ընթացիկ օգտատերը կարող է խաչբառ ստեղծել/խմբագրել:
+    Հերթականությամբ ստուգվում է՝ անձնական արգելափակում, ստեղծելու գլոբալ
+    կողպեք, ապա տվյալ ռեժիմի (``ai`` կամ ``keyword``) կողպեքը:
+    Վերադարձնում է պատրաստի պատասխան, կամ None՝ եթե թույլատրված է:
+    """
+    cu = getattr(g, "current_user", None) or {}
+    if is_user_blocked(cu.get("sub")):
+        return _deny("Ձեր հաշիվը արգելափակված է ադմինիստրատորի կողմից:")
+
+    settings = get_settings()
+    if settings["creation_locked"]:
+        return _deny("Խաչբառ ստեղծելը ժամանակավորապես անջատված է:")
+    if mode == "ai" and settings["ai_creation_locked"]:
+        return _deny("AI-ով խաչբառ ստեղծելը ժամանակավորապես անջատված է:")
+    if mode == "keyword" and settings["keyword_creation_locked"]:
+        return _deny("Keyword ռեժիմով ստեղծելը ժամանակավորապես անջատված է:")
+    return None
 
 
 def require_api_key_or_user(*roles):
@@ -300,7 +410,7 @@ def ask_raw(message: str) -> str:
         response = requests.post(
             API_URL, headers=headers,
             data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-            timeout=15
+            timeout=API_TIMEOUT
         )
         response.encoding = "utf-8"
     except requests.RequestException as e:
@@ -390,22 +500,17 @@ def normalize(text):
     return text.strip().upper()
 
 def flash_skipped_words(crossword_data):
-    """Ծանուցում է այն հարցերի մասին, որոնց պատասխանները չհատվեցին և դուրս մնացին։"""
+    """Ծանուցում է այն հարցերի մասին, որոնց պատասխանները չհատվեցին և դուրս մնացին։
+    Տվյալը ուղարկում ենք JSON-ով՝ 'skipped' կատեգորիայով, որ էջը ցույց տա
+    պատուհանով և կարմիրով նշի համապատասխան տողերը (ինչպես ստեղծման էջում)։"""
     skipped = (crossword_data or {}).get('skipped') or []
     if not skipped:
         return False
-    lines = "\n".join(
-        f"• {s.get('question', '') or '(առանց հարցի)'} — {s.get('word', '')}"
+    payload = [
+        {"q": s.get('question', '') or '', "a": (s.get('word', '') or '').upper()}
         for s in skipped
-    )
-    flash(
-        "⚠️ Հետևյալ հարցերը չներառվեցին խաչբառում, քանի որ դրանց պատասխանները "
-        "ընդհանուր տառ չունեն մյուս բառերի հետ և ոչ մի տեղ չեն հատվում․\n"
-        + lines +
-        "\n\nՓոխե՛ք այդ հարցերի պատասխանները , "
-        "ապա նորից պահպանե՛ք։",
-        "warning"
-    )
+    ]
+    flash(json.dumps(payload, ensure_ascii=False), "skipped")
     return True
 
 # Մասնագիտական դաշտերի key → հայերեն պիտակ
@@ -422,8 +527,8 @@ CREATOR_FIELD_LABELS = {
 def fetch_profile_claims_sync(user_id):
     """Վերցնում է օգտվողի profile-claims-ը mainlogin-ից (firstName, lastName, email...)։"""
     try:
-        url = f"{MAINLOGIN_BASE}/api/users/{user_id}/profile-claims"
-        resp = requests.get(url, timeout=10, verify=False)
+        resp = requests.get(profile_claims_url(user_id),
+                            timeout=MAINLOGIN_TIMEOUT, verify=MAINLOGIN_VERIFY_SSL)
         data = resp.json()
         if isinstance(data, dict):
             return data.get("claims", data)
@@ -436,9 +541,6 @@ def fetch_profile_claims_sync(user_id):
             extra={"Operation": "FetchProfileClaims", "UserId": user_id, "Exception": type(e).__name__},
         )
         return {}
-
-
-MAINLOGIN_BASE = os.getenv("MAINLOGIN_BASE", "").rstrip("/")
 
 
 def build_user_view(claims, profile=None):
@@ -525,24 +627,36 @@ def current_user_view():
     return build_user_view(claims, profile)
 
 
-MAINLOGIN_PUBLIC = os.getenv("MAINLOGIN_PUBLIC", "").rstrip("/")
-GATEWAY_PUBLIC   = os.getenv("GATEWAY_PUBLIC", "").rstrip("/")
+def is_demo_request():
+    """True, եթե էջը բացվել է demo հասցեով (ըստ DEMO_HOST_MARKER-ի, օր.՝ «demo»)։"""
+    try:
+        host = (request.host or "").lower()
+    except RuntimeError:          # request-ից դուրս (startup և այլն)
+        return False
+    return bool(DEMO_HOST_MARKER) and DEMO_HOST_MARKER in host
+
+
+def public_urls():
+    if is_demo_request():
+        return MAINLOGIN_PUBLIC_DEMO, GATEWAY_PUBLIC_DEMO
+    return MAINLOGIN_PUBLIC_MAIN, GATEWAY_PUBLIC_MAIN
 
 @app.context_processor
 def inject_user():
+    mainlogin, gateway = public_urls()
     try:
-        return {
-            "user": current_user_view(),
-            "MAINLOGIN_PUBLIC": MAINLOGIN_PUBLIC,
-            "GATEWAY_PUBLIC": GATEWAY_PUBLIC,
-        }
+        user = current_user_view()
     except Exception as e:
         logger.warning(
             "inject_user_failed",
             extra={"Operation": "InjectUserContext", "Exception": type(e).__name__},
         )
-        return {"user": {}, "MAINLOGIN_PUBLIC": MAINLOGIN_PUBLIC, "GATEWAY_PUBLIC": GATEWAY_PUBLIC}
-
+        user = {}
+    return {
+        "user": user,
+        "MAINLOGIN_PUBLIC": mainlogin,
+        "GATEWAY_PUBLIC": gateway,
+    }
 def select_questions_for_keyword(keyword, questions):
     selected = []
     for letter in keyword:
@@ -658,6 +772,32 @@ def check_and_create_vote_feedback_table():
         log_critical_startup_failure(
             logger, "startup_table_init_failed", exception=e,
             Operation="StartupDbInit", Table="vote_feedback",
+        )
+    finally:
+        conn.close()
+
+
+def check_and_add_voter_id_column():
+    """vote_feedback-ին ավելացնում է voter_id և եզակի ինդեքս՝ մեկ մարդ = մեկ քվե։"""
+    conn = sqlite3.connect(DATABASE)
+    try:
+        try:
+            conn.execute("ALTER TABLE vote_feedback ADD COLUMN voter_id TEXT;")
+            logger.info("startup_column_added", extra={"Operation": "StartupDbInit", "Table": "vote_feedback", "Column": "voter_id"})
+        except sqlite3.OperationalError as e:
+            if "duplicate column name" not in str(e):
+                raise
+        # Հին գրառումները (voter_id = NULL) ինդեքսից դուրս են մնում
+        conn.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS ux_vote_feedback_once
+            ON vote_feedback (crossword_id, vote_type, voter_id)
+            WHERE voter_id IS NOT NULL
+        """)
+        conn.commit()
+    except Exception as e:
+        log_critical_startup_failure(
+            logger, "startup_column_add_failed", exception=e,
+            Operation="StartupDbInit", Table="vote_feedback", Column="voter_id",
         )
     finally:
         conn.close()
@@ -833,9 +973,9 @@ def check_and_add_is_draft_column():
 @app.route('/api/creator-claims/<user_id>')
 async def creator_claims(user_id):
     try:
-        url = f"{MAINLOGIN_BASE}/api/users/{user_id}/profile-claims"
+        url = profile_claims_url(user_id)
         resp = await asyncio.to_thread(
-            lambda: requests.get(url, timeout=10, verify=False)
+            lambda: requests.get(url, timeout=MAINLOGIN_TIMEOUT, verify=MAINLOGIN_VERIFY_SSL)
         )
         try:
             return jsonify(resp.json()), resp.status_code
@@ -850,8 +990,49 @@ async def creator_claims(user_id):
         return jsonify({"error": str(e)}), 500
 
 
+# ── Հեղինակի տվյալները՝ ՄԻԱՅՆ այն դաշտերը, որոնք հեղինակը թույլ է տվել ──
+CREATOR_ALWAYS_KEYS = {"firstName", "lastName", "FirstName", "LastName", "description"}
+CREATOR_FIELD_ALIASES = {
+    # show_creator_data-ի key → mainlogin-ի claims-ում հնարավոր անունները
+    "photo": {"photo", "Photo", "profileImagePath", "ProfileImagePath",
+              "picture", "Picture", "avatar", "Avatar"},
+    "professionalAchievements": {"professionalAchievements", "achievements"},
+}
+
+
+@app.route('/api/crosswords/<int:id>/creator')
+async def crossword_creator(id):
+    cw = await asyncio.to_thread(db_operation_wrapper, fetch_crossword_by_id_public, id)
+    if not cw:
+        return jsonify({"claims": {}}), 404
+    cw = dict(cw)
+
+    raw = cw.get('show_creator_data') or 'no'
+    if raw == 'no':
+        return jsonify({"claims": {}})
+
+    if raw == 'yes':
+        allowed_keys = None  # հին խաչբառեր՝ բոլորը
+    else:
+        try:
+            fields = json.loads(raw)
+        except Exception:
+            return jsonify({"claims": {}})
+        allowed_keys = set(CREATOR_ALWAYS_KEYS)
+        for f in fields:
+            allowed_keys.add(f)
+            allowed_keys |= CREATOR_FIELD_ALIASES.get(f, set())
+
+    claims = await asyncio.to_thread(fetch_profile_claims_sync, cw.get('user_id'))
+    if allowed_keys is not None:
+        claims = {k: v for k, v in claims.items() if k in allowed_keys}
+
+    return jsonify({"claims": claims})
+
 @app.route('/debug_scd/<int:id>')
 async def debug_scd(id):
+    if not FLASK_DEBUG:
+        return "Not found", 404
     cw = await asyncio.to_thread(db_operation_wrapper, fetch_crossword_by_id_public, id)
     if not cw:
         return "not found", 404
@@ -1004,38 +1185,6 @@ async def api_crossword_stats(id):
         return jsonify({"success": False, "error": str(e)}), 500
 
 
-@app.route('/api/crosswords/<int:id>/vote', methods=['POST'])
-async def api_crossword_vote(id):
-    try:
-        data = request.get_json()
-        vote_type = data.get('type')
-        action = data.get('action')
-
-        if vote_type not in ('like', 'dislike') or action not in ('add', 'remove'):
-            return jsonify({"success": False, "error": "Invalid params"}), 400
-
-        col = 'like_count' if vote_type == 'like' else 'dislike_count'
-        delta = 1 if action == 'add' else -1
-
-        async with aiosqlite.connect(DATABASE) as db:
-            await db.execute(f"""
-                INSERT INTO crossword_stats (crossword_id, {col})
-                VALUES (?, ?)
-                ON CONFLICT(crossword_id) DO UPDATE
-                SET {col} = MAX(0, {col} + ?)
-            """, (id, max(0, delta), delta))
-            await db.commit()
-
-        return jsonify({"success": True})
-
-    except Exception as e:
-        logger.error(
-            "crossword_vote_failed",
-            extra={"Operation": "CrosswordVote", "CrosswordId": id, "RequestId": g.get("request_id")},
-            exc_info=True,
-        )
-        return jsonify({"success": False, "error": str(e)}), 500
-
 
 @app.route('/api/crosswords/<int:id>/print', methods=['POST'])
 async def api_crossword_print(id):
@@ -1082,6 +1231,10 @@ async def api_crossword_download_count(id):
 # ── ՆՈՐ: կիսվելը հաշվելու endpoint ────────────────────────────────────────────
 @app.route('/api/crosswords/<int:id>/share', methods=['POST'])
 async def api_crossword_share(id):
+    if get_settings()["sharing_locked"]:
+        return jsonify({"success": False,
+                        "error": "Կիսվելը ժամանակավորապես անջատված է:"}), 403
+
     try:
         async with aiosqlite.connect(DATABASE) as db:
             await db.execute("""
@@ -1100,6 +1253,60 @@ async def api_crossword_share(id):
         )
         return jsonify({"success": False, "error": str(e)}), 500
 
+@app.route('/api/crosswords/<int:id>/vote', methods=['POST'])
+async def api_crossword_vote(id):
+    try:
+        data = request.get_json(silent=True) or {}
+        vote_type = data.get('type')
+        action = data.get('action')
+
+        if vote_type not in ('like', 'dislike') or action not in ('add', 'remove'):
+            return jsonify({"success": False, "error": "Invalid params"}), 400
+
+        col = 'like_count' if vote_type == 'like' else 'dislike_count'
+        delta = 1 if action == 'add' else -1
+
+        async with aiosqlite.connect(DATABASE) as db:
+            await db.execute(f"""
+                INSERT INTO crossword_stats (crossword_id, {col})
+                VALUES (?, ?)
+                ON CONFLICT(crossword_id) DO UPDATE
+                SET {col} = MAX(0, {col} + ?)
+            """, (id, max(0, delta), delta))
+            await db.commit()
+
+        return jsonify({"success": True})
+
+    except Exception as e:
+        logger.error(
+            "crossword_vote_failed",
+            extra={"Operation": "CrosswordVote", "CrosswordId": id, "RequestId": g.get("request_id")},
+            exc_info=True,
+        )
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+VOTER_COOKIE = "cw_voter"
+VOTER_COOKIE_MAX_AGE = 60 * 60 * 24 * 365 * 2   # 2 տարի
+
+
+def _get_or_create_voter_id():
+    """Վերադարձնում է (voter_id, is_new)։ ID-ն պահվում է cookie-ում։"""
+    vid = (request.cookies.get(VOTER_COOKIE) or "").strip()
+    if re.fullmatch(r"[0-9a-f]{32}", vid):
+        return vid, False
+    return uuid.uuid4().hex, True
+
+
+def _attach_voter_cookie(resp, voter_id, is_new):
+    if is_new:
+        resp.set_cookie(
+            VOTER_COOKIE, voter_id,
+            max_age=VOTER_COOKIE_MAX_AGE,
+            httponly=True, samesite="Lax",
+            secure=request.is_secure,
+        )
+    return resp
 
 # ── ՆՈՐ: հավանել/չհավանելու կարծիք պահելու endpoint ──────────────────────────
 @app.route('/api/crosswords/<int:id>/feedback', methods=['POST'])
@@ -1115,13 +1322,33 @@ async def api_crossword_feedback(id):
     message = (data.get('message') or '').strip()[:2000]
 
     col = 'like_count' if vote_type == 'like' else 'dislike_count'
+    voter_id, is_new = _get_or_create_voter_id()
+
+    def already_voted_response():
+        resp = jsonify({"success": False, "alreadyVoted": True,
+                        "error": "Արդեն քվեարկել եք այս խաչբառի համար"})
+        return _attach_voter_cookie(resp, voter_id, is_new), 409
 
     try:
         async with aiosqlite.connect(DATABASE) as db:
-            await db.execute("""
-                INSERT INTO vote_feedback (crossword_id, vote_type, reasons, other_text, message)
-                VALUES (?, ?, ?, ?, ?)
-            """, (id, vote_type, reasons_json, other, message))
+            exists = await aio_fetchone(db, """
+                SELECT 1 FROM vote_feedback
+                WHERE crossword_id = ? AND vote_type = ? AND voter_id = ?
+            """, (id, vote_type, voter_id))
+            if exists:
+                logger.info("vote_already_exists",
+                            extra={"Operation": "SaveCrosswordFeedback", "CrosswordId": id, "VoteType": vote_type})
+                return already_voted_response()
+
+            try:
+                # ՄԵԿ քվե = ՄԵԿ տող (կետերը՝ reasons JSON-ում)
+                await db.execute("""
+                    INSERT INTO vote_feedback (crossword_id, vote_type, reasons, other_text, message, voter_id)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (id, vote_type, reasons_json, other, message, voter_id))
+            except sqlite3.IntegrityError:
+                # Երկու միաժամանակյա հարցում. եզակի ինդեքսը երկրորդը կանգնեցրեց
+                return already_voted_response()
 
             await db.execute(f"""
                 INSERT INTO crossword_stats (crossword_id, {col})
@@ -1130,7 +1357,10 @@ async def api_crossword_feedback(id):
                 SET {col} = {col} + 1
             """, (id,))
             await db.commit()
-        return jsonify({"success": True})
+
+        resp = jsonify({"success": True})
+        return _attach_voter_cookie(resp, voter_id, is_new)
+
     except Exception as e:
         logger.error(
             "crossword_feedback_save_failed",
@@ -1235,6 +1465,10 @@ async def api_get_comments(id):
 
 @app.route('/api/crosswords/<int:id>/comments', methods=['POST'])
 async def api_add_comment(id):
+    if get_settings()["comments_locked"]:
+        return jsonify({"success": False,
+                        "error": "Մեկնաբանելը ժամանակավորապես անջատված է:"}), 403
+
     data = request.get_json(silent=True) or {}
     name = (data.get('name') or 'Անանուն').strip()[:60]
     text = (data.get('comment') or data.get('text') or '').strip()[:1000]
@@ -1297,6 +1531,7 @@ async def api_delete_crossword(id):
 
             await db.execute("DELETE FROM crossword_stats WHERE crossword_id = ?", (id,))
             await db.execute("DELETE FROM comments     WHERE crossword_id = ?", (id,))
+            await db.execute("DELETE FROM vote_feedback WHERE crossword_id = ?", (id,))  # ← ՆՈՐ
             await db.execute("DELETE FROM results      WHERE crossword_id = ?", (id,))
             await db.execute("DELETE FROM participants WHERE crossword_id = ?", (id,))
             await db.execute("DELETE FROM questions    WHERE crossword_id = ?", (id,))
@@ -1477,8 +1712,11 @@ async def api_user_stats(user_id, period):
 @app.route('/generate_ai_crossword', methods=['POST'])
 @require_auth()
 async def generate_ai_crossword():
-    ai_model = request.form.get("ai_model", "claude")
-    provider = get_provider(ai_model)
+    denied = blocked_response(mode="ai")
+    if denied:
+        return denied
+
+    ai_model = request.form.get("ai_model", DEFAULT_AI_MODEL)
     topic = request.form.get('topic', 'Ընդհանուր')
     creator_name = request.form.get('creator_name', 'AI Assistant')
     keyword_mode = request.form.get("keyword_mode")
@@ -1492,6 +1730,7 @@ async def generate_ai_crossword():
     show_creator_data = json.dumps(creator_fields, ensure_ascii=False) if creator_fields else 'no'
 
     try:
+        provider = get_provider(ai_model)
         if keyword_mode != "with":
             # Ավելի շատ ենք խնդրում՝ կրկնվող պատասխանները հեռացնելուց հետո count-ը լրանա
             raw_questions = await provider.generate_questions(topic, question_count + 8, description)
@@ -1565,7 +1804,7 @@ async def generate_ai_crossword():
                     raise ValueError("Չհաջողվեց կառուցել բանալի բառով խաչբառ")
 
         # ← ai_kind-ը գրում ենք ԲՈԼՈՐ ճյուղերի համար (if/else-ից դուրս, try-ի ներսում)
-        OTHER_AI_MODELS = {"claude"}  # ← սրանք «ԱՅԼ ԱԲ» են (հետագա մոդելներ ավելացրու այստեղ)
+        # OTHER_AI_MODELS-ը՝ .env-ից (օր.՝ OTHER_AI_MODELS=claude,gpt)
         crossword_data['ai_model'] = ai_model
         crossword_data['ai_kind'] = 'other_ai' if (ai_model or '').lower() in OTHER_AI_MODELS else 'dshh_ai'
         logger.info(
@@ -1592,8 +1831,9 @@ async def generate_ai_crossword():
             creator_name,
             ["AI Generated"],
             ["Բոլոր"],
-            1,
-            show_creator_data  # show_creator_data default
+            1,  # is_ai
+            show_creator_data,
+            1  # is_draft → սևագիր, մինչև ուսուցիչը չպահպանի խմբագրման էջում
         )
 
         logger.info(
@@ -1622,18 +1862,26 @@ async def generate_ai_crossword():
             },
             exc_info=True,
         )
-        flash("Խաչբառի ստեղծման ժամանակ առաջացավ սխալ։", "danger")
+        if "credit balance" in str(e).lower() or "authentication" in str(e).lower():
+            flash("ԱԲ ծառայությունը ժամանակավորապես հասանելի չէ։ Փորձեք ավելի ուշ։", "danger")
+        else:
+            flash("Խաչբառի ստեղծման ժամանակ առաջացավ սխալ։", "danger")
         return redirect(url_for('choose_keyword_mode'))
 
 
 @app.route('/api/ai-questions-for-edit', methods=['POST'])
+@require_auth()
 async def ai_questions_for_edit():
-    data = request.get_json()
-    topic = data.get('topic', '').strip()
+    data = request.get_json(silent=True) or {}
+    topic = (data.get('topic') or '').strip()
     subject = data.get('subject', '')
     grade = data.get('grade', '')
-    count = int(data.get('count', 3))
-    existing = data.get('existing', [])
+    try:
+        count = int(data.get('count', 3) or 3)
+    except (TypeError, ValueError):
+        count = 3
+    count = max(1, min(40, count))
+    existing = data.get('existing') or []
 
     if not topic:
         return jsonify({"error": "Թեմա չի նշված"}), 400
@@ -1644,15 +1892,37 @@ async def ai_questions_for_edit():
     if grade:
         full_topic += f" {grade}-րդ դասարան"
 
-    try:
-        existing_answers = set(q.get("answer", "").strip().upper() for q in existing)
-        provider = get_provider("claude")
-        pairs = await provider.generate_questions(full_topic, count)
-        filtered_pairs = [p for p in pairs if p["a"].strip().upper() not in existing_answers]
+    def clean_answer(s):
+        # Նույն կանոնը, ինչ frontend-ում՝ միայն հայերեն/լատիներեն մեծատառեր
+        return re.sub(r'[^Ա-ՖA-ZА-ЯЁ]', '', (s or '').strip().upper())
 
-        return jsonify({
-            "pairs": [{"question": p["q"], "answer": p["a"]} for p in filtered_pairs]
-        })
+    seen = set()
+    for x in existing:
+        if isinstance(x, dict):
+            a = clean_answer(x.get('answer') or x.get('a'))
+            if a:
+                seen.add(a)
+
+    result = []
+    try:
+        provider = get_provider(DEFAULT_AI_MODEL)
+        # Մինչև 3 փորձ՝ մինչև հավաքվի պահանջված քանակը
+        for _ in range(3):
+            need = count - len(result)
+            if need <= 0:
+                break
+            pairs = await provider.generate_questions(full_topic, need + 3)
+            for p in pairs or []:
+                q = (p.get('q') or p.get('question') or '').strip()
+                a = clean_answer(p.get('a') or p.get('answer'))
+                if not q or len(a) < 2 or a in seen:
+                    continue
+                seen.add(a)
+                result.append({"question": q, "answer": a})
+                if len(result) >= count:
+                    break
+
+        return jsonify({"pairs": result[:count], "requested": count})
 
     except Exception as e:
         logger.error(
@@ -1660,12 +1930,16 @@ async def ai_questions_for_edit():
             extra={"Operation": "AiQuestionsForEdit", "Topic": topic, "RequestId": g.get("request_id")},
             exc_info=True,
         )
+        # Եթե մինչ սխալը ինչ-որ բան հավաքվել է, վերադարձնում ենք
+        if result:
+            return jsonify({"pairs": result[:count], "requested": count})
         return jsonify({"error": str(e)}), 500
 
 
 
 
 @app.route('/api/ai-edit-crossword', methods=['POST'])
+@require_auth()
 async def ai_edit_crossword():
     data = request.get_json(silent=True) or {}
     qa_pairs = data.get("qa_pairs", [])
@@ -1694,7 +1968,7 @@ async def ai_edit_crossword():
 ]
 """
     try:
-        provider = get_provider("claude")
+        provider = get_provider(DEFAULT_AI_MODEL)
         raw = await provider.ask_async(prompt)  # ← ուղիղ async կանչ, ոչ call_for_json
 
         # parse անում ենք raw պատասխանը
@@ -1750,6 +2024,10 @@ async def ai_edit_crossword():
 @app.route('/ai_setup')
 @require_auth()
 async def ai_setup():
+    denied = blocked_response(mode="ai")
+    if denied:
+        return denied
+
     return render_template('ai_setup.html', is_teacher=user_has_role("teacher"))
 
 
@@ -1770,6 +2048,7 @@ async def delete_file_async(file_path):
 
 
 @app.route('/upload-bg', methods=['POST'])
+@require_auth()
 async def upload_bg():
     if 'bg_file' not in request.files:
         return jsonify({'success': False, 'error': 'Ֆայլ չի ընտրվել'})
@@ -1779,7 +2058,7 @@ async def upload_bg():
         return jsonify({'success': False, 'error': 'Ֆայլի անունը բացակայում է'})
 
     if file and allowed_file(file.filename):
-        filename = secure_filename(file.filename)
+        filename = f"bg_{uuid.uuid4().hex[:8]}_{secure_filename(file.filename)}"
         save_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         try:
             await save_file_async(file, save_path)
@@ -1796,9 +2075,10 @@ async def upload_bg():
 
 
 @app.route('/delete-bg', methods=['POST'])
+@require_auth()
 async def delete_bg():
-    data = request.get_json()
-    filename = data.get('filename')
+    data = request.get_json(silent=True) or {}
+    filename = secure_filename(data.get('filename') or '')
     if not filename:
         return jsonify({'success': False, 'error': 'Ֆայլի անունը բացակայում է'})
 
@@ -2017,7 +2297,14 @@ def delete_crossword_from_db(conn, id, user_id):
         "SELECT id FROM crosswords WHERE id = ? AND user_id = ?", (id, user_id)
     ).fetchone()
     if cw:
-        conn.execute("DELETE FROM crosswords WHERE id = ?", (id,))
+        # Կապված տվյալները՝ նախ, հետո ինքը խաչբառը
+        conn.execute("DELETE FROM crossword_stats WHERE crossword_id = ?", (id,))
+        conn.execute("DELETE FROM comments        WHERE crossword_id = ?", (id,))
+        conn.execute("DELETE FROM vote_feedback   WHERE crossword_id = ?", (id,))
+        conn.execute("DELETE FROM results         WHERE crossword_id = ?", (id,))
+        conn.execute("DELETE FROM participants    WHERE crossword_id = ?", (id,))
+        conn.execute("DELETE FROM questions       WHERE crossword_id = ?", (id,))
+        conn.execute("DELETE FROM crosswords      WHERE id = ?", (id,))
         return True
     return False
 
@@ -2106,19 +2393,33 @@ async def save_result(id):
 async def choose_keyword_mode():
     if request.method == 'POST':
         use_keyword = request.form.get('use_keyword')
+        # Ռեժիմն արգելված լինելու դեպքում կանգնեցնում ենք դեռ ընտրության պահին
+        mode = {'yes': 'keyword', 'ai': 'ai'}.get(use_keyword)
+        denied = blocked_response(mode=mode)
+        if denied:
+            return denied
+
         if use_keyword == 'yes':
             return redirect(url_for('input_questions', mode='key'))
         elif use_keyword == 'no':
             return redirect(url_for('input_questions', use_keyword='no'))
         elif use_keyword == 'ai':
             return redirect(url_for('ai_setup'))
-    return render_template('choose_keyword_mode.html')
+
+    settings = get_settings()
+    return render_template('choose_keyword_mode.html',
+                           ai_locked=settings['ai_creation_locked'],
+                           keyword_locked=settings['keyword_creation_locked'])
 
 
 @app.route('/save_draft', methods=['POST'])
 @require_auth()
 async def save_draft():
     """Պահպանում է կիսատ խաչբառը որպես սևագիր՝ առանց խիստ վալիդացիայի։"""
+    denied = blocked_response()
+    if denied:
+        return denied
+
     draft_id = (request.form.get('draft_id', '') or '').strip()
     title = (request.form.get('title', '') or '').strip()
     keyword = (request.form.get('keyword', '') or '').strip().upper()
@@ -2149,7 +2450,7 @@ async def save_draft():
             media_file = request.files.get(f'q_media_{index}')
             if media_file and media_file.filename:
                 ext = media_file.filename.rsplit('.', 1)[-1].lower() if '.' in media_file.filename else 'bin'
-                fname = f"qmedia_{int(time.time())}_{index}.{ext}"
+                fname = f"qmedia_{uuid.uuid4().hex[:12]}_{index}.{ext}"
                 save_path = os.path.join(app.config['UPLOAD_FOLDER'], fname)
                 await asyncio.to_thread(os.makedirs, app.config['UPLOAD_FOLDER'], exist_ok=True)
                 await save_file_async(media_file, save_path)
@@ -2162,7 +2463,7 @@ async def save_draft():
     bg_choice = request.form.get('bg_choice', '')
     bg_path = ''
     if file and file.filename:
-        filename = secure_filename(file.filename)
+        filename = f"bg_{uuid.uuid4().hex[:8]}_{secure_filename(file.filename)}"
         save_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         await asyncio.to_thread(os.makedirs, app.config['UPLOAD_FOLDER'], exist_ok=True)
         await save_file_async(file, save_path)
@@ -2183,6 +2484,7 @@ async def save_draft():
     # Միշտ պահում ենք raw հարցերը՝ resume-ի համար (սա է Ա7-ի հիմքը)
     crossword_data['draft_questions'] = questions
     crossword_data.update({
+        'use_keyword': 'yes' if request.form.get('use_keyword') == 'yes' else 'no',
         'description': description,
         'keyword_info': keyword_info,
         'grades': grades_list,
@@ -2226,10 +2528,62 @@ async def save_draft():
         "editUrl": url_for('edit_crossword', id=crossword_id)
     })
 
+@app.route('/api/check-crossword', methods=['POST'])
+@require_auth()
+async def check_crossword():
+    """Ստուգում է՝ որ հարցերի պատասխանները չեն հատվում մյուսների հետ (առանց պահպանելու)։"""
+    data = request.get_json(silent=True) or {}
+    keyword = (data.get('keyword') or '').strip().upper()
+
+    items = []
+    for i, it in enumerate(data.get('questions') or []):
+        q = (it.get('q') or '').strip()
+        a = (it.get('a') or '').strip().upper()
+        if a:
+            items.append({'q': q, 'a': a, 'idx': i})
+
+    if not items:
+        return jsonify({'skipped': []})
+
+    try:
+        grid = await asyncio.to_thread(
+            generate_crossword_grid,
+            [{'q': x['q'], 'a': x['a']} for x in items],
+            keyword
+        )
+    except Exception as e:
+        logger.warning(
+            "check_crossword_failed",
+            extra={"Operation": "CheckCrossword", "RequestId": g.get("request_id"), "Exception": type(e).__name__},
+        )
+        return jsonify({'skipped': []})   # ստուգումը ձախողվեց → թողնում ենք սովորական ընթացքին
+
+    # skipped-ը համապատասխանեցնում ենք ձևի տողերի ինդեքսներին
+    used, result = set(), []
+    for s in (grid or {}).get('skipped') or []:
+        word = (s.get('word') or '').upper()
+        question = s.get('question') or ''
+        match = next((x for x in items if x['idx'] not in used and x['a'] == word and x['q'] == question), None) \
+             or next((x for x in items if x['idx'] not in used and x['a'] == word), None)
+        if match:
+            used.add(match['idx'])
+            result.append({'idx': match['idx'], 'q': match['q'], 'a': match['a']})
+
+    return jsonify({'skipped': result})
+
 
 @app.route('/input', methods=['GET', 'POST'])
 @require_auth()
 async def input_questions():
+    if request.method == 'POST':
+        # mode=key / use_keyword=yes նշանակում է keyword ռեժիմ
+        uses_keyword = (request.args.get('mode') == 'key'
+                        or request.args.get('use_keyword') == 'yes'
+                        or request.form.get('use_keyword') == 'yes')
+        denied = blocked_response(mode="keyword" if uses_keyword else None)
+        if denied:
+            return denied
+
     mode = request.args.get('mode', '')
     use_keyword = request.args.get('use_keyword', '')
 
@@ -2249,10 +2603,6 @@ async def input_questions():
 
     if request.method == 'POST':
         grades_list = request.form.getlist('grades')
-        selected_subjects_raw = request.form.get('selected_subjects', '').strip()
-        if not selected_subjects_raw:
-            selected_subjects_raw = request.form.get('subject', '').strip()
-
         selected_subjects_raw = request.form.get('selected_subjects', '').strip()
         subjects_list = [s.strip() for s in selected_subjects_raw.split(',') if s.strip()]
         font_size = request.form.get('font_size', '20px')
@@ -2275,7 +2625,7 @@ async def input_questions():
 
         if hint_type in ['audio', 'video', 'image'] and hint_file and hint_file.filename:
             ext = hint_file.filename.rsplit('.', 1)[-1].lower() if '.' in hint_file.filename else 'bin'
-            filename = f"hint_{int(time.time())}.{ext}"
+            filename = f"hint_{uuid.uuid4().hex[:12]}.{ext}"
             hint_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             await save_file_async(hint_file, hint_path)
             hint_value = f"uploads/{filename}"
@@ -2292,7 +2642,7 @@ async def input_questions():
                                        'animation') and keyword_material_file and keyword_material_file.filename:
             ext = keyword_material_file.filename.rsplit('.', 1)[
                 -1].lower() if '.' in keyword_material_file.filename else 'bin'
-            filename = f"kwmat_{int(time.time())}.{ext}"
+            filename = f"kwmat_{uuid.uuid4().hex[:12]}.{ext}"
             save_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             await save_file_async(keyword_material_file, save_path)
             keyword_material_value = f"uploads/{filename}"
@@ -2308,7 +2658,7 @@ async def input_questions():
         bg_path = ''
 
         if file and file.filename:
-            filename = secure_filename(file.filename)
+            filename = f"bg_{uuid.uuid4().hex[:8]}_{secure_filename(file.filename)}"
             save_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             await asyncio.to_thread(os.makedirs, app.config['UPLOAD_FOLDER'], exist_ok=True)
             await save_file_async(file, save_path)
@@ -2322,19 +2672,24 @@ async def input_questions():
         for key in request.form:
             if key.startswith('question_'):
                 index = key.split('_')[1]
-                q = request.form.get(f'question_{index}')
-                a = request.form.get(f'answer_{index}')
-                if q and a:
-                    item = {'q': q.strip(), 'a': a.strip().upper()}
-                    media_file = request.files.get(f'q_media_{index}')
-                    if media_file and media_file.filename:
-                        ext = media_file.filename.rsplit('.', 1)[-1].lower() if '.' in media_file.filename else 'bin'
-                        fname = f"qmedia_{int(time.time())}_{index}.{ext}"
-                        save_path = os.path.join(app.config['UPLOAD_FOLDER'], fname)
-                        await save_file_async(media_file, save_path)
-                        item['q_media'] = f"uploads/{fname}"
-                        item['q_media_type'] = 'audio' if ext in AUDIO_EXT else 'image'
-                    questions.append(item)
+                q = (request.form.get(f'question_{index}') or '').strip()
+                a = (request.form.get(f'answer_{index}') or '').strip().upper()
+                media_file = request.files.get(f'q_media_{index}')
+                has_media = bool(media_file and media_file.filename)
+
+                # Պատասխանը պարտադիր է, հարցը՝ տեքստ ԿԱՄ նկար/աուդիո
+                if not a or (not q and not has_media):
+                    continue
+
+                item = {'q': q, 'a': a}
+                if has_media:
+                    ext = media_file.filename.rsplit('.', 1)[-1].lower() if '.' in media_file.filename else 'bin'
+                    fname = f"qmedia_{uuid.uuid4().hex[:12]}_{index}.{ext}"
+                    save_path = os.path.join(app.config['UPLOAD_FOLDER'], fname)
+                    await save_file_async(media_file, save_path)
+                    item['q_media'] = f"uploads/{fname}"
+                    item['q_media_type'] = 'audio' if ext in AUDIO_EXT else 'image'
+                questions.append(item)
 
         crossword_data = generate_crossword_grid(questions, keyword)
 
@@ -2346,6 +2701,7 @@ async def input_questions():
                 placed['q_media'] = src['q_media']
                 placed['q_media_type'] = src['q_media_type']
         crossword_data.update({
+            'use_keyword': 'yes' if request.form.get('use_keyword') == 'yes' else 'no',
             'hint_type': hint_type,
             'hint_value': hint_value,
             'description': description,
@@ -2361,6 +2717,12 @@ async def input_questions():
             'keyword_material_value': keyword_material_value,
         })
 
+        # Բառ է դուրս մնացել → պահում ենք բոլոր հարցերը և թողնում սևագիր,
+        # որ խմբագրման էջում չհատվածներն էլ երևան
+        has_skipped = bool(crossword_data.get('skipped'))
+        if has_skipped:
+            crossword_data['draft_questions'] = questions
+
         try:
             crossword_id = await asyncio.to_thread(
                 db_operation_wrapper,
@@ -2368,7 +2730,8 @@ async def input_questions():
                 g.current_user["sub"],
                 title, keyword, bg_path, crossword_data,
                 description, creator_name, subjects_list, grades_list, 0,
-                show_creator_data
+                show_creator_data,
+                1 if has_skipped else 0
             )
         except Exception as e:
             logger.error(
@@ -2379,7 +2742,20 @@ async def input_questions():
             flash(f"Սխալ տվյալների բազայում՝ {e}", "error")
             return redirect(url_for('input_questions'))
 
-            # ← ՆՈՐ: եթե բառեր դուրս մնացին, ծանուցել և տանել խմբագրման էջ
+        draft_id = (request.form.get('draft_id') or '').strip()
+        if draft_id.isdigit():
+            try:
+                await asyncio.to_thread(
+                    db_operation_wrapper, delete_crossword_from_db,
+                    int(draft_id), g.current_user["sub"]
+                )
+            except Exception:
+                logger.warning(
+                    "draft_cleanup_failed",
+                    extra={"Operation": "CreateCrossword", "DraftId": draft_id, "RequestId": g.get("request_id")},
+                )
+
+        # ← ՆՈՐ: եթե բառեր դուրս մնացին, ծանուցել և տանել խմբագրման էջ
         if flash_skipped_words(crossword_data):
             return redirect(url_for('edit_crossword', id=crossword_id))
 
@@ -2394,6 +2770,11 @@ async def input_questions():
 @app.route('/edit/<int:id>', methods=['GET', 'POST'])
 @require_auth()
 async def edit_crossword(id):
+    if request.method == 'POST':
+        denied = blocked_response()
+        if denied:
+            return denied
+
     user_id = g.current_user["sub"]
     cw = await asyncio.to_thread(db_operation_wrapper, fetch_crossword_by_id, id, user_id)
 
@@ -2406,6 +2787,13 @@ async def edit_crossword(id):
     bg_images = await asyncio.to_thread(
         lambda: [f for f in os.listdir(bg_folder) if f.lower().endswith((".jpg", "jpeg", ".png"))]
     )
+
+    # Խաչբառի տեսակը՝ ըստ պահված նշանի, ոչ թե միայն ըստ բանալի բառի առկայության
+    try:
+        _saved = json.loads(cw.get('data') or '{}')
+    except Exception:
+        _saved = {}
+    keyword_mode = bool(cw.get('keyword')) or _saved.get('use_keyword') == 'yes'
 
     if request.method == 'POST':
         title = request.form.get('title', '').strip()
@@ -2437,7 +2825,7 @@ async def edit_crossword(id):
 
         if bg_file and bg_file.filename:
             filename = secure_filename(bg_file.filename)
-            filename = f"bg_{int(time.time())}_{filename}"
+            filename = f"bg_{uuid.uuid4().hex[:12]}_{filename}"
             save_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             await asyncio.to_thread(os.makedirs, app.config['UPLOAD_FOLDER'], exist_ok=True)
             await save_file_async(bg_file, save_path)
@@ -2455,32 +2843,36 @@ async def edit_crossword(id):
                 index = key.split('_')[1]
                 q = request.form.get(f'question_{index}', '').strip()
                 a = request.form.get(f'answer_{index}', '').strip().upper()
-                if q and a:
-                    item = {'q': q, 'a': a}
+                if not a:
+                    continue
 
-                    media_val = request.form.get(f'q_media_existing_{index}', '').strip()
-                    media_type = request.form.get(f'q_media_existing_type_{index}', '').strip()
+                media_val = request.form.get(f'q_media_existing_{index}', '').strip()
+                media_type = request.form.get(f'q_media_existing_type_{index}', '').strip()
 
-                    if request.form.get(f'remove_q_media_{index}', '0') == '1':
-                        media_val, media_type = '', ''
+                if request.form.get(f'remove_q_media_{index}', '0') == '1':
+                    media_val, media_type = '', ''
 
-                    media_file = request.files.get(f'q_media_{index}')
-                    if media_file and media_file.filename:
-                        ext = media_file.filename.rsplit('.', 1)[-1].lower() if '.' in media_file.filename else 'bin'
-                        fname = f"qmedia_{int(time.time())}_{index}.{ext}"
-                        save_path = os.path.join(app.config['UPLOAD_FOLDER'], fname)
-                        await asyncio.to_thread(os.makedirs, app.config['UPLOAD_FOLDER'], exist_ok=True)
-                        await save_file_async(media_file, save_path)
-                        media_val = f"uploads/{fname}"
-                        media_type = 'audio' if ext in AUDIO_EXT else 'image'
+                media_file = request.files.get(f'q_media_{index}')
+                if media_file and media_file.filename:
+                    ext = media_file.filename.rsplit('.', 1)[-1].lower() if '.' in media_file.filename else 'bin'
+                    fname = f"qmedia_{uuid.uuid4().hex[:12]}_{index}.{ext}"
+                    save_path = os.path.join(app.config['UPLOAD_FOLDER'], fname)
+                    await asyncio.to_thread(os.makedirs, app.config['UPLOAD_FOLDER'], exist_ok=True)
+                    await save_file_async(media_file, save_path)
+                    media_val = f"uploads/{fname}"
+                    media_type = 'audio' if ext in AUDIO_EXT else 'image'
 
-                    if media_val:
-                        item['q_media'] = media_val
-                        item['q_media_type'] = media_type
+                # Հարցը՝ տեքստ ԿԱՄ նկար/աուդիո
+                if not q and not media_val:
+                    continue
 
-                    questions.append(item)
+                item = {'q': q, 'a': a}
+                if media_val:
+                    item['q_media'] = media_val
+                    item['q_media_type'] = media_type
+                questions.append(item)
 
-        if cw.get('keyword'):
+        if keyword_mode:
             question_count = len(questions)
             if not keyword:
                 flash("Բանալի բառը պարտադիր է։", "error")
@@ -2510,6 +2902,9 @@ async def edit_crossword(id):
 
         old_data = json.loads(cw['data'])
         global_hint_media = old_data.get('global_hint_media')
+        if not global_hint_media and old_data.get('hint_type') in ('audio', 'video', 'image'):
+            # Ստեղծման էջը ֆայլը պահում է hint_value-ում
+            global_hint_media = old_data.get('hint_value') or None
         global_hint = None
 
         if hint_type == 'text':
@@ -2518,7 +2913,7 @@ async def edit_crossword(id):
         elif hint_type in ('audio', 'video', 'image'):
             if file_hint and file_hint.filename:
                 filename = secure_filename(file_hint.filename)
-                filename = f"hint_{int(time.time())}_{filename}"
+                filename = f"hint_{uuid.uuid4().hex[:12]}_{filename}"
                 save_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
                 await asyncio.to_thread(os.makedirs, app.config['UPLOAD_FOLDER'], exist_ok=True)
                 await save_file_async(file_hint, save_path)
@@ -2543,7 +2938,7 @@ async def edit_crossword(id):
                                        'animation') and keyword_material_file and keyword_material_file.filename:
             ext = keyword_material_file.filename.rsplit('.', 1)[
                 -1].lower() if '.' in keyword_material_file.filename else 'bin'
-            filename = f"kwmat_{int(time.time())}.{ext}"
+            filename = f"kwmat_{uuid.uuid4().hex[:12]}.{ext}"
             save_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             await asyncio.to_thread(os.makedirs, app.config['UPLOAD_FOLDER'], exist_ok=True)
             await save_file_async(keyword_material_file, save_path)
@@ -2554,6 +2949,7 @@ async def edit_crossword(id):
             keyword_material_value = ''
 
         crossword_data.update({
+            'use_keyword': 'yes' if keyword_mode else 'no',
             'hint_type': hint_type,
             'global_hint': global_hint,
             'global_hint_media': global_hint_media,
@@ -2571,8 +2967,57 @@ async def edit_crossword(id):
             'keyword_material_value': keyword_material_value,
         })
 
+        # ── Ավարտված խաչբառ + չհատվող բառեր → ՉԵՆՔ պահպանում ──
+        # Բազայում խաչբառը մնում է նախկին ավարտված վիճակով, իսկ օգտատիրոջը
+        # ցույց ենք տալիս նույն էջը՝ իր մուտքագրած (չպահպանված) փոփոխություններով։
+        if (crossword_data or {}).get('skipped') and not cw.get('is_draft'):
+            flash_skipped_words(crossword_data)
+
+            preview = dict(crossword_data)
+            preview['placed'] = [
+                {
+                    'question': it.get('q', ''),
+                    'word': it.get('a', ''),
+                    'number': i + 1,
+                    'x': 0, 'y': 0, 'dir': 'h',
+                    **({'q_media': it['q_media'], 'q_media_type': it.get('q_media_type', '')}
+                       if it.get('q_media') else {})
+                }
+                for i, it in enumerate(questions)
+            ]
+
+            cw_preview = dict(cw)
+            cw_preview.update({
+                'title': title,
+                'description': description,
+                'keyword': keyword,
+                'background': bg_path,
+            })
+
+            logger.info(
+                "edit_crossword_not_saved_skipped",
+                extra={"Operation": "EditCrossword", "CrosswordId": id,
+                       "SkippedCount": len(crossword_data.get('skipped') or []),
+                       "RequestId": g.get("request_id")},
+            )
+
+            return render_template('edit_crossword.html',
+                                   crossword=preview,
+                                   cw=cw_preview,
+                                   bg_images=bg_images,
+                                   creator_name=cw.get('creator_name', ''),
+                                   show_creator_data=show_creator_data,
+                                   current_creator_fields=creator_fields,
+                                   keyword_mode=keyword_mode,
+                                   is_teacher=user_has_role("teacher"),
+                                   skipped_not_saved=True)
+
         try:
             has_skipped = bool((crossword_data or {}).get('skipped'))
+            if has_skipped:
+                # Սևագիր է մնում → պահում ենք ԲՈԼՈՐ հարցերը գրված հերթականությամբ,
+                # որպեսզի չհատվածները չկորչեն և հնարավոր լինի ուղղել
+                crossword_data['draft_questions'] = questions
             await asyncio.to_thread(
                 db_operation_wrapper,
                 update_crossword_db,
@@ -2596,8 +3041,8 @@ async def edit_crossword(id):
 
     crossword_json = json.loads(cw['data'])
 
-    # ── Սևագրի fallback՝ եթե ցանցը դատարկ է, հարցերը վերցնում ենք draft_questions-ից ──
-    if not crossword_json.get('placed') and crossword_json.get('draft_questions'):
+    # ── Սևագիր՝ հարցերը միշտ վերցնում ենք draft_questions-ից (գրված հերթականությամբ, առանց կորուստի) ──
+    if crossword_json.get('draft_questions'):
         crossword_json['placed'] = [
             {
                 'question': item.get('q', ''),
@@ -2631,7 +3076,7 @@ async def edit_crossword(id):
     for key, value in defaults.items():
         crossword_json.setdefault(key, value)
 
-        # ── ընթացիկ ընտրված դաշտեր ─────────────────────────────────
+    # ── ընթացիկ ընտրված դաշտեր ─────────────────────────────────
     raw_scd = cw.get('show_creator_data', 'no')
     current_fields = []
     if raw_scd and raw_scd not in ('no', 'yes'):
@@ -2649,6 +3094,7 @@ async def edit_crossword(id):
                            creator_name=cw.get('creator_name', ''),
                            show_creator_data=cw.get('show_creator_data', 'no'),
                            current_creator_fields=current_fields,
+                           keyword_mode=keyword_mode,
                            is_teacher=user_has_role("teacher"))
 
 
@@ -2713,6 +3159,14 @@ async def view_crossword(id):
     cw = dict(cw)
     if cw.get('is_draft'):
         return redirect(url_for('edit_crossword', id=id))
+
+    # Թաքցվածը հասանելի է միայն սեփականատիրոջը (ադմինը դիտում է պանելից):
+    is_owner = current_user_id and str(cw.get('user_id')) == str(current_user_id)
+    if not is_owner:
+        if cw.get('hidden'):
+            return "Խաչբառը հասանելի չէ։", 404
+        if get_settings()["all_crosswords_hidden"]:
+            return "Խաչբառերը ժամանակավորապես հասանելի չեն։", 404
 
     crossword = json.loads(cw['data'])
     crossword.setdefault('global_hint', None)
@@ -2892,6 +3346,8 @@ async def api_client_log():
 
 @app.route('/dashboard-debug')
 def dashboard_debug():
+    if not FLASK_DEBUG:
+        return "Not found", 404
     # Authorization header-ը ամբողջությամբ չենք վերադարձնում response-ում (կանոն 17),
     # այլ միայն presence/prefix-ը
     auth = request.headers.get("Authorization", "ՉԿԱ")
@@ -2901,6 +3357,8 @@ def dashboard_debug():
 
 @app.route('/debug')
 async def debug():
+    if not FLASK_DEBUG:
+        return "Not found", 404
     def get_tables_list(conn):
         c = conn.cursor()
         c.execute("SELECT name FROM sqlite_master WHERE type='table'")
@@ -2912,6 +3370,8 @@ async def debug():
 
 @app.route('/crossword_text/<int:id>')
 async def crossword_text(id):
+    if not FLASK_DEBUG:
+        return "Not found", 404
     cw = await asyncio.to_thread(db_operation_wrapper, fetch_crossword_by_id_public, id)
     if not cw:
         return "Խաչբառը չի գտնվել։", 404
@@ -2937,6 +3397,8 @@ async def crossword_text(id):
 
 @app.route('/debug_data/<int:id>')
 async def debug_data(id):
+    if not FLASK_DEBUG:
+        return "Not found", 404
     data_json = await asyncio.to_thread(db_operation_wrapper, get_single_field_db, id, id, 'data')
     if not data_json:
         return "Խաչբառը չի գտնվել։", 404
@@ -3090,6 +3552,7 @@ def admin_delete_crossword(id):
     conn.execute("DELETE FROM questions       WHERE crossword_id=?", (id,))
     conn.execute("DELETE FROM crossword_stats WHERE crossword_id=?", (id,))
     conn.execute("DELETE FROM comments        WHERE crossword_id=?", (id,))
+    conn.execute("DELETE FROM vote_feedback   WHERE crossword_id=?", (id,))
     conn.commit()
     conn.close()
     logger.info(
@@ -3150,7 +3613,7 @@ def admin_edit_full_crossword(cw_id):
 
         if bg_file and bg_file.filename:
             filename = secure_filename(bg_file.filename)
-            filename = f"bg_{int(time.time())}_{filename}"
+            filename = f"bg_{uuid.uuid4().hex[:12]}_{filename}"
             save_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
             bg_file.save(save_path)
@@ -3173,17 +3636,20 @@ def admin_edit_full_crossword(cw_id):
                         "dir": direction
                     })
 
-        cw_data['placed'] = new_questions
+        new_grid = generate_crossword_grid(
+            [{'q': q['question'], 'a': q['answer']} for q in new_questions], keyword
+        ) or {}
+        cw_data.update(new_grid)
         cw_data['description'] = description
         cw_data['grades'] = grades_list
 
         try:
             conn.execute("""
                 UPDATE crosswords
-                SET title=?, keyword=?, background=?, data=?, description=?, grades=?
+                SET title=?, keyword=?, background=?, data=?, description=?, grade=?
                 WHERE id=?
             """, (title, keyword, bg_path, json.dumps(cw_data, ensure_ascii=False),
-                  description, grades_str, cw_id))
+                  description, normalize_to_json_list(grades_list), cw_id))
 
             conn.execute("DELETE FROM questions WHERE crossword_id=?", (cw_id,))
             for q in new_questions:
@@ -3285,7 +3751,7 @@ if __name__ == '__main__':
     if not os.path.exists(os.path.join(BASE_DIR, 'dataset')):
         os.makedirs(os.path.join(BASE_DIR, 'dataset'))
 
-    logger.info("startup_begin", extra={"Operation": "AppStartup", "Env": ENV if 'ENV' in dir() else os.getenv("FLASK_ENV", "production")})
+    logger.info("startup_begin", extra={"Operation": "AppStartup", "Env": FLASK_ENV})
 
     check_and_add_creator_name_column()
     check_and_create_participants_table()
@@ -3301,6 +3767,21 @@ if __name__ == '__main__':
     check_and_add_show_creator_data_column()
     check_and_add_is_draft_column()
     ensure_admin_tables()
+    check_and_add_voter_id_column()
+
+    # ── .env-ի կարևոր արժեքների ստուգում ──
+    if not SECRET_KEY:
+        log_critical_startup_failure(
+            logger, "secret_key_missing",
+            Operation="AppStartup",
+            Detail="SECRET_KEY-ը .env-ում չկա, օգտագործվում է dev fallback (production-ում անթույլատրելի է)",
+        )
+
+    if not MAINLOGIN_BASE:
+        logger.warning(
+            "mainlogin_base_missing",
+            extra={"Operation": "AppStartup", "Detail": "MAINLOGIN_BASE-ը .env-ում չկա, profile-claims-ը չի աշխատի"},
+        )
 
     if INTERNAL_API_KEY:
         # ⚠️ API key-ը երբեք ամբողջությամբ չգրանցել (PDF, գլուխ 8). միայն masked prefix/suffix + երկարություն
@@ -3319,18 +3800,12 @@ if __name__ == '__main__':
             Detail=".env չի բեռնվել կամ INTERNAL_API_KEY տողը բացակայում է",
         )
 
-    host = os.getenv("HOST", "0.0.0.0")
-    port = int(os.getenv("PORT", "15400"))
-    debug = os.getenv("FLASK_DEBUG", "false").lower() == "true"
+    ssl_context = (SSL_CERT_FILE, SSL_KEY_FILE) if USE_HTTPS else None
 
-    ssl_context = None
-    if os.getenv("USE_HTTPS", "false").lower() == "true":
-        ssl_context = ("certs/cert.pem", "certs/key.pem")
-
-    logger.info("app_run", extra={"Operation": "AppStartup", "Host": host, "Port": port, "Debug": debug})
+    logger.info("app_run", extra={"Operation": "AppStartup", "Host": HOST, "Port": PORT, "Debug": FLASK_DEBUG})
 
     try:
-        app.run(host=host, port=port, debug=debug, ssl_context=ssl_context)
+        app.run(host=HOST, port=PORT, debug=FLASK_DEBUG, ssl_context=ssl_context)
     except Exception as e:
         log_critical_startup_failure(
             logger, "app_terminated_unexpectedly", exception=e,

@@ -8,7 +8,9 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Armenian:wght@400;500;600;700;900&display=swap" rel="stylesheet">
-
+    <script src="{{ url_for('static', filename='js/client-logger.js') }}"
+        data-log-endpoint="{{ url_for('api_client_log') }}"
+        data-request-id="{{ g.get('request_id', '') }}"></script>
     <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -712,11 +714,12 @@ body.dark .no-btn:hover { background:#2f2238; }
     border-radius: 999px;
     padding: 3px 12px;
     font-size: 12px;
-    color: #8e3aad;
+    color: #000;
     font-weight: 600;
 }
 body.dark #ai-context-info { background: #241a2b; border-color: #4a2d57; }
-body.dark .ai-ctx-pill { background: #1a1226; border-color: #4a2d57; color: #cba6e0; }
+body.dark .ai-ctx-pill { background: #1a1226; border-color: #4a2d57; color: #ffffff; }
+body.dark #ai-spinner { color: #ffffff; }
 
 /* Արդյունքների կոճակներ */
 .ai-bulk-add-btn {
@@ -762,7 +765,7 @@ body.dark .ai-result-card .ai-a::before { background-color: #7ee2a0; }
 }
 .ai-result-card .ai-add-this:hover { background: #D6F2E2; transform: translateY(-1px); }
 body.dark .ai-result-card .ai-add-this { background: #12301c; border-color: #27ae60; color: #7ee2a0; }
-    #ai-spinner { display: none; text-align: center; padding: 18px 0 6px; color: #8e3aad; font-size: 14px; font-weight: 600; }
+    #ai-spinner { display: none; text-align: center; padding: 18px 0 6px; color: #000; font-size: 14px; font-weight: 600; }
     #ai-spinner .spin { display: inline-block; animation: spin 0.8s linear infinite; }
     #ai-error { color: var(--danger); font-size: 13px; margin-top: 10px; display: none; }
     .custom-file-input { display: none; }
@@ -817,6 +820,8 @@ body.dark .format-hint { color: #9b9bb5; }
     .guide-box ol { padding-left: 20px; margin: 14px 0 0; }
     .guide-box li { margin-bottom: 6px; font-size: 0.95rem; line-height: 1.6; color: var(--text); }
     body.dark .guide-box li { color: #e2e2f0; }
+        .guide-box li em { display:block; margin-top:4px; font-size:.88rem; line-height:1.55; color:#6b5a70; }
+    body.dark .guide-box li em { color:#b9b2c8; }
     .guide-close-btn { position: absolute; top: 14px; right: 18px; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; font-size: 20px; cursor: pointer; color: #aaa; border: none; background: transparent; border-radius: 50%; transition: .3s; }
     .guide-close-btn:hover { color: #e74c3c; background: #ffeaea; border: 2px solid #e74c3c; transform: rotate(90deg); }
 
@@ -1012,7 +1017,7 @@ body.dark .req-star { color: #ff6b6b !important; }
     width: 100%;
     box-sizing: border-box;
     display: flex !important;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     align-items: center;
     gap: 10px;
     margin: 6px 0 0 46px;
@@ -1033,20 +1038,20 @@ body.dark .req-star { color: #ff6b6b !important; }
     align-items: center;
     gap: 6px;
     white-space: nowrap;
-    background: var(--grad) !important;
-    border: none;
-    color: #fff !important;
-    padding: 9px 16px;
+    background: var(--add-bg) !important;
+    border: 1.5px solid var(--accent-soft);
+    color: var(--text) !important;
+    padding: 6px 14px;
     border-radius: 999px;
     font-size: 13px;
     font-weight: 600;
     line-height: 1.2;
     cursor: pointer;
-    box-shadow: 0 3px 10px rgba(176,82,228,0.22);
-    transition: filter .2s, transform .15s;
+    box-shadow: none;
+    transition: background .2s, transform .15s;
     width: auto;
 }
-.qa-media-cell label.qa-media-label:hover { filter: brightness(1.05); transform: translateY(-1px); }
+.qa-media-cell label.qa-media-label:hover { background: #fbe7fa; transform: translateY(-1px); }
 
 /* ֆայլի անունը՝ կոճակի կողքին */
 
@@ -1089,8 +1094,9 @@ body.dark .req-star { color: #ff6b6b !important; }
 .qa-media-cell .qa-media-clear:hover { transform: scale(1.2); }
 body.dark .qa-media-cell .qa-media-name { color: #9b9bb5; }
 body.dark .qa-media-cell label.qa-media-label {
-    background: var(--grad) !important;
-    color: #fff !important;
+    background: #2a2233 !important;
+    border-color: #5a3a68;
+    color: #e7e5ee !important;
 }
     /* Հաստատման կոճակի կանաչ տարբերակ */
     /* Հաստատման կոճակ՝ պահպանելու համար */
@@ -1110,9 +1116,10 @@ body.dark .qa-media-cell label.qa-media-label {
 }
     .qa-media-preview { flex-basis: 100%; width: 100%; margin-top: 8px; }
 .qa-media-thumb {
-    max-height: 90px; max-width: 160px;
+    width: 64px; height: 64px;          /* բոլոր նկարները՝ նույն չափի */
+    object-fit: cover;                  /* համամասնությունը պահվում է, ավելորդը կտրվում */
     border-radius: 8px; border: 1px solid var(--field-border);
-    display: block; object-fit: cover;
+    display: block;
 }
 .qa-media-audio { width: 100%; max-width: 320px; height: 36px; display: block; }
 .confirm-modal-title .cm-icon.save-icon svg { width: 15px; height: 15px; }
@@ -1136,7 +1143,22 @@ body.dark .confirm-modal-title .cm-icon.save-icon { background: #2a2040; border-
         #hint-media-preview-container video { width: 100%; height: auto; }
         .guide-box { padding: 18px; max-height: 78vh; }
     }
-
+    @media (max-width: 760px) {
+    /* քարտի ներսի ուղղահայաց բացը փոքրացնում ենք */
+    #qa-container > .qa-row {
+        row-gap: 2px;
+    }
+    /* media բջիջը՝ պատասխանին կպած, դաշտերի չափ */
+    #qa-container > .qa-row .qa-media-cell,
+    .qa-media-cell {
+        margin: 0 !important;
+    }
+    .qa-media-cell label.qa-media-label {
+        width: 100%;
+        justify-content: center;
+        box-sizing: border-box;
+    }
+}
     /* ===== ԱԲ-ով ստեղծված խաչբառի նախազգուշում ===== */
 .ai-notice-overlay{
     display:none; position:fixed; inset:0;
@@ -1224,15 +1246,365 @@ body.dark #qa-container > .qa-row {
     border-color: #3a3147;
 }
 
+/* ====== ՄՈԲԱՅԼ — հարց/պատասխան քարտի շտկումներ (ինչպես ստեղծման էջում) ====== */
+@media (max-width: 760px) {
+    /* Քարտ՝ ձախում տեղ համարի, աջում՝ ջնջելու կոճակի համար */
+    #qa-container > .qa-row {
+        position: relative;
+        flex-direction: column;      /* հարց/պատասխան՝ իրար տակ */
+        gap: 8px;
+        padding: 14px 44px 10px 30px; /* ձախ՝ համար, աջ՝ ջնջել */
+    }
+
+    /* Հարցի համարը՝ հարցի ձախ կողքին (ոչ վերևում) */
+    #qa-container > .qa-row > label {
+        position: absolute;
+        left: 6px;
+        top: 20px;                   /* հավասարեցված է առաջին դաշտի տեքստին */
+        margin: 0;
+        width: auto;
+    }
+
+    /* Ջնջելու (✕) կոճակը՝ հարցի աջ կողքին */
+    #qa-container > .qa-row > button {
+        position: absolute;
+        top: 12px;
+        right: 4px;
+        align-self: auto;
+        margin: 0;
+        width: 34px;
+        height: 34px;
+    }
+    #qa-container > .qa-row > button svg { width: 24px; height: 24px; }
+
+    /* Հարց ու պատասխան դաշտերը՝ իրար հավասար, ամբողջ լայնությամբ */
+    #qa-container > .qa-row > textarea {
+        width: 100%;
+        min-width: 0;
+        min-height: 48px;
+        box-sizing: border-box;
+    }
+
+    /* media-ն՝ ձախից հավասարեցված դաշտերի հետ */
+    #qa-container > .qa-row .qa-media-cell {
+        margin: 0 !important;
+    }
+
+    /* «Կցել/փոխել…» կոճակ՝ տեքստը փաթաթվի, դաշտից դուրս չգա */
+    .qa-media-cell label.qa-media-label {
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+        justify-content: center;
+        text-align: center;
+        white-space: normal;
+        overflow-wrap: anywhere;
+        line-height: 1.35;
+    }
+}
+    /* ====== ՄՈԲԱՅԼ — ֆոնային նախադիտման շտկում ====== */
+@media (max-width: 760px) {
+    /* Նկարը չդուրս գա քարտից՝ ջնջելու կոճակի համար տեղ թողնելով աջից */
+    .bg-preview-wrap {
+        max-width: 100%;
+        padding-right: 34px;   /* տեղ՝ ✕ կոճակի համար */
+        box-sizing: border-box;
+    }
+
+    /* Ֆիքսված inline width/height-ը վերացնում ենք, նկարը՝ ճկուն */
+    #bg-preview {
+        max-width: 100% !important;
+    }
+
+    /* Ջնջելու (✕) կոճակը՝ նկարի ներսի աջ վերևի անկյունում, ոչ դուրսը */
+    .corner-delete-btn {
+        right: 0 !important;
+        top: 4px !important;
+    }
+}
+
+    /* ===== Պարտադիր դաշտերի սխալներ՝ ստեղծման էջի ոճով ===== */
+#edit-form .error-message { color: var(--danger); font-size: 13px; margin: 4px 0 10px; display: block; }
+#edit-form .error-message:empty { display: none; }
+body.dark #edit-form .error-message { color: #ff6b6b !important; }
+
+/* Հարց/պատասխան քարտի սխալը՝ առանձին տողով, դաշտերի տակ */
+.qa-row .qa-error { flex: 0 0 100%; margin: 2px 0 0 40px !important; }
+@media (max-width: 760px) {
+    .qa-row .qa-error { margin-left: 0 !important; }
+}
+
+/* Սքրոլի ժամանակ դաշտը չթաքնվի topbar-ի տակ */
+#edit-form input, #edit-form textarea, #grade-select-display, #subject-select-display-edit {
+    scroll-margin-top: 90px;
+}
+/* ===== Լայն ծանուցում (չներառված հարցեր) ===== */
+.ai-notice-box.wide{
+    max-width: 820px;
+    max-height: 85vh;
+    overflow-y: auto;
+    padding: 28px 34px 24px;
+}
+.ai-notice-box.wide .ai-notice-body{
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 14px;
+}
+.ai-notice-box.wide .ai-notice-text{ width: 100%; }
+.ai-notice-box.wide .ai-notice-text p{ font-size: 16px; }
+.ai-notice-box.wide .ai-notice-text ul{
+    display: inline-block;
+    text-align: left;
+    margin: 12px auto;
+    padding-left: 20px;
+}
+.ai-notice-box.wide .ai-notice-text li{ margin-bottom: 6px; line-height: 1.5; }
+.ai-notice-box.wide .ai-notice-actions{ justify-content: center; }
+body.dark .ai-notice-text li{ color: #f2e6f0; }
+
+@media (min-width: 769px){
+    .ai-notice-overlay{ padding-left: calc(var(--sidebar-width) + 20px); }
+    body.sidebar-collapsed .ai-notice-overlay{ padding-left: calc(var(--sidebar-collapsed-width) + 20px); }
+}
+    /* ===== Հարցի նկարի մեծացում (lightbox) ===== */
+.qa-media-thumb {
+    cursor: zoom-in;
+    transition: transform .15s, box-shadow .15s;
+}
+.qa-media-thumb:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(176,82,228,0.25);
+}
+.img-lightbox {
+    display: none; position: fixed; inset: 0;
+    background: rgba(20,10,25,0.8);
+    z-index: 80000;                 /* բոլոր պատուհաններից վերև */
+    align-items: center; justify-content: center;
+    padding: 20px; cursor: zoom-out;
+}
+.img-lightbox.active { display: flex; }
+.img-lightbox img {
+    max-width: 90vw; max-height: 85vh;
+    border-radius: 12px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    background: #fff;
+    animation: popIn .18s ease;
+    cursor: default;
+}
+.img-lightbox-close {
+    position: absolute; top: 18px; right: 22px;
+    width: 40px; height: 40px; border-radius: 50%;
+    background: rgba(255,255,255,0.15); color: #fff;
+    border: none; font-size: 20px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+}
+.img-lightbox-close:hover { background: rgba(255,255,255,0.3); }
+/* ===== Հուշման / բանալի բառի նյութի նախադիտում ===== */
+.media-preview{
+    display:none; margin-top:12px; padding:12px;
+    background:#fff; border:1px solid var(--banner-border);
+    border-radius:12px; text-align:center;
+}
+.media-preview .mp-img{
+    max-width:220px; max-height:160px; object-fit:contain;
+    border-radius:8px; display:block; margin:0 auto; cursor:zoom-in;
+    transition:transform .15s;
+}
+.media-preview .mp-img:hover{ transform:scale(1.03); }
+.media-preview .mp-audio{ width:100%; max-width:360px; }
+.media-preview .mp-video{ width:100%; max-width:360px; border-radius:8px; display:block; margin:0 auto; }
+.media-preview .mp-yt{ width:100%; max-width:360px; aspect-ratio:16/9; border:0; border-radius:8px; display:block; margin:0 auto; }
+.media-preview .mp-link{
+    display:inline-flex; align-items:center; gap:6px;
+    color:var(--accent); font-weight:600; text-decoration:none; word-break:break-all;
+}
+.media-preview .mp-link:hover{ text-decoration:underline; }
+.media-preview .mp-bad{ color:var(--danger); font-size:13px; }
+body.dark .media-preview{ background:#1c1925; border-color:#4a2d57; }
+/* ===== «+» պատկերակ՝ բոլոր սարքերում նույն գույնով ===== */
+.plus-ic{
+    display:inline-block;
+    width:14px; height:14px;
+    flex-shrink:0;
+    vertical-align:-2px;
+    background:currentColor;
+    -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 4v16M4 12h16' stroke='black' stroke-width='3.5' stroke-linecap='round'/%3E%3C/svg%3E") center / contain no-repeat;
+            mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 4v16M4 12h16' stroke='black' stroke-width='3.5' stroke-linecap='round'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.add-btn .plus-ic{ width:15px; height:15px; }
+@media (max-width:760px){
+    .qa-media-cell label.qa-media-label{
+        display:block !important;
+        width:100%;
+        box-sizing:border-box;
+        text-align:center;
+        white-space:normal;
+        overflow-wrap:anywhere;
+        line-height:1.35;
+    }
+    .qa-media-cell label.qa-media-label .plus-ic{
+        margin-right:6px;
+        vertical-align:-2px;
+    }
+}
+    /* ===== Հեռախոս՝ ձախ մենյուի ենթամենյուն կողքից (flyout) ===== */
+@media (max-width:768px){
+    .sidebar-flyout-wrap .sidebar-flyout.open{
+        display:flex; flex-direction:column;
+        position:fixed; left:var(--sidebar-collapsed-width);
+        background:#fff; border:1px solid #e4e1f0; border-radius:12px;
+        box-shadow:0 8px 24px rgba(0,0,0,.10);
+        padding:6px; z-index:9999; min-width:200px; gap:2px;
+    }
+    body.dark .sidebar-flyout-wrap .sidebar-flyout.open{
+        background:#16162a; border-color:#2a2a45;
+    }
+}
+    /* ===== Խմբագրման էջ՝ հեռախոսում նույն լայնքը, ինչ ստեղծման էջում ===== */
+.page-inner{ min-width:0; }
+
+/* Մասնագիտական տվյալներ՝ տեքստը չդուրս գա սահմաններից */
+.cd-head-left{ min-width:0; flex:1 1 auto; }
+.cd-title{ min-width:0; overflow-wrap:anywhere; }
+.cd-grid{ grid-template-columns:repeat(2, minmax(0,1fr)); }
+.cd-option, .cd-label{ min-width:0; overflow-wrap:anywhere; }
+
+@media (max-width:760px){
+    .app-main{ padding:1.5rem 12px 30px; }
+    #edit-form{ padding:22px 16px 30px; border-radius:14px; }
+
+    .cd-grid{ grid-template-columns:minmax(0,1fr); gap:10px; }
+    .cd-header{ padding:14px 16px; gap:8px; }
+    .cd-title{ font-size:14px; }
+    .cd-body{ padding:14px 16px 18px; }
+    .cd-desc{ padding:12px 14px; font-size:13px; }
+    .cd-option{ padding:12px 14px; border-radius:14px; gap:10px; font-size:13px; }
+
+    .keyword-material-section,
+    .hint-section,
+    .keyword-section{ padding:16px 14px; border-radius:16px; }
+}
+    /* ===== Ֆոնային նախադիտում՝ ստեղծման էջի պես ===== */
+/* .page-inner label-ի ընդհանուր կանոնը չազդի կոճակների վրա */
+.page-inner .mode-label{ margin-top:0; }
+.page-inner .select-image-btn{
+    display:inline-flex;
+    margin:14px 0 22px;
+}
+
+@media (max-width:760px){
+    #bg-preview-container{ padding:20px 14px; }
+    #bg-preview-container > p{ font-size:17px; }
+
+    /* Նկարը՝ կենտրոնում, աղբարկղը՝ նկարի աջ կողքին */
+    .bg-preview-wrap{
+        padding-right:0;
+        max-width:calc(100% - 32px);
+        line-height:0;
+    }
+    #bg-preview{ max-width:100% !important; }
+    .corner-delete-btn{
+        top:0 !important;
+        right:-30px !important;
+        width:28px; height:28px;
+    }
+
+    /* Ռեժիմի կոճակներ */
+    #bg-mode-buttons{ gap:8px !important; margin-top:18px; }
+    .page-inner .mode-label{ padding:9px 16px; font-size:12.5px; }
+
+    /* «Վերբեռնել պատկերը»՝ ամբողջ լայնքով, մեկ տողով */
+    .page-inner .select-image-btn{
+        display:flex;
+        width:100%;
+        white-space:nowrap;
+    }
+}
+    /* ===== ԱԲ պատուհան՝ «Ստեղծել»-ը կենտրոնում ===== */
+.ai-generate-btn{ justify-content:center; }
+
+/* ===== Հուշման և բանալի բառի նյութի ֆայլի անունը չդուրս գա ===== */
+#hint-file-name, #km-file-name{
+    min-width:0;
+    max-width:100%;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+}
+@media (max-width:760px){
+    /* Կոճակը՝ առանձին տողով, տակը՝ անունն ու աղբարկղը կողք կողքի */
+    #hint-file-row .custom-file-label,
+    #km-file-area .custom-file-label{
+        flex:0 0 100%;
+        text-align:center;
+    }
+        #hint-file-name, #km-file-name{
+        flex:0 1 auto;
+        margin-left:0;
+    }
+    #remove-hint-btn, #km-file-clear{
+        margin:0;
+        flex-shrink:0;
+    }
+}
+    /* ===== Բոլոր ծանուցումները՝ այքոնն ու «Հասկացա»-ն կենտրոնում ===== */
+.ai-notice-body{
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 14px;
+}
+.ai-notice-text{ width: 100%; }
+.ai-notice-actions{ justify-content: center; }
+/* ===== «Ուղեցույց» վերնագիր՝ բոլոր էջերում նույնը ===== */
+.guide-title{
+    font-family:'Noto Sans Armenian', sans-serif !important;
+    font-size:1.4rem !important;
+    font-weight:700 !important;
+    color:#3b1f7a !important;
+    text-align:center !important;
+    line-height:1.3 !important;
+    margin:0 0 16px !important;
+}
+body.dark .guide-title{ color:#b99cff !important; }
+/* ===== «Ավելացնել նոր հարց/պատասխան»՝ մոբայլում «+»-ը տեքստին կպած ===== */
+@media (max-width:760px){
+    .add-btn{
+        display:block;
+        text-align:center;
+        line-height:1.35;
+        white-space:normal;
+        padding:12px 14px;
+    }
+    .add-btn .add-btn-text{
+        display:inline;
+        overflow-wrap:anywhere;
+    }
+    .add-btn .plus-ic{
+        display:inline-block;
+        margin-right:6px;
+        vertical-align:-2px;
+    }
+}
+    /* Հուշման ֆայլի աղբարկղը՝ անվան կողքին */
+#hint-file-row .remove-media-btn{
+    margin-left:2px;
+    margin-top:0;
+}
     </style>
 </head>
 <body class="has-sidebar">
 
     <div id="google_translate_element"></div>
-    {% with messages = get_flashed_messages(with_categories=true) %}
-  {% if messages %}
-    <div style="max-width:700px; margin:16px auto;">
-      {% for category, message in messages %}
+    {% set flash_msgs = get_flashed_messages(with_categories=true) %}
+{% set fl = namespace(skipped='', normal=0) %}
+{% for category, message in flash_msgs %}
+  {% if category == 'skipped' %}{% set fl.skipped = message %}{% else %}{% set fl.normal = fl.normal + 1 %}{% endif %}
+{% endfor %}
+{% if fl.normal %}
+    <div style="max-width:700px; margin:76px auto 16px; padding:0 16px;">
+      {% for category, message in flash_msgs if category != 'skipped' %}
         <div style="white-space:pre-wrap; padding:14px 18px; border-radius:12px; margin-bottom:10px;
              {% if category == 'warning' %}background:#fff4e5; border:1.5px solid #ffcf8a; color:#8a5a00;
              {% elif category == 'error' or category == 'danger' %}background:#fdecec; border:1.5px solid #f6c6c6; color:#c0392b;
@@ -1241,13 +1613,12 @@ body.dark #qa-container > .qa-row {
         </div>
       {% endfor %}
     </div>
-  {% endif %}
-{% endwith %}
+{% endif %}
 
     <!-- SIDEBAR -->
     <aside class="sidebar" id="sidebar">
         <div class="sidebar-header">
-            <a href="https://mainlogin.dshh.am:15107/Tools" class="sidebar-logo notranslate" translate="no" target="_blank">
+            <a href="{{ GATEWAY_PUBLIC }}/Tools" class="sidebar-logo notranslate" translate="no" target="_blank">
                 <img src="{{ url_for('static', filename='dshh.png') }}" alt="ԴՇՀ">
             </a>
             <button class="sidebar-collapse-btn" onclick="toggleSidebar()" title="Փակել մենյուն">
@@ -1275,19 +1646,19 @@ body.dark #qa-container > .qa-row {
 
                 <div class="sidebar-flyout">
                     <div class="sidebar-flyout-title">Կրթական գործիքներ</div>
-                    <a href="https://gatewayapi.dshh.am:15106/ibook/" class="sidebar-flyout-link" >Թղթապանակ</a>
+                    <a href="{{ GATEWAY_PUBLIC }}/ibook/" class="sidebar-flyout-link" >Թղթապանակ</a>
                     <a href="{{ url_for('choose_keyword_mode') }}" class="sidebar-flyout-link active">Խաչբառ</a>
-                    <a href="https://gatewayapi.dshh.am:15106/ibook/digital-book" class="sidebar-flyout-link" >Նյութերի թվայնացում</a>
-                    <a href="https://gatewayapi.dshh.am:15106/pairmatch" class="sidebar-flyout-link" >Գտիր զույգը</a>
-                    <a href="https://gatewayapi.dshh.am:15106/learn/" class="sidebar-link sidebar-sub" ><span class="sidebar-label">ՀարցԱԲան</span></a>
+                    <a href="{{ GATEWAY_PUBLIC }}/ibook/digital-book" class="sidebar-flyout-link" >Նյութերի թվայնացում</a>
+                    <a href="{{ GATEWAY_PUBLIC }}/pairmatch" class="sidebar-flyout-link" >Գտիր զույգը</a>
+                    <a href="{{ GATEWAY_PUBLIC }}/learn/" class="sidebar-flyout-link">ՀարցԱԲան</a>
                 </div>
 
                 <div class="sidebar-group-items open" id="group-tools">
-                    <a href="https://gatewayapi.dshh.am:15106/ibook/" class="sidebar-link sidebar-sub" ><span class="sidebar-label">Թղթապանակ</span></a>
+                    <a href="{{ GATEWAY_PUBLIC }}/ibook/" class="sidebar-link sidebar-sub" ><span class="sidebar-label">Թղթապանակ</span></a>
                     <a href="{{ url_for('choose_keyword_mode') }}" class="sidebar-link sidebar-sub active"><span class="sidebar-label">Խաչբառ</span></a>
-                    <a href="https://gatewayapi.dshh.am:15106/ibook/digital-book" class="sidebar-link sidebar-sub" ><span class="sidebar-label">Նյութերի թվայնացում</span></a>
-                    <a href="https://gatewayapi.dshh.am:15106/pairmatch" class="sidebar-link sidebar-sub" ><span class="sidebar-label">Գտիր զույգը</span></a>
-                    <a href="https://gatewayapi.dshh.am:15106/learn/" class="sidebar-link sidebar-sub" ><span class="sidebar-label">ՀարցԱԲան</span></a>
+                    <a href="{{ GATEWAY_PUBLIC }}/ibook/digital-book" class="sidebar-link sidebar-sub" ><span class="sidebar-label">Նյութերի թվայնացում</span></a>
+                    <a href="{{ GATEWAY_PUBLIC }}/pairmatch" class="sidebar-link sidebar-sub" ><span class="sidebar-label">Գտիր զույգը</span></a>
+                    <a href="{{ GATEWAY_PUBLIC }}/learn/" class="sidebar-link sidebar-sub"><span class="sidebar-label">ՀարցԱԲան</span></a>
                 </div>
             </div>
 
@@ -1304,23 +1675,23 @@ body.dark #qa-container > .qa-row {
 
                 <div class="sidebar-flyout">
                     <div class="sidebar-flyout-title">Իմ ստեղծած նյութերը</div>
-                    <a href="https://mainlogin.dshh.am:15107/Materials/Folders" class="sidebar-flyout-link">Թղթապանակներ</a>
-                    <a href="https://mainlogin.dshh.am:15107/Materials/Crosswords" class="sidebar-flyout-link">Խաչբառներ</a>
-                    <a href="https://mainlogin.dshh.am:15107/Materials/Digitized" class="sidebar-flyout-link">Թվայնացված նյութեր</a>
-                    <a href="https://mainlogin.dshh.am:15107/Materials/PairsGame" class="sidebar-flyout-link">«Գտիր զույգը» խաղեր></a>
+                    <a href="{{ MAINLOGIN_PUBLIC }}/Materials/Folders" class="sidebar-flyout-link">Թղթապանակներ</a>
+                    <a href="{{ MAINLOGIN_PUBLIC }}/Materials/Crosswords" class="sidebar-flyout-link">Խաչբառներ</a>
+                    <a href="{{ MAINLOGIN_PUBLIC }}/Materials/Digitized" class="sidebar-flyout-link">Թվայնացված նյութեր</a>
+                    <a href="{{ MAINLOGIN_PUBLIC }}/Materials/PairsGame" class="sidebar-flyout-link">«Գտիր զույգը» խաղեր</a>
                 </div>
 
                 <div class="sidebar-group-items" id="group-materials">
-                    <a href="https://mainlogin.dshh.am:15107/Materials/Folders" class="sidebar-link sidebar-sub"><span class="sidebar-label">Թղթապանակներ</span></a>
-                    <a href="https://mainlogin.dshh.am:15107/Materials/Crosswords" class="sidebar-link sidebar-sub"><span class="sidebar-label">Խաչբառներ</span></a>
-                    <a href="https://mainlogin.dshh.am:15107/Materials/Digitized" class="sidebar-link sidebar-sub"><span class="sidebar-label">Թվայնացված նյութեր</span></a>
-                    <a href="https://mainlogin.dshh.am:15107/Materials/PairsGame" class="sidebar-link sidebar-sub"><span class="sidebar-label">«Գտիր զույգը» խաղեր</span></a>
+                    <a href="{{ MAINLOGIN_PUBLIC }}/Materials/Folders" class="sidebar-link sidebar-sub"><span class="sidebar-label">Թղթապանակներ</span></a>
+                    <a href="{{ MAINLOGIN_PUBLIC }}/Materials/Crosswords" class="sidebar-link sidebar-sub"><span class="sidebar-label">Խաչբառներ</span></a>
+                    <a href="{{ MAINLOGIN_PUBLIC }}/Materials/Digitized" class="sidebar-link sidebar-sub"><span class="sidebar-label">Թվայնացված նյութեր</span></a>
+                    <a href="{{ MAINLOGIN_PUBLIC }}/Materials/PairsGame" class="sidebar-link sidebar-sub"><span class="sidebar-label">«Գտիր զույգը» խաղեր</span></a>
                 </div>
             </div>
 
             <div class="sidebar-divider"></div>
 
-            <a href="https://mainlogin.dshh.am:15107/Profiles/UserStatistics" class="sidebar-link">
+            <a href="{{ MAINLOGIN_PUBLIC }}/Profiles/UserStatistics" class="sidebar-link">
                 <span class="sidebar-icon">
                     <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M.9.9V15.3c0 .48.19.93.53 1.27.34.34.79.53 1.27.53H17.1"/>
@@ -1330,7 +1701,7 @@ body.dark #qa-container > .qa-row {
                 <span class="sidebar-label">Վիճակագրություն</span>
             </a>
 
-            <a href="https://mainlogin.dshh.am:15107/Settings" class="sidebar-link">
+            <a href="{{ MAINLOGIN_PUBLIC }}/Settings" class="sidebar-link">
                 <span class="sidebar-icon">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                         <circle cx="12" cy="12" r="3"/>
@@ -1340,7 +1711,7 @@ body.dark #qa-container > .qa-row {
                 <span class="sidebar-label">Կարգավորումներ</span>
             </a>
 
-            <a href="https://mainlogin.dshh.am:15107/Profiles/UserProfile" class="sidebar-link">
+            <a href="{{ MAINLOGIN_PUBLIC }}/Profiles/UserProfile" class="sidebar-link">
                 <span class="sidebar-icon">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
@@ -1396,16 +1767,16 @@ body.dark #qa-container > .qa-row {
                         <div class="avatar-dropdown-email">{{ (user or {}).get('email', '') }}</div>
                     </div>
                     <div class="avatar-dropdown-links">
-                        <a href="https://mainlogin.dshh.am:15107/Profiles/UserProfile" class="avatar-dropdown-link">
+                        <a href="{{ MAINLOGIN_PUBLIC }}/Profiles/UserProfile" class="avatar-dropdown-link">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                             Անձնական էջ
                         </a>
-                        <a href="https://mainlogin.dshh.am:15107/Settings" class="avatar-dropdown-link">
+                        <a href="{{ MAINLOGIN_PUBLIC }}/Settings" class="avatar-dropdown-link">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
                             Կարգավորումներ
                         </a>
                         <div class="avatar-dropdown-divider"></div>
-                        <a href="https://mainlogin.dshh.am:15107/Login/Logout" class="avatar-dropdown-link danger">
+                        <a href="{{ MAINLOGIN_PUBLIC }}/Login/Logout" class="avatar-dropdown-link danger">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
                             Դուրս գալ
                         </a>
@@ -1427,7 +1798,7 @@ body.dark #qa-container > .qa-row {
     </div>
 
 
-    <form method="post" enctype="multipart/form-data" id="edit-form" onsubmit="return handleSubmit(event)">
+    <form method="post" enctype="multipart/form-data" id="edit-form" novalidate onsubmit="return handleSubmit(event)">
 {% if is_teacher %}
 {% set cf = current_creator_fields %}
 <div class="creator-data-section {% if not cf %}collapsed{% endif %}" id="creator-data-section">
@@ -1471,10 +1842,11 @@ body.dark #qa-container > .qa-row {
                     <span class="arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span>
                 </div>
                 <div class="custom-options" id="grade-options-edit">
-                    {% for i in range(1, 13) %}
+                                        {% for i in range(1, 13) %}
                     <label><input type="checkbox" name="grades" value="{{ i }}" onchange="updateSelectionEdit()" {% if i|string in crossword.get('grades', []) %}checked{% endif %}> {{ i }}{% if i == 1 %}-ին{% else %}-րդ{% endif %} դասարան</label>
                     {% endfor %}
                 </div>
+                <span class="error-message" id="grade-error-edit"></span>
             </div>
 
             <input type="hidden" name="selected_grades" id="selected_grades_edit">
@@ -1493,14 +1865,14 @@ body.dark #qa-container > .qa-row {
                     <label><input type="checkbox" name="subjects" value="{{ name }}" onchange="updateSubjectSelectionEdit()" {% if name in current_subjects %}checked{% endif %}> {{ name }}</label>
                     {% endfor %}
                     <label><input type="checkbox" name="subjects" id="subject-other-cb-edit" value="Այլ" onchange="toggleOtherSubjectEdit(); updateSubjectSelectionEdit()"> Այլ</label>
-                    <div id="other-subject-wrap-edit" style="display:none; padding:6px 10px;">
+                                        <div id="other-subject-wrap-edit" style="display:none; padding:6px 10px;">
                         <input type="text" id="other-subject-input-edit" placeholder="Գրեք առարկայի անունը..." oninput="updateSubjectSelectionEdit()" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:5px; text-transform:none;">
                     </div>
                 </div>
+                <span class="error-message" id="subject-error-edit"></span>
             </div>
             <input type="hidden" name="selected_subjects" id="selected_subjects_edit" value="{{ current_subjects | join(',') }}">
         </div>
-        <span class="error-message" id="subject-error-edit" style="margin-left: 0;"></span>
 
         <!-- ═══════════ ՏԱՌԱՉԱՓ / ՏԱՌԱՏԵՍԱԿ ═══════════ -->
         {% set cur_size = crossword.get('font_size', '20px') %}
@@ -1538,18 +1910,18 @@ body.dark #qa-container > .qa-row {
         <!-- ═══════════ ՎԵՐՆԱԳԻՐ ═══════════ -->
         <label style="margin-top:20px;">Խաչբառի վերնագիր<span class="req-star">*</span></label>
         <textarea name="title" rows="1" class="title-field" required>{{ cw.title }}</textarea>
-
+        <span class="error-message" id="title-error-edit"></span>
         <!-- ═══════════ ՆԿԱՐԱԳՐՈՒԹՅՈՒՆ (վերնագրից անմիջապես հետո) ═══════════ -->
         <label style="margin-top:20px;">Խաչբառի նկարագրություն<span class="req-star">*</span></label>
         <textarea name="description" rows="4" required>{{ cw.description }}</textarea>
+        <span class="error-message" id="desc-error-edit"></span>
 
 
-
-        {% if cw.keyword %}
+        {% if keyword_mode %}
         <div class="keyword-order-hint">
             <span class="koh-icon"><svg width="17" height="21" viewBox="0 0 17 21" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12.3751 20.0648C12.3751 20.214 12.3159 20.3571 12.2104 20.4626C12.1049 20.5681 11.9618 20.6273 11.8126 20.6273H4.31263C4.16344 20.6273 4.02037 20.5681 3.91488 20.4626C3.80939 20.3571 3.75013 20.214 3.75013 20.0648C3.75013 19.9157 3.80939 19.7726 3.91488 19.6671C4.02037 19.5616 4.16344 19.5023 4.31263 19.5023H11.8126C11.9618 19.5023 12.1049 19.5616 12.2104 19.6671C12.3159 19.7726 12.3751 19.9157 12.3751 20.0648ZM16.1251 8.06484C16.1283 9.28679 15.8522 10.4933 15.318 11.5923C14.7838 12.6913 14.0055 13.6537 13.0426 14.4061C12.8361 14.5648 12.6687 14.7686 12.553 15.0019C12.4373 15.2352 12.3765 15.4919 12.3751 15.7523V16.3148C12.3751 16.6629 12.2368 16.9968 11.9907 17.2429C11.7446 17.4891 11.4107 17.6273 11.0626 17.6273H5.06263C4.71453 17.6273 4.38069 17.4891 4.13455 17.2429C3.88841 16.9968 3.75013 16.6629 3.75013 16.3148V15.7523C3.74987 15.4946 3.69059 15.2404 3.57684 15.0091C3.46308 14.7779 3.29787 14.5758 3.09388 14.4183C2.13396 13.6707 1.35661 12.7146 0.820627 11.6224C0.284648 10.5301 0.00407275 9.33026 0.000125489 8.11359C-0.0242495 3.7439 3.50544 0.107336 7.86856 0.00233602C8.94356 -0.0235465 10.0129 0.165874 11.0136 0.559448C12.0143 0.953023 12.9261 1.5428 13.6955 2.29406C14.4648 3.04533 15.0761 3.9429 15.4934 4.93396C15.9106 5.92501 16.1254 6.98952 16.1251 8.06484ZM15.0001 8.06484C15.0004 7.1395 14.8155 6.22345 14.4565 5.37063C14.0974 4.5178 13.5713 3.74543 12.9092 3.09899C12.2471 2.45254 11.4624 1.94507 10.6012 1.60647C9.74008 1.26786 8.81988 1.10495 7.89481 1.12734C4.14106 1.22109 1.1045 4.34671 1.12513 8.10421C1.12868 9.15118 1.37021 10.1836 1.83147 11.1235C2.29273 12.0634 2.96164 12.8862 3.78763 13.5295C4.1268 13.7922 4.40121 14.1292 4.58974 14.5145C4.77828 14.8999 4.87591 15.3233 4.87513 15.7523V16.3148C4.87513 16.3646 4.89488 16.4123 4.93004 16.4474C4.96521 16.4826 5.0129 16.5023 5.06263 16.5023H7.50013V12.0483L4.66513 9.21234C4.56577 9.1057 4.51167 8.96467 4.51424 8.81894C4.51682 8.67322 4.57585 8.53418 4.67891 8.43112C4.78197 8.32806 4.92101 8.26903 5.06673 8.26645C5.21246 8.26388 5.35349 8.31798 5.46013 8.41734L8.06263 11.0198L10.6651 8.41734C10.7718 8.31798 10.9128 8.26388 11.0585 8.26645C11.2042 8.26903 11.3433 8.32806 11.4463 8.43112C11.5494 8.53418 11.6084 8.67322 11.611 8.81894C11.6136 8.96467 11.5595 9.1057 11.4601 9.21234L8.62513 12.0483V16.5023H11.0626C11.1124 16.5023 11.16 16.4826 11.1952 16.4474C11.2304 16.4123 11.2501 16.3646 11.2501 16.3148V15.7523C11.2513 15.3218 11.3507 14.8971 11.5408 14.5108C11.7308 14.1245 12.0066 13.7866 12.347 13.523C13.1761 12.8756 13.8461 12.0473 14.3059 11.1013C14.7658 10.1553 15.0032 9.11667 15.0001 8.06484Z" fill="currentColor"/></svg></span>
-            <span><b>Ուշադրություն՝</b> հարցերի հերթականությունը կարևոր է։ Բանալի բառը ձևավորվում է հարցերի հերթականությամբ՝ առաջին հարցի պատասխանը տալիս է բանալի բառի 1-ին տառը, երկրորդ հարցինը՝ 2-րդ տառը և այսպես շարունակ։ Եթե հարցերը գրեք այլ հերթականությամբ, բանալի բառը ճիշտ չի կազմվի, և խաչբառը կարող է կտրվել։ Ուստի դասավորեք ստորև հարցերն այնպես, որ պատասխանների համապատասխան տառերը հաջորդաբար կազմեն «<span id="keyword-target-word">{{ cw.keyword }}</span>» բառը։</span>
-            </div>
+            <span><b>Ուշադրություն՝</b> հարցերի հերթականությունը պետք է համապատասխանի բանալի բառի տառերի հերթականությանը․  բանալի բառի 1-ին տառը վերցվում է 1-ին հարցի պատասխանից, 2-րդ տառը՝ 2-րդ հարցի պատասխանից և այդպես շարունակ։ Եթե հարցերը գրեք այլ հերթականությամբ, բանալի բառը ճիշտ չի կազմվի, և խաչբառի տողերը կարող են հատում չունենալ։</span>
+        </div>
         {% endif %}
 
         <h3 style="text-align:center; margin-top:24px;">Հարցեր</h3>
@@ -1558,13 +1930,13 @@ body.dark #qa-container > .qa-row {
     {% for item in crossword.get('placed', []) if item.question != 'Բանալի բառ' %}
     <div class="qa-row" id="qa-{{ loop.index }}">
         <label>{{ loop.index }}.</label>
-        <textarea name="question_{{ loop.index }}" rows="2" required oninput="schedulePreviewUpdate()">{{ item.question }}</textarea>
+        <textarea name="question_{{ loop.index }}" rows="2" oninput="schedulePreviewUpdate()">{{ item.question }}</textarea>
         <textarea name="answer_{{ loop.index }}" class="answer-field" rows="2" required
           title="Միայն տառեր՝ առանց թվերի և նշանների"
           oninput="schedulePreviewUpdate()">{{ item.word }}</textarea>
         <button type="button" onclick="showConfirmDeleteEdit('qa-{{ loop.index }}')"><svg width="39" height="39" viewBox="0 0 39 39" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M19.7533 17.0624L26.1858 10.6298L28.8442 13.2882L22.4116 19.7207L29.0083 26.3174L26.3171 29.0086L19.7204 22.4119L13.2879 28.8445L10.6295 26.1861L17.0621 19.7536L10.4326 13.1241L13.1238 10.4329L19.7533 17.0624Z" fill="#FF4343"/></svg></button>
         <div class="qa-media-cell">
-            <label class="qa-media-label" for="q_media_{{ loop.index }}">📎 Կցել/փոխել նկար կամ աուդիո</label>
+            <label class="qa-media-label" for="q_media_{{ loop.index }}"><span class="plus-ic"></span>Կցել/փոխել նկար կամ աուդիո</label>
             <input type="file" class="qm-file" id="q_media_{{ loop.index }}" name="q_media_{{ loop.index }}" accept="image/*,audio/*" style="display:none;" onchange="showQMediaName(this)">
             <input type="hidden" class="qm-existing" name="q_media_existing_{{ loop.index }}" value="{{ item.q_media or '' }}">
             <input type="hidden" class="qm-existing-type" name="q_media_existing_type_{{ loop.index }}" value="{{ item.q_media_type or '' }}">
@@ -1578,21 +1950,23 @@ body.dark #qa-container > .qa-row {
                     {% if item.q_media_type == 'audio' %}
                         <audio class="qa-media-audio" controls src="{{ url_for('static', filename=item.q_media) }}"></audio>
                     {% else %}
-                        <img class="qa-media-thumb" src="{{ url_for('static', filename=item.q_media) }}" alt="">
+                                                <img class="qa-media-thumb" src="{{ url_for('static', filename=item.q_media) }}" alt="">
                     {% endif %}
                 {% endif %}
             </div>
         </div>
+        <span class="error-message qa-error"></span>
     </div>
     {% endfor %}
 </div>
+<span class="error-message" id="qa-empty-error"></span>
 
         <!-- ═══════════ Ավելացնել հարց + ԱԲ կոճակները իրար կողք, ընդհանուր տողի մեջ ═══════════ -->
         <div class="add-btn-row">
-            <button type="button" class="add-btn" onclick="addField()">➕ Ավելացնել նոր հարց/պատասխան</button>
+            <button type="button" class="add-btn" onclick="addField()"><span class="plus-ic"></span>Ավելացնել նոր հարց/պատասխան</button>
         </div>
         <div class="qa-actions-row">
-            {% if not cw.keyword %}
+            {% if not keyword_mode %}
             <button type="button" class="add-ai-btn" id="open-ai-modal-btn" onclick="openAiModal()">ԱԲ-ով հարց ավելացնել</button>
             {% endif %}
             <button type="button" class="add-ai-btn" onclick="editWithAI(this)">ԱԲ-ով սրբագրել խաչբառը</button>
@@ -1671,7 +2045,7 @@ body.dark #qa-container > .qa-row {
 </div>
 <input type="hidden" id="hint-type" name="hint_type" value="{{ current_hint_type }}">
 
-        <textarea id="hint-text" name="global_hint_text" rows="3" placeholder="Մուտքագրեք հուշումը․․․" {% if current_hint_type == 'text' %}style="display:block;"{% else %}style="display:none;"{% endif %}>{% set gh = crossword.get('global_hint', '') %}{% if gh and gh != 'None' %}{{ gh }}{% endif %}</textarea>
+        <textarea id="hint-text" name="global_hint_text" rows="3" placeholder="Մուտքագրեք հուշումը․․․  " {% if current_hint_type == 'text' %}style="display:block;"{% else %}style="display:none;"{% endif %}>{% set gh = crossword.get('global_hint', '') %}{% if gh and gh != 'None' %}{{ gh }}{% endif %}</textarea>
 
         {% set media_file = crossword.get('global_hint_media') %}
         {% set has_media = media_file and current_hint_type in ['image', 'audio', 'video'] %}
@@ -1683,6 +2057,7 @@ body.dark #qa-container > .qa-row {
         </div>
         <input type="file" id="hint-media" name="global_hint_media" class="custom-file-input" accept="image/*,audio/*,video/*" style="display:none;" onchange="handleHintMediaUpload(this); updateFileName(this, 'hint-file-name')">
         <div class="format-hint" id="hint-format-hint" style="{% if current_hint_type in ['image','audio','video'] %}display:block;{% else %}display:none;{% endif %}"></div>
+        <div class="media-preview" id="hint-preview"></div>
         <input type="hidden" name="remove_hint_media" id="remove_hint_media" value="0">
 
         <span class="error-message" id="media-error"></span>
@@ -1690,14 +2065,18 @@ body.dark #qa-container > .qa-row {
 
         <br>
 
-        {% if cw.keyword %}
+        {% if keyword_mode %}
         <div class="keyword-section">
         <label style="display:flex; align-items:center; gap:8px;">
             <svg width="18" height="18" viewBox="0 0 21 21" fill="none" xmlns="http://www.w3.org/2000/svg" style="color:var(--text); flex-shrink:0;"><path d="M14.25 3.75C15.9069 3.75 17.25 5.09315 17.25 6.75M20.25 6.75C20.25 10.0637 17.5637 12.75 14.25 12.75C13.8993 12.75 13.5555 12.7199 13.2213 12.6622C12.6583 12.5649 12.062 12.688 11.658 13.092L9 15.75H6.75V18H4.5V20.25H0.75V17.432C0.75 16.8352 0.98705 16.2629 1.40901 15.841L7.908 9.342C8.31202 8.938 8.43512 8.34172 8.33785 7.7787C8.2801 7.44446 8.25 7.10074 8.25 6.75C8.25 3.43629 10.9363 0.75 14.25 0.75C17.5637 0.75 20.25 3.43629 20.25 6.75Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
             Բանալի բառ<span class="req-star">*</span>
         </label>
-        <input type="text" name="keyword" value="{{ cw.keyword }}" id="keyword-input" style="margin-top:6px; margin-bottom:16px;">
+        <input type="text" name="keyword" value="{{ cw.keyword }}" id="keyword-input" style="margin-top:6px;"
+       oninput="this.value = this.value.toUpperCase().replace(/[^\p{L}]/gu, '')">
+        <span class="error-message" id="keyword-error-edit"></span>
+
         </div>
+
 
         <div class="keyword-material-section">
             <h4 style="display:flex; align-items:center; gap:8px;">
@@ -1741,8 +2120,14 @@ body.dark #qa-container > .qa-row {
                     </button>
                 </div>
                 <span class="format-hint" id="km-format-hint" style="display:{% if km_type in ['image','animation'] %}block{% else %}none{% endif %};">{% if km_type == 'animation' %}Աջակցվող ֆորմատներ՝ MP4, MPEG4, MOV, WEBM, MKV{% else %}Աջակցվող ֆորմատներ՝ JPG, JPEG, PNG, BMP, GIF{% endif %}</span>
+                <div class="media-preview" id="km-media-preview"
+     data-src="{% if km_value and km_type in ['image','animation'] %}{{ url_for('static', filename=km_value) }}{% endif %}"
+     data-kind="{{ 'video' if km_type == 'animation' else 'image' }}"></div>
                 <div id="km-link-input" style="display:{% if km_type == 'link' %}block{% else %}none{% endif %};">
-                    <input type="text" name="keyword_material_link" placeholder="https://..." style="text-transform:none;" value="{% if km_type == 'link' %}{{ km_value }}{% endif %}">
+                    <input type="text" name="keyword_material_link" placeholder="https://..." style="text-transform:none;"
+       value="{% if km_type == 'link' %}{{ km_value }}{% endif %}"
+       oninput="renderLinkPreview('km-link-preview', this.value)">
+<div class="media-preview" id="km-link-preview"></div>
                 </div>
 
                 <img id="km-preview-img" src="" alt="" style="display:none;">
@@ -1801,44 +2186,49 @@ body.dark #qa-container > .qa-row {
         </div>
     </div>
 
-    <div class="guide-overlay" id="guideOverlay">
+        <div class="guide-overlay" id="guideOverlay">
         <div class="guide-box">
             <button type="button" class="guide-close-btn" onclick="closeGuide()">✕</button>
-            <h3>📖 Ուղեցույց</h3>
-            {% if cw.keyword %}
+            <h2 class="guide-title">Ուղեցույց</h2>
+            {% if keyword_mode %}
             <ol>
             <li>Ընտրե՛ք, թե Ձեր անձնական էջում լրացված որ մասնագիտական տվյալները կարող են տեսանելի լինել խաչբառը լրացնողներին։</li>
-            <li>Ընտրե՛ք այն դասարանն ու առարկան, որոնց համար նախատեսված է խաչբառը։ Կարող եք ընտրել մեկից ավելի դասարան ու առարկա։</li>
+            <li>Անհրաժեշտության դեպքում փոխե՛ք այն դասարանն ու առարկան, որոնց համար նախատեսված է խաչբառը։ Կարող եք ընտրել մեկից ավելի դասարան ու առարկա։</li>
             <li>Դասարանն ընտրելուց հետո կերևան տեքստի տառաչափն ու տառատեսակն ընտրելու դաշտերը։ Ծրագրում կանխադրված են չափորոշիչներին համապատասխանող տարբերակներ, որոնք կարող եք փոխել։</li>
-            <li>Անհրաժեշտության դեպքում խմբագրե՛ք խաչբառի վերնագիրը և «Խաչբառի նկարագրություն» դաշտում մուտքագրված բովանդակությունը։</li>
-            <li>Կարող եք խմբագրել հարց/պատասխան զույգերը։ Հիշե՛ք․ պատրաստի խաչբառում «ՈՒ» և «ԵՎ» տառերը գրվում են երկու վանդակում։</li>
-            <li>Սեղմե՛ք «Ավելացնել նոր հարց/պատասխան» կոճակը՝ նոր զույգ ավելացնելու համար։ Կարող եք ավելացնել առավելագույնը 40 զույգ։ Յուրաքանչյուր հարց/պատասխան զույգի կողքին գտնվող «❌» կոճակով կարող եք ջնջել մուտքագրված տվյալները։</li>
+            <li>Անհրաժեշտության դեպքում խմբագրե՛ք խաչբառի վերնագիրը և «Խաչբառի նկարագրություն» դաշտում լրացված բովանդակությունը։</li>
+            <li>Կարող եք խմբագրել հարց/պատասխան զույգերը։
+                <em>Պատասխանի դաշտում տառերն ավտոմատ գրվում են մեծատառերով։ Քանի որ «ու» և «և» տառերի մեծատառերը («ՈՒ», «ԵՎ») պատրաստի խաչբառում զբաղեցնում են երկուական վանդակ, պատասխանի դաշտում մուտքագրե՛ք դրանք երկու նիշով՝ Ո+Ւ և Ե+Վ։</em></li>
+            <li>Սեղմե՛ք «Ավելացնել նոր հարց/պատասխան» կոճակը՝ նոր զույգ ավելացնելու համար։<br>Յուրաքանչյուր հարց/պատասխան զույգի կողքին գտնվող «❌» կոճակով կարող եք ջնջել մուտքագրված տվյալները։</li>
+            <li>Օգտվե՛ք ԱԲ-ի օգնությունից՝ մուտքագրված հարցերն ու պատասխանները սրբագրելու համար։</li>
             <li>Կարող եք փոխել ընտրված ֆոնային պատկերը՝ ընտրելով նոր պատկեր առաջարկվող նկարներից կամ վերբեռնելով Ձեր սարքից։</li>
-            <li>Կարգավորե՛ք ֆոնային պատկերի չափսերը՝ ընտրելով «Ֆիքսված չափսեր» կամ «Ամբողջական էկրան» տարբերակներից մեկը, կամ սահմանեք պատկերի չափսերը՝ օգտագործելով լայնության ու բարձրության սղնակները։ Սխալի դեպքում ջնջե՛ք պատկերը «❌» կոճակով և ընտրե՛ք նորը։</li>
-            <li>Խաչբառը լրացնողի համար նախատեսված հուշումը փոխելու համար ջնջե՛ք կցված տարբերակը, ընտրե՛ք հուշման տեսակը, ապա մուտքագրե՛ք կամ կցե՛ք նոր հուշումը։</li>
-            <li>Անհրաժեշտության դեպքում փոխե՛ք բանալի բառը։ Հիշե՛ք, որ հարցերի հերթականությունը պետք է համապատասխանի բանալի բառի տառերի հերթականությանը․ առաջին հարցի պատասխանը տալիս է բանալի բառի առաջին տառը, երկրորդինը՝ երկրորդ տառը, և այդպես շարունակ։ Եթե հարցերը գրեք այլ հերթականությամբ, բանալի բառը ճիշտ չի կազմվի, և խաչբառը կարող է կտրվել։</li>
-            <li>Խաչբառը ճիշտ լուծելուց և բանալի բառը հաջողությամբ գտնելուց հետո ցուցադրվող նյութը փոխելու համար ջնջե՛ք կցված տարբերակը, ընտրե՛ք նյութի տեսակը, ապա մուտքագրե՛ք կամ կցե՛ք նոր նյութը։</li>
-            <li>Աշխատանքն ավարտելու համար սեղմե՛ք «Պահպանել» կոճակը։ Խաչբառը հաջողությամբ թարմացվեց։</li>
+            <li>Կարգավորե՛ք ֆոնային պատկերի չափսերը՝ ընտրելով «Ֆիքսված չափսեր» կամ «Ամբողջական էկրան» տարբերակներից մեկը, կամ սահմանե՛ք պատկերի չափսերը՝ օգտագործելով լայնության ու բարձրության սղնակները։</li>
+            <li>Ցանկության դեպքում ավելացրե՛ք խաչբառը լրացնողի համար նախատեսված հուշում. ընտրե՛ք հուշման ձևաչափը, ապա մուտքագրե՛ք կամ կցե՛ք համապատասխան նյութը։
+                <em>Հուշումը փոխելու համար ջնջե՛ք առկա տարբերակը, ընտրե՛ք հուշման ձևաչափը, ապա մուտքագրե՛ք կամ կցե՛ք նոր նյութ։</em></li>
+            <li>Անհրաժեշտության դեպքում փոխե՛ք բանալի բառը։
+                <em>Հարցերի հերթականությունը պետք է համապատասխանի բանալի բառի տառերի հերթականությանը. բանալի բառի առաջին տառը վերցվում է առաջին հարցի պատասխանից, երկրորդ տառը՝ երկրորդ հարցի պատասխանից և այդպես շարունակ։ Եթե հարցերը գրեք այլ հերթականությամբ, բանալի բառը ճիշտ չի կազմվի, և խաչբառի տողերը կարող են հատում չունենալ։</em></li>
+            <li>Ցանկության դեպքում ավելացրե՛ք խաչբառը ճիշտ լուծելուց և բանալի բառը հաջողությամբ գտնելուց հետո ցուցադրվող նյութ։ Ընտրե՛ք նյութի ձևաչափը, ապա մուտքագրե՛ք կամ կցե՛ք համապատասխան նյութը։
+                <em>Նյութը փոխելու համար ջնջե՛ք առկա տարբերակը, ընտրե՛ք նյութի ձևաչափը, ապա մուտքագրե՛ք կամ կցե՛ք նոր նյութ։</em></li>
+            <li>Աշխատանքն ավարտելու համար սեղմե՛ք «Պահպանել» կոճակը։</li>
             </ol>
             {% else %}
             <ol>
             <li>Ընտրե՛ք, թե Ձեր անձնական էջում լրացված որ մասնագիտական տվյալները կարող են տեսանելի լինել խաչբառը լրացնողներին։</li>
-            <li>Ընտրե՛ք այն դասարանն ու առարկան, որոնց համար նախատեսված է խաչբառը։ Կարող եք ընտրել մեկից ավելի դասարան ու առարկա։</li>
+            <li>Անհրաժեշտության դեպքում փոխե՛ք այն դասարանն ու առարկան, որոնց համար նախատեսված է խաչբառը։ Կարող եք ընտրել մեկից ավելի դասարան ու առարկա։</li>
             <li>Դասարանն ընտրելուց հետո կերևան տեքստի տառաչափն ու տառատեսակն ընտրելու դաշտերը։ Ծրագրում կանխադրված են չափորոշիչներին համապատասխանող տարբերակներ, որոնք կարող եք փոխել։</li>
-            <li>Անհրաժեշտության դեպքում խմբագրե՛ք խաչբառի վերնագիրը և «Խաչբառի նկարագրություն» դաշտում մուտքագրված բովանդակությունը։</li>
-            <li>Կարող եք խմբագրել հարց/պատասխան զույգերը։ Հիշե՛ք․ պատրաստի խաչբառում «ՈՒ» և «ԵՎ» տառերը գրվում են երկու վանդակում։</li>
-            <li>Սեղմե՛ք «Ավելացնել նոր հարց/պատասխան» կոճակը՝ նոր զույգ ավելացնելու համար։ Կարող եք ավելացնել առավելագույնը 40 զույգ։ Յուրաքանչյուր հարց/պատասխան զույգի կողքին գտնվող «❌» կոճակով կարող եք ջնջել մուտքագրված տվյալները։</li>
+            <li>Անհրաժեշտության դեպքում խմբագրե՛ք խաչբառի վերնագիրը և «Խաչբառի նկարագրություն» դաշտում լրացված բովանդակությունը։</li>
+            <li>Կարող եք խմբագրել հարց/պատասխան զույգերը։
+                <em>Պատասխանի դաշտում տառերն ավտոմատ գրվում են մեծատառերով։ Քանի որ «ու» և «և» տառերի մեծատառերը («ՈՒ», «ԵՎ») պատրաստի խաչբառում զբաղեցնում են երկուական վանդակ, պատասխանի դաշտում մուտքագրե՛ք դրանք երկու նիշով՝ Ո+Ւ և Ե+Վ։</em></li>
+            <li>Սեղմե՛ք «Ավելացնել նոր հարց/պատասխան» կոճակը՝ նոր զույգ ավելացնելու համար։<br>Յուրաքանչյուր հարց/պատասխան զույգի կողքին գտնվող «❌» կոճակով կարող եք ջնջել մուտքագրված տվյալները։</li>
             <li>Ավելացրե՛ք նոր հարց/պատասխան զույգեր ԱԲ-ի օգնությամբ։ Ընտրե՛ք հարցերի քանակը և սեղմե՛ք «Ստեղծել» կոճակը։ Ծանոթացե՛ք ԱԲ-ի առաջարկած հարցերին ու պատասխաններին, ապա ավելացրե՛ք դրանք խաչբառին կամ ջնջե՛ք ոչ համապատասխան տարբերակները։</li>
-            <li>Օգտվե՛ք ԱԲ-ի օգնությունից՝ մուտքագրված հարցերն ու պատասխանները խմբագրելու համար։</li>
+            <li>Օգտվե՛ք ԱԲ-ի օգնությունից՝ մուտքագրված հարցերն ու պատասխանները սրբագրելու համար։</li>
             <li>Կարող եք փոխել ընտրված ֆոնային պատկերը՝ ընտրելով նոր պատկեր առաջարկվող նկարներից կամ վերբեռնելով Ձեր սարքից։</li>
-            <li>Կարգավորե՛ք ֆոնային պատկերի չափսերը՝ ընտրելով «Ֆիքսված չափսեր» կամ «Ամբողջական էկրան» տարբերակներից մեկը, կամ սահմանեք պատկերի չափսերը՝ օգտագործելով լայնության ու բարձրության սղնակները։ Սխալի դեպքում ջնջե՛ք պատկերը «❌» կոճակով և ընտրե՛ք նորը։</li>
-            <li>Խաչբառը լրացնողի համար նախատեսված հուշումը փոխելու համար ջնջե՛ք կցված տարբերակը, ընտրե՛ք հուշման տեսակը, ապա մուտքագրե՛ք կամ կցե՛ք նոր հուշումը։</li>
-            <li>Աշխատանքն ավարտելու համար սեղմե՛ք «Պահպանել» կոճակը։ Խաչբառը հաջողությամբ թարմացվեց։</li>
+            <li>Կարգավորե՛ք ֆոնային պատկերի չափսերը՝ ընտրելով «Ֆիքսված չափսեր» կամ «Ամբողջական էկրան» տարբերակներից մեկը, կամ սահմանե՛ք պատկերի չափսերը՝ օգտագործելով լայնության ու բարձրության սղնակները։</li>
+            <li>Ցանկության դեպքում ավելացրե՛ք խաչբառը լրացնողի համար նախատեսված հուշում. ընտրե՛ք հուշման ձևաչափը, ապա մուտքագրե՛ք կամ կցե՛ք համապատասխան նյութը։
+                <em>Հուշումը փոխելու համար ջնջե՛ք առկա տարբերակը, ընտրե՛ք հուշման ձևաչափը, ապա մուտքագրե՛ք կամ կցե՛ք նոր նյութ։</em></li>
+            <li>Աշխատանքն ավարտելու համար սեղմե՛ք «Պահպանել» կոճակը։</li>
             </ol>
             {% endif %}
         </div>
-    </div>
-
     </div>
         <!-- ═══════════ ԱԲ-ով ստեղծված խաչբառի նախազգուշում ═══════════ -->
 <div id="ai-notice-overlay" class="ai-notice-overlay" role="alertdialog" aria-modal="true">
@@ -1861,7 +2251,7 @@ body.dark #qa-container > .qa-row {
             <div class="ai-notice-text">
                 <p>Խաչբառը ստեղծվել է արհեստական բանականությամբ:</p>
                 <p>Խնդրում ենք անպայման ստուգել և խմբագրել խաչբառի բովանդակությունը:</p>
-                {% if cw.keyword %}
+                {% if keyword_mode %}
                 <p>Բանալի բառը ձևավորվում է հարցերի հերթականությամբ. պահպանե՛ք ճիշտ հերթականությունը:</p>
                 {% endif %}
             </div>
@@ -1871,7 +2261,14 @@ body.dark #qa-container > .qa-row {
         </div>
     </div>
 </div>
+        <!-- ===== Նկարի մեծացում ===== -->
+    <div class="img-lightbox" id="imgLightbox" onclick="closeImgLightbox(event)">
+        <button type="button" class="img-lightbox-close" onclick="closeImgLightbox(event, true)" aria-label="Փակել">✕</button>
+        <img id="imgLightboxImg" src="" alt="">
+    </div>
     </main>
+
+    <!-- FOOTER -->
 
     <!-- FOOTER -->
     <footer class="app-footer">
@@ -1936,11 +2333,31 @@ body.dark #qa-container > .qa-row {
     setTimeout(() => clearInterval(_bannerTimer), 6000);
 
     function toggleSidebar() { document.body.classList.toggle('sidebar-collapsed'); }
+        function closeAllFlyouts() {
+        document.querySelectorAll('.sidebar-flyout.open').forEach(f => f.classList.remove('open'));
+    }
     function toggleGroup(id) {
+        const wrap = document.getElementById('grp-' + id);
+        // Հեռախոս՝ սեղմելիս բացում/փակում ենք կողքի flyout-ը
+        if (window.innerWidth <= 768 && !document.body.classList.contains('sidebar-collapsed')) {
+            const fly = wrap.querySelector('.sidebar-flyout');
+            const isOpen = fly.classList.contains('open');
+            closeAllFlyouts();
+            if (!isOpen) {
+                fly.style.top = wrap.getBoundingClientRect().top + 'px';
+                fly.classList.add('open');
+            }
+            return;
+        }
+        // Համակարգիչ՝ նախկին վարքագիծը
         if (document.body.classList.contains('sidebar-collapsed')) return;
         document.getElementById('group-' + id).classList.toggle('open');
-        document.getElementById('grp-' + id).classList.toggle('open');
+        wrap.classList.toggle('open');
     }
+    // Մենյուից դուրս սեղմելիս flyout-ը փակվում է
+    document.addEventListener('click', function (e) {
+        if (!e.target.closest('.sidebar-flyout-wrap')) closeAllFlyouts();
+    });
     document.querySelectorAll('.sidebar-flyout-wrap').forEach(wrap => {
         const fly = wrap.querySelector('.sidebar-flyout');
         if (!fly) return;
@@ -2052,12 +2469,20 @@ body.dark #qa-container > .qa-row {
         document.getElementById('keywordMatOptions').classList.toggle('open');
     }
     function selectKmType(type, label){
-        document.getElementById('keywordMatLabel').textContent = label;
-        document.querySelectorAll('#keywordMatOptions div').forEach(d => d.classList.toggle('active', d.dataset.value === type));
-        document.getElementById('keywordMatSelect').classList.remove('open');
-        document.getElementById('keywordMatOptions').classList.remove('open');
-        setKmType(type, null);
+    const prev = document.getElementById('km-type-hidden').value;
+    document.getElementById('keywordMatLabel').textContent = label;
+    document.querySelectorAll('#keywordMatOptions div').forEach(d => d.classList.toggle('active', d.dataset.value === type));
+    document.getElementById('keywordMatSelect').classList.remove('open');
+    document.getElementById('keywordMatOptions').classList.remove('open');
+    if (prev !== type) {
+        clearMediaPreview('km-media-preview');
+        const fi = document.getElementById('km-file-input');
+        if (fi) fi.value = '';
     }
+    const linkInp = document.querySelector('input[name="keyword_material_link"]');
+    renderLinkPreview('km-link-preview', type === 'link' && linkInp ? linkInp.value : '');
+    setKmType(type, null);
+}
     function setKmType(type, btn) {
         if (btn) {
             document.querySelectorAll('.km-type-btn').forEach(b => b.classList.remove('km-selected'));
@@ -2093,7 +2518,30 @@ body.dark #qa-container > .qa-row {
             if (hasImg || hasVid) box.style.display = 'block';
         }
     }
+    // Վերբեռնման սահմանաչափը՝ սերվերի MAX_CONTENT_LENGTH-ից (եթե նշված չէ՝ 50 ՄԲ)
+    const MAX_UPLOAD_BYTES = {{ config.get('MAX_CONTENT_LENGTH') or (50 * 1024 * 1024) }};
+    const MAX_UPLOAD_MB = Math.floor(MAX_UPLOAD_BYTES / 1024 / 1024);
 
+    function toMB(bytes) { return (bytes / 1024 / 1024).toFixed(1); }
+
+    function tooBigMsg(file) {
+        return 'Ֆայլը չափազանց մեծ է (' + toMB(file.size) + ' ՄԲ)։ ' +
+               'Թույլատրելի առավելագույն չափը՝ ' + MAX_UPLOAD_MB + ' ՄԲ։ ' +
+               'Ընտրե՛ք ավելի փոքր ֆայլ կամ սեղմե՛ք տեսանյութը։';
+    }
+
+    function totalUploadBytes(form) {
+        let sum = 0;
+        form.querySelectorAll('input[type="file"]').forEach(function (inp) {
+            Array.from(inp.files || []).forEach(function (f) { sum += f.size; });
+        });
+        return sum;
+    }
+
+    function totalTooBigMsg(bytes) {
+        return 'Կցված ֆայլերի ընդհանուր չափը (' + toMB(bytes) + ' ՄԲ) գերազանցում է ' +
+               'թույլատրելի ' + MAX_UPLOAD_MB + ' ՄԲ-ը։ Հեռացրեք կամ փոխարինեք մեծ ֆայլերը։';
+    }
     const KM_IMG_EXT = ['jpg', 'jpeg', 'png', 'gif', 'bmp'];
 const KM_VID_EXT = ['mp4', 'mov', 'webm', 'mkv'];
 
@@ -2109,20 +2557,24 @@ function previewKmFile(input) {
         msg = 'Թույլատրվում են՝ MP4, MOV, WEBM, MKV';
     } else {                               // Նկար/Անիմացիա
         allowed = KM_IMG_EXT;
-        msg = 'Թույլատրվում են՝ JPG, JPEG, PNG, GIF, BMP';
+                msg = 'Թույլատրվում են՝ JPG, JPEG, PNG, GIF, BMP';
     }
     if (!allowed.includes(ext)) {
-        alert('⚠️ Չաջակցվող ֆորմատ։ ' + msg);
+        showAiLimitNotice('Չաջակցվող ֆորմատ։ ' + msg);
         input.value = '';
         return;
+    }
+    if (file.size > MAX_UPLOAD_BYTES) {
+        showAiLimitNotice(tooBigMsg(file));
+        input.value = '';
+        return;                              // նախկին նյութը մնում է անփոփոխ
     }
     const rm = document.getElementById('remove_keyword_material');
     if (rm) rm.value = '0';
     document.getElementById('km-file-name').textContent = file.name;
     const clearBtn = document.getElementById('km-file-clear');
     if (clearBtn) clearBtn.style.display = 'inline-flex';
-    const box = document.getElementById('km-preview-box');
-    if (box) box.style.display = 'none';
+        renderMediaPreview('km-media-preview', URL.createObjectURL(file), kmType === 'animation' ? 'video' : 'image');
 }
 
     function removeBackground() {
@@ -2164,6 +2616,7 @@ function previewKmFile(input) {
         newYesBtn.addEventListener('click', () => { onYes(); closeConfirmModal(); });
         overlay.classList.add('open');
     }
+
     function closeConfirmModal() {
         document.getElementById('confirm-modal-overlay').classList.remove('open');
     }
@@ -2179,11 +2632,17 @@ function previewKmFile(input) {
     function showConfirmDeleteEdit(rowId) {
         openConfirmModal('', function(){ removeField(rowId); });
     }
+    document.addEventListener('DOMContentLoaded', function () {
+    const km = document.getElementById('km-media-preview');
+    if (km && km.dataset.src) renderMediaPreview('km-media-preview', km.dataset.src, km.dataset.kind);
+    const linkInp = document.querySelector('input[name="keyword_material_link"]');
+    const kmType = (document.getElementById('km-type-hidden') || {}).value;
+    if (linkInp && kmType === 'link') renderLinkPreview('km-link-preview', linkInp.value);
+});
 
     document.getElementById('confirm-modal-overlay').addEventListener('click', function(e) {
         if (e.target === this) closeConfirmModal();
     });
-    document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeConfirmModal(); closeGuide(); closeAiModal(); } });
     document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeConfirmModal(); closeGuide(); closeAiModal(); closeAiNotice(); } });
 
     function removeHintMedia() {
@@ -2193,6 +2652,7 @@ function previewKmFile(input) {
         const nameSp = document.getElementById('hint-file-name');
         if (nameSp) nameSp.textContent = '';
         document.getElementById('remove-hint-btn').style.display = 'none';
+            clearMediaPreview('hint-preview');
     }
 
     function removeKeywordMaterial() {
@@ -2219,6 +2679,8 @@ function previewKmFile(input) {
         if (rmKmBtn) rmKmBtn.style.display = 'none';
         const kmClear = document.getElementById('km-file-clear');
         if (kmClear) kmClear.style.display = 'none';
+            clearMediaPreview('km-media-preview');
+    renderLinkPreview('km-link-preview', '');
     }
 
     function updateFileName(input, targetId) {
@@ -2228,10 +2690,7 @@ function previewKmFile(input) {
     else label.textContent = "";
 }
 
-    let placedLength = {{ crossword.get('placed', []) | length }};
-    let initialCount = placedLength;
-    {% if cw.keyword %} initialCount = placedLength - 1; {% endif %}
-    let count = initialCount + 1;
+        let count = document.querySelectorAll('#qa-container .qa-row').length + 1;
         // էջ բեռնվելիս՝ ֆոն ունեցե՞լ է
     const HAD_BACKGROUND = {{ 'true' if cw.background else 'false' }};
 
@@ -2262,40 +2721,31 @@ function previewKmFile(input) {
     const DELETE_ICON_SVG = '<svg width="39" height="39" viewBox="0 0 39 39" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M19.7533 17.0624L26.1858 10.6298L28.8442 13.2882L22.4116 19.7207L29.0083 26.3174L26.3171 29.0086L19.7204 22.4119L13.2879 28.8445L10.6295 26.1861L17.0621 19.7536L10.4326 13.1241L13.1238 10.4329L19.7533 17.0624Z" fill="#FF4343"/></svg>';
 
     function addField() {
+    // ← 40-ի սահմանաչափի ստուգում (ինչպես ստեղծման էջում)
+    const existing = document.querySelectorAll('#qa-container .qa-row').length;
+    if (existing >= 40) {
+        showAiLimitNotice('Հասել եք 40 հարցի սահմանաչափին։ Նոր հարց ավելացնել հնարավոր չէ։');
+        return;
+    }
+
     const container = document.getElementById('qa-container');
     const div = document.createElement('div');
     div.className = 'qa-row'; div.id = 'qa-' + count;
-    div.innerHTML = `<label>${count}.</label><textarea name="question_${count}" placeholder="Հարց ${count}" rows="2" required oninput="schedulePreviewUpdate()"></textarea><textarea name="answer_${count}" class="answer-field" placeholder="Պատասխան ${count}" rows="2" required oninput="schedulePreviewUpdate()"></textarea><button type="button" onclick="showConfirmDeleteEdit('qa-${count}')">${DELETE_ICON_SVG}</button><div class="qa-media-cell"><label class="qa-media-label" for="q_media_${count}">📎 Կցել/փոխել նկար կամ աուդիո</label><input type="file" class="qm-file" id="q_media_${count}" name="q_media_${count}" accept="image/*,audio/*" style="display:none;" onchange="showQMediaName(this)"><input type="hidden" class="qm-existing" name="q_media_existing_${count}" value=""><input type="hidden" class="qm-existing-type" name="q_media_existing_type_${count}" value=""><input type="hidden" class="qm-remove" name="remove_q_media_${count}" value="0"><span class="qa-media-namewrap"><span class="qa-media-name"></span><button type="button" class="qa-media-clear" onclick="clearQMedia(this)" style="display:none;">✕</button></span><div class="qa-media-preview"></div></div>`;
+    div.innerHTML = `<label>${count}.</label><textarea name="question_${count}" placeholder="Հարց ${count}" rows="2"  oninput="schedulePreviewUpdate()"></textarea><textarea name="answer_${count}" class="answer-field" placeholder="Պատասխան ${count}" rows="2" required oninput="schedulePreviewUpdate()"></textarea><button type="button" onclick="showConfirmDeleteEdit('qa-${count}')">${DELETE_ICON_SVG}</button><div class="qa-media-cell"><label class="qa-media-label" for="q_media_${count}"><span class="plus-ic"></span>Կցել/փոխել նկար կամ աուդիո</label><input type="file" class="qm-file" id="q_media_${count}" name="q_media_${count}" accept="image/*,audio/*" style="display:none;" onchange="showQMediaName(this)"><input type="hidden" class="qm-existing" name="q_media_existing_${count}" value=""><input type="hidden" class="qm-existing-type" name="q_media_existing_type_${count}" value=""><input type="hidden" class="qm-remove" name="remove_q_media_${count}" value="0"><span class="qa-media-namewrap"><span class="qa-media-name"></span><button type="button" class="qa-media-clear" onclick="clearQMedia(this)" style="display:none;">✕</button></span><div class="qa-media-preview"></div></div><span class="error-message qa-error"></span>`;
 
     container.appendChild(div);
     count++;
     renumberFields();
+}
 
-    function renderQMediaPreview(preview, file) {
-    if (!preview) return;
-    preview.innerHTML = '';
-    if (!file) return;
-    const url = URL.createObjectURL(file);
-    const ext = (file.name.split('.').pop() || '').toLowerCase();
-    const AUDIO_EXT = ['mp3','wav','aac','flac','ogg','m4a'];
-    const isAudio = (file.type && file.type.startsWith('audio/')) || AUDIO_EXT.includes(ext);
-    if (isAudio) {
-        const audio = document.createElement('audio');
-        audio.controls = true; audio.src = url; audio.className = 'qa-media-audio';
-        preview.appendChild(audio);
-    } else {
-        const img = document.createElement('img');
-        img.src = url; img.className = 'qa-media-thumb'; img.alt = '';
-        preview.appendChild(img);
-    }
-}
-}
+
 
     function addFieldWithData(question, answer) {
+    if (document.querySelectorAll('#qa-container .qa-row').length >= 40) return;
     const container = document.getElementById('qa-container');
     const div = document.createElement('div');
     div.className = 'qa-row'; div.id = 'qa-' + count;
-    div.innerHTML = `<label>${count}.</label><textarea name="question_${count}" placeholder="Հարց ${count}" rows="2" required oninput="schedulePreviewUpdate()">${escapeHtml(question || '')}</textarea><textarea name="answer_${count}" class="answer-field" placeholder="Պատասխան ${count}" rows="2" required oninput="schedulePreviewUpdate()">${escapeHtml((answer || '').toUpperCase())}</textarea><button type="button" onclick="showConfirmDeleteEdit('qa-${count}')">${DELETE_ICON_SVG}</button><div class="qa-media-cell"><label class="qa-media-label" for="q_media_${count}">📎 Կցել/փոխել նկար կամ աուդիո</label><input type="file" class="qm-file" id="q_media_${count}" name="q_media_${count}" accept="image/*,audio/*" style="display:none;" onchange="showQMediaName(this)"><input type="hidden" class="qm-existing" name="q_media_existing_${count}" value=""><input type="hidden" class="qm-existing-type" name="q_media_existing_type_${count}" value=""><input type="hidden" class="qm-remove" name="remove_q_media_${count}" value="0"><span class="qa-media-namewrap"><span class="qa-media-name"></span><button type="button" class="qa-media-clear" onclick="clearQMedia(this)" style="display:none;">✕</button></span><div class="qa-media-preview"></div></div>`;
+    div.innerHTML = `<label>${count}.</label><textarea name="question_${count}" placeholder="Հարց ${count}" rows="2" oninput="schedulePreviewUpdate()">${escapeHtml(question || '')}</textarea><textarea name="answer_${count}" class="answer-field" placeholder="Պատասխան ${count}" rows="2" required oninput="schedulePreviewUpdate()">${escapeHtml((answer || '').toUpperCase())}</textarea><button type="button" onclick="showConfirmDeleteEdit('qa-${count}')">${DELETE_ICON_SVG}</button><div class="qa-media-cell"><label class="qa-media-label" for="q_media_${count}"><span class="plus-ic"></span>Կցել/փոխել նկար կամ աուդիո</label><input type="file" class="qm-file" id="q_media_${count}" name="q_media_${count}" accept="image/*,audio/*" style="display:none;" onchange="showQMediaName(this)"><input type="hidden" class="qm-existing" name="q_media_existing_${count}" value=""><input type="hidden" class="qm-existing-type" name="q_media_existing_type_${count}" value=""><input type="hidden" class="qm-remove" name="remove_q_media_${count}" value="0"><span class="qa-media-namewrap"><span class="qa-media-name"></span><button type="button" class="qa-media-clear" onclick="clearQMedia(this)" style="display:none;">✕</button></span><div class="qa-media-preview"></div></div><span class="error-message qa-error"></span>`;
     container.appendChild(div);
     div.querySelectorAll('textarea').forEach(growTextarea);
     count++;
@@ -2306,8 +2756,36 @@ function previewKmFile(input) {
         return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
     }
 
-    function removeField(id) { const e = document.getElementById(id); if (e) { e.remove(); renumberFields(); } }
 
+    const HAS_KEYWORD = {{ 'true' if keyword_mode else 'false' }};
+
+function updateDeleteButtonsState() {
+    if (HAS_KEYWORD) return; // բանալի բառով խաչբառներում սահմանափակում չկա
+    const rows = document.querySelectorAll('#qa-container .qa-row');
+    rows.forEach((row, i) => {
+        const btn = row.querySelector('button'); // առաջին կոճակը՝ ջնջելու կոճակն է
+        if (!btn) return;
+        if (i === 0) {
+            btn.style.visibility = 'hidden';
+            btn.style.pointerEvents = 'none';
+        } else {
+            btn.style.visibility = '';
+            btn.style.pointerEvents = '';
+        }
+    });
+}
+
+
+    function removeField(id) {
+        const e = document.getElementById(id);
+        if (!e) return;
+        if (!HAS_KEYWORD) {
+            const first = document.querySelector('#qa-container .qa-row');
+            if (first && first.id === e.id) return; // առաջին հարցը չենք ջնջում
+        }
+        e.remove();
+        renumberFields();
+    }
     function renumberFields() {
     const rows = document.querySelectorAll('#qa-container .qa-row');
     let idx = 1;
@@ -2335,6 +2813,27 @@ function previewKmFile(input) {
         idx++;
     });
     count = idx;
+    updateDeleteButtonsState();
+}
+document.addEventListener('DOMContentLoaded', updateDeleteButtonsState);
+
+function renderQMediaPreview(preview, file) {
+    if (!preview) return;
+    preview.innerHTML = '';
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    const ext = (file.name.split('.').pop() || '').toLowerCase();
+    const AUDIO_EXT = ['mp3','wav','aac','flac','ogg','m4a'];
+    const isAudio = (file.type && file.type.startsWith('audio/')) || AUDIO_EXT.includes(ext);
+    if (isAudio) {
+        const audio = document.createElement('audio');
+        audio.controls = true; audio.src = url; audio.className = 'qa-media-audio';
+        preview.appendChild(audio);
+    } else {
+        const img = document.createElement('img');
+        img.src = url; img.className = 'qa-media-thumb'; img.alt = '';
+        preview.appendChild(img);
+    }
 }
 
 function showQMediaName(input) {
@@ -2413,7 +2912,7 @@ function handleBgUpload(input) {
         const file = input.files[0];
         const ext = (file.name.split('.').pop() || '').toLowerCase();
         if (!BG_ALLOWED_EXT.includes(ext)) {
-            alert('⚠️ Չաջակցվող ֆորմատ։ Թույլատրվում են՝ JPG, JPEG, PNG, GIF, BMP');
+            showAiLimitNotice('Չաջակցվող ֆորմատ։ Թույլատրվում են՝ JPG, JPEG, PNG, GIF, BMP');
             input.value = '';
             const fn = document.getElementById('bg-file-name');
             if (fn) fn.textContent = '';
@@ -2437,18 +2936,21 @@ function handleBgUpload(input) {
 }
     }
 
-    function showMediaPreview(type, src) { /* նախադիտում չկա — ցուցադրվում է միայն ֆայլի անունը */ }
-    function handleHintMediaUpload(input) {
-        if (existingHintInfo) existingHintInfo.style.display = 'none';
-        document.getElementById('remove_hint_media').value = '0';
-        if (input.files && input.files[0]) {
-            const reader = new FileReader();
-            reader.onload = e => showMediaPreview(hintTypeSelect.value, e.target.result);
-            reader.readAsDataURL(input.files[0]);
-            const rmBtn = document.getElementById('remove-hint-btn');
-            if (rmBtn) rmBtn.style.display = 'inline-flex';
-        }
+   function showMediaPreview(type, src) { renderMediaPreview('hint-preview', src, type); }
+        function handleHintMediaUpload(input) {
+    const f = input.files && input.files[0];
+    if (f && f.size > MAX_UPLOAD_BYTES) {
+        showAiLimitNotice(tooBigMsg(f));
+        input.value = '';                    // մերժում ենք. updateFileName-ը հետո կդատարկի անունը
+        return;                              // նախկին հուշումը մնում է անփոփոխ
     }
+    document.getElementById('remove_hint_media').value = '0';
+    if (input.files && input.files[0]) {
+        showMediaPreview(hintTypeSelect.value, URL.createObjectURL(input.files[0]));
+        const rmBtn = document.getElementById('remove-hint-btn');
+        if (rmBtn) rmBtn.style.display = 'inline-flex';
+    }
+}
     const HINT_FORMATS = {
     image: 'Աջակցվող ֆորմատներ՝ JPG, JPEG, PNG, BMP, GIF',
     audio: 'Աջակցվող ֆորմատներ՝ MP3, AAC, FLAC, WAV',
@@ -2476,6 +2978,7 @@ function handleBgUpload(input) {
         const fileNameSp = document.getElementById('hint-file-name');
         const rmBtn      = document.getElementById('remove-hint-btn');
         if (!hintTypeSelect) return;
+        clearMediaPreview('hint-preview');
         textArea.style.display = 'none';
         if (hintImagePreview) hintImagePreview.style.display = 'none';
         if (hintAudioPreview) hintAudioPreview.style.display = 'none';
@@ -2708,7 +3211,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const subject = subjectLabels.join(', ') || '';
         const gradeRaw = (document.getElementById('selected_grades_edit').value || '').split(',').filter(Boolean);
         const grade = gradeRaw.length ? gradeRaw.join(', ') + '-րդ դասարան' : '';
-        const title = (document.querySelector('input[name="title"]') || {}).value || '';
+        const title = (document.querySelector('[name="title"]') || {}).value || '';
         const desc  = (document.querySelector('textarea[name="description"]') || {}).value || '';
         const topic = [title, desc].filter(Boolean).join(' — ').trim() || 'Ընդհանուր';
         return { subject, grade, topic };
@@ -2753,50 +3256,120 @@ document.addEventListener('DOMContentLoaded', function () {
             const response = await fetch(AI_QUESTIONS_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ topic, subject, grade, count: countN })
+                                body: JSON.stringify({
+                    topic, subject, grade, count: countN,
+                    existing: Array.from(document.querySelectorAll('#qa-container [name^="answer_"]'))
+                        .map(el => ({ answer: el.value.trim().toUpperCase() }))
+                        .filter(x => x.answer)
+                })
             });
             const data = await response.json();
             if (!response.ok) throw new Error(data.error || 'Սխալ սերվերի կողմից');
             if (!data.pairs || data.pairs.length === 0) throw new Error('Հարց-պատասխան զույգ չստացվեց:');
             renderAiResults(data.pairs);
+                        if (data.pairs.length < countN) {
+                showAiError(`Ստեղծվեց ${data.pairs.length} հարց ${countN}-ի փոխարեն. մնացածը կրկնվում էին։`);
+            }
         } catch (err) { showAiError(err.message || 'Անհայտ սխալ:'); }
         finally { btn.disabled = false; document.getElementById('ai-spinner').style.display = 'none'; }
     }
 
     function renderAiResults(pairs) {
-        const container = document.getElementById('ai-results');
-        container.innerHTML = '';
-        if (pairs.length > 1) {
-            const row = document.createElement('div');
-            row.style.cssText = "display:flex; gap:8px; margin-bottom:10px;";
-            const addAll = document.createElement('button');
-            addAll.type = 'button'; addAll.className = 'ai-bulk-add-btn';
-            addAll.textContent = `Ավելացնել բոլորը (${pairs.length})`;
-            addAll.onclick = () => { pairs.forEach(p => addFieldWithData(p.question, p.answer)); closeAiModal(); };
-            const clr = document.createElement('button');
-            clr.type = 'button'; clr.className = 'ai-bulk-clear-btn';
-            clr.textContent = 'Ջնջել բոլորը';
-            clr.onclick = () => { container.innerHTML = ''; };
-            row.appendChild(addAll); row.appendChild(clr); container.appendChild(row);
+    const container = document.getElementById('ai-results');
+    container.innerHTML = '';
+
+    const actions = document.createElement('div');
+    actions.className = 'ai-results-actions';
+    actions.style.cssText = 'display:flex; gap:8px; margin-bottom:10px;';
+
+    const addAll = document.createElement('button');
+    addAll.type = 'button';
+    addAll.className = 'ai-bulk-add-btn';
+    addAll.onclick = () => {
+        // Միայն էկրանին մնացած քարտերը
+        const cards = Array.from(container.querySelectorAll('.ai-result-card'));
+        for (const card of cards) {
+            if (document.querySelectorAll('#qa-container .qa-row').length >= 40) {
+                showAiLimitNotice('Հասել եք 40 հարցի սահմանաչափին։ Մնացած հարցերը չավելացվեցին։');
+                refreshAiActions();
+                return;
+            }
+            addFieldWithData(card._pair.question, card._pair.answer);
+            card.remove();
         }
-        pairs.forEach(pair => {
-            const card = document.createElement('div');
-            card.className = 'ai-result-card';
-            card.innerHTML = `<div class="ai-q">${escapeHtml(pair.question)}</div><div class="ai-a">${escapeHtml(pair.answer)}</div>`;
-            const btnRow = document.createElement('div');
-            btnRow.style.cssText = "display:flex; gap:6px; align-self:flex-end;";
-            const addBtn = document.createElement('button');
-            addBtn.type = 'button';
-            addBtn.className = 'ai-add-this'; addBtn.textContent = 'Ավելացնել';
-            addBtn.onclick = () => { addFieldWithData(pair.question, pair.answer); card.style.opacity='0'; setTimeout(()=>card.remove(),200); };
-            const delBtn = document.createElement('button');
-            delBtn.type = 'button'; delBtn.className = 'ai-del-this';
-            delBtn.textContent = 'Ջնջել';
-            delBtn.onclick = () => card.remove();
-            btnRow.appendChild(addBtn); btnRow.appendChild(delBtn); card.appendChild(btnRow);
-            container.appendChild(card);
-        });
+        closeAiModal();
+    };
+
+    const clearAll = document.createElement('button');
+    clearAll.type = 'button';
+    clearAll.className = 'ai-bulk-clear-btn';
+    clearAll.textContent = 'Ջնջել բոլորը';
+    clearAll.onclick = () => { container.innerHTML = ''; closeAiModal(); };
+
+    actions.appendChild(addAll);
+    actions.appendChild(clearAll);
+    container.appendChild(actions);
+
+    pairs.forEach(pair => {
+        const card = document.createElement('div');
+        card.className = 'ai-result-card';
+        card._pair = { question: pair.question, answer: pair.answer };
+        card.innerHTML = `<div class="ai-q">${escapeHtml(pair.question)}</div><div class="ai-a">${escapeHtml(pair.answer)}</div>`;
+
+        const btnRow = document.createElement('div');
+        btnRow.style.cssText = 'display:flex; gap:6px; align-self:flex-end;';
+
+        const addBtn = document.createElement('button');
+        addBtn.type = 'button';
+        addBtn.className = 'ai-add-this';
+        addBtn.textContent = 'Ավելացնել';
+        addBtn.onclick = () => {
+            if (document.querySelectorAll('#qa-container .qa-row').length >= 40) {
+                showAiLimitNotice('Հասել եք 40 հարցի սահմանաչափին։');
+                return;
+            }
+            addFieldWithData(card._pair.question, card._pair.answer);
+            removeAiCard(card);
+        };
+
+        const delBtn = document.createElement('button');
+        delBtn.type = 'button';
+        delBtn.className = 'ai-del-this';
+        delBtn.textContent = 'Ջնջել';
+        delBtn.onclick = () => removeAiCard(card);
+
+        btnRow.appendChild(addBtn);
+        btnRow.appendChild(delBtn);
+        card.appendChild(btnRow);
+        container.appendChild(card);
+    });
+
+    refreshAiActions();
+}
+
+function removeAiCard(card) {
+    card.style.opacity = '0';
+    card.style.pointerEvents = 'none';
+    setTimeout(() => { card.remove(); refreshAiActions(); }, 200);
+}
+
+// Թարմացնում է «Ավելացնել բոլորը (N)»-ը; քարտ չմնալու դեպքում փակում է մոդալը
+function refreshAiActions() {
+    const container = document.getElementById('ai-results');
+    if (!container) return;
+    const left = container.querySelectorAll('.ai-result-card').length;
+    if (left === 0) {
+        container.innerHTML = '';
+        closeAiModal();
+        return;
     }
+    const actions = container.querySelector('.ai-results-actions');
+    if (actions) {
+        actions.style.display = left > 1 ? 'flex' : 'none';
+        const addAll = actions.querySelector('.ai-bulk-add-btn');
+        if (addAll) addAll.textContent = `Ավելացնել բոլորը (${left})`;
+    }
+}
 
     function setCountPreset(btn, val) {
         document.querySelectorAll('.ai-count-preset').forEach(b => b.classList.remove('selected-preset'));
@@ -2834,7 +3407,7 @@ document.addEventListener('DOMContentLoaded', function(){
         answer:   row.querySelector('[name^="answer_"]')?.value || ''
     }));
     if (!qaPairs.some(p => p.question.trim() && p.answer.trim())) {
-        alert("Չկան հարցեր խմբագրելու համար"); return;
+        showAiLimitNotice('Չկան հարցեր խմբագրելու համար։'); return;
     }
     const { subject, grade, topic } = getFormContext();
     btn.disabled = true;
@@ -2856,74 +3429,165 @@ document.addEventListener('DOMContentLoaded', function(){
             if (!row) return;
             const q = row.querySelector('[name^="question_"]');
             const a = row.querySelector('[name^="answer_"]');
-            if (q && p.question != null) { q.value = p.question; growTextarea(q); }
+            if (q && p.question != null && q.value.trim()) { q.value = p.question; growTextarea(q); }
             if (a && p.answer   != null) { a.value = String(p.answer).toUpperCase(); growTextarea(a); }
         });
-    } catch (err) { alert("Սխալ: " + err.message); }
+        } catch (err) {
+        console.error('editWithAI failed', err);
+        showAiLimitNotice('Սխալ ԱԲ-ով սրբագրելիս։ Խնդրում ենք փորձել կրկին։');
+    }
     finally { btn.disabled = false; btn.textContent = originalText; }
 }
 
+        const REQUIRED_MSG = "Դաշտը լրացնելը պարտադիր է";
+
+    function scrollToError(el) {
+        if (!el) return;
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setTimeout(function () {
+            if (typeof el.focus === 'function') {
+                try { el.focus({ preventScroll: true }); } catch (e) { el.focus(); }
+            }
+        }, 450);
+    }
+
     function validateBeforeSave() {
-    const gradesChecked   = document.querySelectorAll('#grade-options-edit input:checked').length;
-    const subjectsChecked = document.querySelectorAll('#subject-options-edit input:checked').length;
-    if (gradesChecked === 0) {
-        alert('⚠️ Խնդրում ենք ընտրել առնվազն մեկ դասարան։');
-        document.getElementById('grade-options-edit').style.display = 'block';
-        document.getElementById('grade-select-display').scrollIntoView({ behavior: 'smooth', block: 'center' });
-        return false;
-    }
-    if (subjectsChecked === 0) {
-        alert('⚠️ Խնդրում ենք ընտրել առնվազն մեկ առարկա։');
-        document.getElementById('subject-options-edit').style.display = 'block';
-        document.getElementById('subject-select-display-edit').scrollIntoView({ behavior: 'smooth', block: 'center' });
-        return false;
+        let valid = true;
+        let firstBad = null;
+
+        function fail(spanEl, msg, focusEl) {
+            if (spanEl) spanEl.textContent = msg;
+            valid = false;
+            if (!firstBad) firstBad = focusEl;
+        }
+
+        // Նախորդ սխալները մաքրում ենք
+        document.querySelectorAll('#edit-form .error-message, #qa-empty-error')
+            .forEach(el => el.textContent = '');
+
+        /* ---- Դասարան ---- */
+        if (document.querySelectorAll('#grade-options-edit input:checked').length === 0) {
+            fail(document.getElementById('grade-error-edit'), REQUIRED_MSG,
+                 document.getElementById('grade-select-display'));
+        }
+
+        /* ---- Առարկա ---- */
+        if (!document.getElementById('selected_subjects_edit').value.trim()) {
+            fail(document.getElementById('subject-error-edit'), REQUIRED_MSG,
+                 document.getElementById('subject-select-display-edit'));
+        }
+
+        /* ---- Վերնագիր ---- */
+        const titleEl = document.querySelector('textarea[name="title"]');
+        if (titleEl && !titleEl.value.trim()) {
+            fail(document.getElementById('title-error-edit'), REQUIRED_MSG, titleEl);
+        }
+
+        /* ---- Նկարագրություն ---- */
+        const descEl = document.querySelector('textarea[name="description"]');
+        if (descEl && !descEl.value.trim()) {
+            fail(document.getElementById('desc-error-edit'), REQUIRED_MSG, descEl);
+        }
+
+        /* ---- Հարց / Պատասխան ---- */
+        const rows = document.querySelectorAll('#qa-container .qa-row');
+        if (rows.length === 0) {
+            fail(document.getElementById('qa-empty-error'),
+                 'Խնդրում ենք ավելացնել առնվազն մեկ հարց և պատասխան։',
+                 document.querySelector('.add-btn'));
+        }
+        rows.forEach(function (row) {
+            const q = row.querySelector('[name^="question_"]');
+            const a = row.querySelector('[name^="answer_"]');
+            const file = row.querySelector('.qm-file');
+            const existing = row.querySelector('.qm-existing');
+            const removed = row.querySelector('.qm-remove');
+            const hasMedia = (file && file.files && file.files.length > 0) ||
+                             (existing && existing.value && (!removed || removed.value !== '1'));
+            const err = row.querySelector('.qa-error');
+
+            if (!q.value.trim() && !hasMedia) {
+                fail(err, 'Գրեք հարցը կամ կցեք նկար/աուդիո', q);
+            } else if (!a.value.trim()) {
+                fail(err, REQUIRED_MSG, a);
+            }
+        });
+
+        /* ---- Բանալի բառ ---- */
+        const keywordInput = document.querySelector('input[name="keyword"]');
+        if (keywordInput) {
+            const keyword = keywordInput.value.trim();
+            const kwErr = document.getElementById('keyword-error-edit');
+            if (!keyword) {
+                fail(kwErr, REQUIRED_MSG, keywordInput);
+            } else if (keyword.length !== rows.length) {
+                fail(kwErr, 'Բանալի բառը պետք է ունենա ' + rows.length +
+                     ' տառ (հիմա ունի ' + keyword.length + ')։', keywordInput);
+            }
+        }
+
+        if (!valid) scrollToError(firstBad);
+        return valid;
     }
 
-        // ← ՆՈՐ՝ առնվազն մեկ լրացված հարց/պատասխան զույգ
-    let hasQA = false;
-    document.querySelectorAll('#qa-container .qa-row').forEach(function (row) {
-        const q = row.querySelector('[name^="question_"]');
-        const a = row.querySelector('[name^="answer_"]');
-        if (q && a && q.value.trim() && a.value.trim()) hasQA = true;
+    /* Լրացնելիս կարմիր տեքստը անհետանում է */
+    ['input', 'change'].forEach(function (evt) {
+        document.getElementById('edit-form').addEventListener(evt, function (e) {
+            const t = e.target;
+            const row = t.closest('.qa-row');
+            if (row) {
+                const err = row.querySelector('.qa-error');
+                if (err) err.textContent = '';
+                return;
+            }
+            if (t.name === 'grades') { document.getElementById('grade-error-edit').textContent = ''; return; }
+            if (t.name === 'subjects' || t.id === 'other-subject-input-edit') {
+                document.getElementById('subject-error-edit').textContent = ''; return;
+            }
+            const next = t.nextElementSibling;
+            if (next && next.classList.contains('error-message')) next.textContent = '';
+        });
     });
-    if (!hasQA) {
-        alert('⚠️ Խնդրում ենք ավելացնել առնվազն մեկ հարց և պատասխան։');
-        const c = document.getElementById('qa-container');
-        if (c) c.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        return false;
-    }
-
-    // ← ԱՎԵԼԱՑՐՈՒ ԱՅՍ ԲԼՈԿԸ (բանալի բառի ստուգում)
-    const keywordInput = document.querySelector('input[name="keyword"]');
-    if (keywordInput) {
-        const keyword = keywordInput.value.trim();
-        const questionCount = document.querySelectorAll('#qa-container .qa-row').length;
-        if (!keyword) {
-            alert('⚠️ Խնդրում ենք մուտքագրել բանալի բառը։');
-            keywordInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            keywordInput.focus();
-            return false;
-        }
-        if (keyword.length !== questionCount) {
-            alert('⚠️ Բանալի բառը պետք է ունենա ' + questionCount + ' տառ (հիմա ունի ' + keyword.length + ')։');
-            keywordInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            keywordInput.focus();
-            return false;
-        }
-    }
-
-    return true;
-}
 
     /* ───────── Պահպանման հաստատում + success toast ───────── */
-    let saveConfirmed = false;
+       let saveConfirmed = false;
+    let checkingBeforeSave = false;              // ստուգումն ընթացքի մեջ է
 
     function handleSubmit(e) {
         if (saveConfirmed) return true;          // արդեն հաստատված է → ուղարկել
         e.preventDefault();
+        if (checkingBeforeSave) return false;    // կրկնակի սեղմումից պաշտպանություն
         if (!validateBeforeSave()) return false;
-        openSaveConfirmModal();
+        if (!checkKeywordLetters()) return false;   // բանալի բառի խնդիր → պատուհան չենք բացում
+                const totalBytes = totalUploadBytes(document.getElementById('edit-form'));
+        if (totalBytes > MAX_UPLOAD_BYTES) {
+            showAiLimitNotice(totalTooBigMsg(totalBytes));
+            return false;
+        }
+        crossCheckThenConfirm();                 // նախ ստուգում ենք հատումները, հետո միայն պատուհանը
         return false;
+    }
+
+    // Սերվերով ստուգում ենք չհատվող պատասխանները։
+    // Խնդիր կա → միանգամից ծանուցումը, «Համոզվա՞ծ եք...» պատուհանը չի բացվում։
+    // Խնդիր չկա → բացում ենք հաստատման պատուհանը։
+    async function crossCheckThenConfirm() {
+        checkingBeforeSave = true;
+        const btn = document.querySelector('#edit-form .submit-btn');
+        const btnText = btn ? btn.textContent : '';
+        if (btn) { btn.disabled = true; btn.textContent = 'Ստուգվում է...'; }
+
+        try {
+            const skipped = await findSkippedBeforeSave();
+            if (skipped.length) {
+                showSkippedProblems(skipped, false);
+                return;
+            }
+            openSaveConfirmModal();
+        } finally {
+            checkingBeforeSave = false;
+            if (btn) { btn.disabled = false; btn.textContent = btnText; }
+        }
     }
 
     function openSaveConfirmModal() {
@@ -2943,27 +3607,35 @@ document.addEventListener('DOMContentLoaded', function(){
         newYes.textContent = 'Այո';
         yesBtn.parentNode.replaceChild(newYes, yesBtn);
         newYes.id = 'confirm-modal-yes';
-        newYes.addEventListener('click', function () {
+                                newYes.addEventListener('click', function () {
             closeConfirmModal();
-            showSaveToast();
+            showSaveToast();          // ստուգումն արդեն անցել է → կանաչ ծանուցում → 1.2 վրկ հետո պահպանում
         });
         overlay.classList.add('open');
     }
 
-    function showSaveToast() {
+        function showSaveToast() {
         const toast = document.getElementById('save-success-toast');
         toast.classList.add('show');
         toast.scrollIntoView({ behavior: 'smooth', block: 'center' });
         saveConfirmed = true;
+
+        // Կրկնակի սեղմումից պաշտպանություն
+        const btn = document.querySelector('#edit-form .submit-btn');
+        if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; btn.style.cursor = 'default'; }
+
         setTimeout(function () {
             document.getElementById('edit-form').submit();
         }, 1200);
     }
     function openAiNotice(){ document.getElementById('ai-notice-overlay').classList.add('open'); }
 function closeAiNotice(){ document.getElementById('ai-notice-overlay').classList.remove('open'); }
-    function showAiLimitNotice(msg){
-        const box = document.querySelector('#ai-notice-overlay .ai-notice-text');
-        if (box) box.innerHTML = '<p>' + msg + '</p>';
+        function showAiLimitNotice(msg, wide){
+        const box  = document.querySelector('#ai-notice-overlay .ai-notice-box');
+        const text = document.querySelector('#ai-notice-overlay .ai-notice-text');
+        if (box) box.classList.toggle('wide', !!wide);
+        // <ul>-ը <p>-ի մեջ չի կարող լինել, դրա համար լայն ռեժիմում div ենք օգտագործում
+        if (text) text.innerHTML = wide ? '<div>' + msg + '</div>' : '<p>' + msg + '</p>';
         document.getElementById('ai-notice-overlay').classList.add('open');
     }
 
@@ -2980,7 +3652,123 @@ document.addEventListener('DOMContentLoaded', function(){
 document.getElementById('ai-notice-overlay').addEventListener('click', function(e){
     if (e.target === this) closeAiNotice();
 });
+            /* ───────── «Չհատվող» հարցեր՝ պատուհանով + կարմիրով տողերի տակ ───────── */
+    const CHECK_CROSSWORD_URL = "{{ url_for('check_crossword') }}";
+    const SKIPPED_FROM_SERVER = JSON.parse({{ (fl.skipped or '[]') | tojson }});
 
+    // skipped = [{q, a, idx?}] ; savedAsDraft = true, եթե սերվերն արդեն պահել է որպես սևագիր
+    function showSkippedProblems(skipped, savedAsDraft) {
+        const rows = Array.from(document.querySelectorAll('#qa-container .qa-row'));
+        const val = (row, kind) => ((row.querySelector('[name^="' + kind + '_"]') || {}).value || '').trim();
+        const used = new Set();
+        let firstBad = null;
+
+        const lines = skipped.map(function (s) {
+            const a = (s.a || '').toUpperCase();
+            const q = (s.q || '').trim();
+            // Նախ՝ ըստ ինդեքսի (եթե կա), հետո՝ հարց+պատասխանով, վերջում՝ միայն պատասխանով
+            let row = (typeof s.idx === 'number') ? rows[s.idx] : null;
+            if (!row || used.has(row)) {
+                row = rows.find(r => !used.has(r) && val(r, 'answer').toUpperCase() === a && val(r, 'question') === q)
+                   || rows.find(r => !used.has(r) && val(r, 'answer').toUpperCase() === a);
+            }
+                        if (row) {
+                used.add(row);
+
+                // Դատարկում ենք տողը (ինչպես ստեղծման էջում)
+                const qEl = row.querySelector('[name^="question_"]');
+                const aEl = row.querySelector('[name^="answer_"]');
+                if (qEl) { qEl.value = ''; growTextarea(qEl); }
+                if (aEl) { aEl.value = ''; growTextarea(aEl); }
+                const clr = row.querySelector('.qa-media-clear');
+                if (clr) clearQMedia(clr);              // կցված նկար/աուդիոն էլ ենք հանում
+
+                const err = row.querySelector('.qa-error');
+                if (err) err.textContent = 'Այս պատասխանը չէր հատվում մյուս բառերի հետ։ Գրեք նոր հարց/պատասխան։';
+                if (!firstBad) firstBad = qEl;
+            }
+            const qText = q ? escapeHtml(q) : '(նկար/աուդիո)';
+            return '<li>' + qText + ' — <strong>' + escapeHtml(a) + '</strong></li>';
+        });
+
+                const tail = savedAsDraft
+            ? 'Խաչբառը պահպանվել է որպես սևագիր։ Այդ տողերը դատարկվել են. լրացրե՛ք նոր հարց/պատասխան և նորից սեղմե՛ք «Պահպանել»։'
+                        : 'Փոփոխությունները չեն պահպանվել, խաչբառը մնացել է նախկին տեսքով։ Այդ տողերը դատարկվել են. լրացրե՛ք նոր հարց/պատասխան և նորից սեղմե՛ք «Պահպանել»։';
+
+        showAiLimitNotice(
+            '<p>Հետևյալ հարցերը չեն կարող ներառվել խաչբառում, քանի որ դրանց պատասխանները ' +
+            'ընդհանուր տառ չունեն մյուս բառերի հետ․  </p>' +
+            '<ul>' + lines.join('') + '</ul>' +
+            '<p>' + tail + '</p>',
+            true
+        );
+
+        if (firstBad) setTimeout(() => scrollToError(firstBad), 300);
+    }
+
+    // Սերվերից եկած ծանուցումը (պահպանելուց հետո)
+        // skipped_not_saved = True → ավարտված խաչբառ էր, ոչինչ չի պահպանվել
+    const SKIPPED_SAVED_AS_DRAFT = {{ 'false' if skipped_not_saved else 'true' }};
+
+    document.addEventListener('DOMContentLoaded', function () {
+        if (SKIPPED_FROM_SERVER.length) showSkippedProblems(SKIPPED_FROM_SERVER, SKIPPED_SAVED_AS_DRAFT);
+    });
+
+    // Պահպանելուց ԱՌԱՋ ստուգում ենք՝ կա՞ն արդյոք չհատվող պատասխաններ
+    async function findSkippedBeforeSave() {
+        const rows = Array.from(document.querySelectorAll('#qa-container .qa-row'));
+        const questions = rows.map(row => ({
+            q: (row.querySelector('[name^="question_"]')?.value || '').trim(),
+            a: (row.querySelector('[name^="answer_"]')?.value || '').trim().toUpperCase()
+        }));
+        const kwInput = document.querySelector('input[name="keyword"]');
+        const keyword = kwInput ? kwInput.value.trim() : '';
+        try {
+            const res = await fetch(CHECK_CROSSWORD_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({ questions: questions, keyword: keyword })
+            });
+            if (!res.ok) return [];
+            const data = await res.json();
+            return data.skipped || [];
+        } catch (err) {
+            console.error('check_crossword failed', err);   // ստուգումը չստացվեց → թողնում ենք պահպանել (սերվերը նորից կստուգի)
+            return [];
+        }
+    }
+        /* ───────── Բանալի բառի տառերի ստուգում ───────── */
+    function checkKeywordLetters() {
+        const kwInput = document.querySelector('input[name="keyword"]');
+        if (!kwInput) return true;                       // բանալի բառ չկա → ստուգելու բան չկա
+        const keyword = kwInput.value.trim().toUpperCase();
+        const letters = Array.from(keyword);
+        const rows = Array.from(document.querySelectorAll('#qa-container .qa-row'));
+
+        const bad = [];
+        rows.forEach((row, i) => {
+            const a = (row.querySelector('[name^="answer_"]')?.value || '').trim().toUpperCase();
+            const q = (row.querySelector('[name^="question_"]')?.value || '').trim();
+            if (letters[i] && !a.includes(letters[i])) bad.push({ row, i, q, a, letter: letters[i] });
+        });
+        if (!bad.length) return true;
+
+        bad.forEach(b => {
+            const err = b.row.querySelector('.qa-error');
+            if (err) err.textContent = 'Այս պատասխանում չկա բանալի բառի «' + b.letter + '» տառը։';
+        });
+                const kwErr = document.getElementById('keyword-error-edit');
+               if (kwErr) kwErr.innerHTML = buildKeywordInlineError(
+            keyword, bad.map(b => ({ idx: b.i, a: b.a, letter: b.letter }))
+        );
+        showAiLimitNotice(
+            buildKeywordMismatchHtml(keyword, bad.map(b => ({ idx: b.i, a: b.a, letter: b.letter })), 'Պահպանել'),
+            true
+        );
+        setTimeout(() => scrollToError(kwInput), 300);
+        return false;
+    }
     const AI_EDIT_URL      = "{{ url_for('ai_edit_crossword') }}";
     const AI_QUESTIONS_URL = "{{ url_for('ai_questions_for_edit') }}";
     function paintSlider(slider) {
@@ -3006,6 +3794,114 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 });
+    /* ───────── Հարցի նկարի մեծացում ───────── */
+function openImgLightbox(src) {
+    if (!src) return;
+    document.getElementById('imgLightboxImg').src = src;
+    document.getElementById('imgLightbox').classList.add('active');
+}
+function closeImgLightbox(e, force) {
+    // Փակվում է միայն ֆոնի կամ ✕-ի վրա սեղմելիս, ոչ թե նկարի
+    if (force || e.target.id === 'imgLightbox') {
+        document.getElementById('imgLightbox').classList.remove('active');
+        document.getElementById('imgLightboxImg').src = '';
+    }
+}
+// Մեկ ընդհանուր handler՝ թե՛ պահպանված, թե՛ նոր կցված նկարների համար
+document.addEventListener('click', function (e) {
+    const img = e.target.closest('#qa-container .qa-media-thumb');
+    if (img) openImgLightbox(img.src);
+});
+document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closeImgLightbox(e, true);
+});
+
+/* ───────── Բանալի բառի դաշտի տակի կարմիր տեքստը ───────── */
+function buildKeywordInlineError(keyword, items) {
+    const many = items.length > 1;
+    return 'Բանալի բառը չի հատվում ' + (many ? 'պատասխանների' : 'պատասխանի') + ' հետ։';
+}
+
+/* ───────── Բանալի բառի անհամապատասխանության ծանուցում ───────── */
+function buildKeywordMismatchHtml(keyword, items, btnName) {
+    const many = items.length > 1;
+    const head = many
+        ? 'չի հատվում հետևյալ հարցերի պատասխանների հետ․  '
+        : 'չի հատվում հետևյալ հարցի պատասխանի հետ․  ';
+
+        const lines = items.map(m =>
+        '<li>' + (m.idx + 1) + '. <strong>' + escapeHtml(m.a) + '</strong> ' +
+        '(պատասխանը պետք է պարունակի «<strong>' + escapeHtml(m.letter) + '</strong>» տառը)</li>'
+    ).join('');
+
+    return '<p>Բանալի բառը՝ <strong>' + escapeHtml(keyword) + '</strong>, ' + head + '</p>' +
+           '<ul>' + lines + '</ul>' +
+           '<p>Բանալի բառի տառերի հերթականությունը համապատասխանում է հարցերի հերթականությանը․  ' +
+           '1-ին տառը վերցվում է 1-ին հարցի պատասխանից, 2-րդ տառը՝ 2-րդ հարցի պատասխանից և այդպես շարունակ։</p>' +
+           '<p>Փոխե՛ք բանալի բառը, ' +
+           (many ? 'համապատասխան հարցերի պատասխանները' : 'համապատասխան հարցի պատասխանը') +
+           ' կամ հարցերի հերթականությունը, ապա կրկին սեղմե՛ք «' + btnName + '» կոճակը։</p>';
+}
+/* ───────── Նախադիտում՝ նկար / աուդիո / վիդեո / հղում ───────── */
+function renderMediaPreview(boxId, src, kind) {
+    const box = document.getElementById(boxId);
+    if (!box) return;
+    box.innerHTML = '';
+    if (!src) { box.style.display = 'none'; return; }
+
+    let el;
+    if (kind === 'image') {
+        el = document.createElement('img');
+        el.src = src; el.className = 'mp-img'; el.alt = '';
+        el.title = 'Սեղմեք՝ մեծացնելու համար';
+        el.addEventListener('click', () => openImgLightbox(src));
+    } else if (kind === 'audio') {
+        el = document.createElement('audio');
+        el.controls = true; el.src = src; el.className = 'mp-audio';
+    } else if (kind === 'video' || kind === 'animation') {
+        el = document.createElement('video');
+        el.controls = true; el.preload = 'metadata'; el.src = src; el.className = 'mp-video';
+    } else {
+        box.style.display = 'none'; return;
+    }
+    box.appendChild(el);
+    box.style.display = 'block';
+}
+
+function clearMediaPreview(boxId) { renderMediaPreview(boxId, null); }
+
+function renderLinkPreview(boxId, url) {
+    const box = document.getElementById(boxId);
+    if (!box) return;
+    box.innerHTML = '';
+    url = (url || '').trim();
+    if (!url) { box.style.display = 'none'; return; }
+
+    let parsed = null;
+    try { parsed = new URL(url); } catch (e) {}
+    if (!parsed || !/^https?:$/.test(parsed.protocol)) {
+        box.innerHTML = '<span class="mp-bad">Հղումը պետք է սկսվի http:// կամ https://</span>';
+        box.style.display = 'block';
+        return;
+    }
+
+    const yt = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([\w-]{11})/);
+    if (yt) {
+        const ifr = document.createElement('iframe');
+        ifr.src = 'https://www.youtube.com/embed/' + yt[1];
+        ifr.className = 'mp-yt';
+        ifr.allowFullscreen = true;
+        box.appendChild(ifr);
+    }
+
+    const a = document.createElement('a');
+    a.href = parsed.href; a.target = '_blank'; a.rel = 'noopener';
+    a.className = 'mp-link';
+    a.textContent = '🔗 ' + parsed.href;
+    if (yt) a.style.marginTop = '8px';
+    box.appendChild(a);
+    box.style.display = 'block';
+}
     </script>
 </body>
 </html>

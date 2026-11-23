@@ -17,7 +17,6 @@ def require_auth(*allowed_roles):
             token = authz.split(" ", 1)[1].strip()
             # introspect-ը sync է, thread-ում run անել
             user = await asyncio.to_thread(introspect, token)
-            print("👤 USER:", user)
 
             if user is None:
                 return jsonify(error="Invalid or expired token"), 401

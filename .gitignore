@@ -6,3 +6,11 @@ __pycache__/
 *.db
 static/uploads/
 *.zip
+
+__pycache__/
+*.pyc
+new_venv/
+.new_venv/
+.env
+logs/
+certs/

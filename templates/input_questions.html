@@ -7,7 +7,41 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Armenian:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+    <script src="{{ url_for('static', filename='js/client-logger.js') }}"
+        data-log-endpoint="{{ url_for('api_client_log') }}"
+        data-request-id="{{ g.get('request_id', '') }}"></script>
+
     <style>
+
+        /* ===== Լայն ծանուցում (չներառված հարցեր) ===== */
+.ai-notice-box.wide{
+    max-width: 820px;
+    max-height: 85vh;
+    overflow-y: auto;
+    padding: 28px 34px 24px;
+}
+.ai-notice-box.wide .ai-notice-body{
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 14px;
+}
+.ai-notice-box.wide .ai-notice-text{ width: 100%; }
+.ai-notice-box.wide .ai-notice-text p{ font-size: 16px; }
+.ai-notice-box.wide .ai-notice-text ul{
+    display: inline-block;
+    text-align: left;
+    margin: 12px auto;
+    padding-left: 20px;
+}
+.ai-notice-box.wide .ai-notice-text li{ margin-bottom: 6px; line-height: 1.5; }
+.ai-notice-box.wide .ai-notice-actions{ justify-content: center; }
+
+/* Կենտրոնը՝ կոնտենտի մասի նկատմամբ (sidebar-ը հաշվի առած) */
+@media (min-width: 769px){
+    .ai-notice-overlay{ padding-left: calc(var(--sidebar-width) + 20px); }
+    body.sidebar-collapsed .ai-notice-overlay{ padding-left: calc(var(--sidebar-collapsed-width) + 20px); }
+}
 *{ box-sizing:border-box; margin:0; padding:0; }
 
 body{
@@ -355,10 +389,44 @@ button { font-family: 'Noto Sans Armenian', sans-serif; border: none; cursor: po
 }
 .qa-media-preview { flex-basis: 100%; width: 100%; margin-top: 8px; }
 .qa-media-thumb {
-    max-height: 90px; max-width: 160px;
-    border-radius: 8px; border: 1px solid var(--field-border);
-    display: block; object-fit: cover;
+    width: 64px; height: 64px;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 1px solid var(--field-border);
+    display: block;
+    cursor: zoom-in;
+    transition: transform .15s, box-shadow .15s;
 }
+.qa-media-thumb:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(176,82,228,0.25);
+}
+
+/* ===== Նկարի մեծացում (lightbox) ===== */
+.img-lightbox {
+    display: none; position: fixed; inset: 0;
+    background: rgba(20,10,25,0.8);
+    z-index: 80000;
+    align-items: center; justify-content: center;
+    padding: 20px; cursor: zoom-out;
+}
+.img-lightbox.active { display: flex; }
+.img-lightbox img {
+    max-width: 90vw; max-height: 85vh;
+    border-radius: 12px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    background: #fff;
+    animation: popIn .18s ease;
+    cursor: default;
+}
+.img-lightbox-close {
+    position: absolute; top: 18px; right: 22px;
+    width: 40px; height: 40px; border-radius: 50%;
+    background: rgba(255,255,255,0.15); color: #fff;
+    border: none; font-size: 20px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+}
+.img-lightbox-close:hover { background: rgba(255,255,255,0.3); }
 .qa-media-audio { width: 100%; max-width: 320px; height: 36px; display: block; }
 body.dark #qa-container > div {
     background: #2a2233;
@@ -568,7 +636,7 @@ hr { border: none; height: 2px; margin: 26px 0;
 .spinner { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.4); border-top-color: #fff;
     border-radius: 50%; animation: spin .7s linear infinite; display: none; }
 @keyframes spin { to { transform: rotate(360deg); } }
-#ai-status { margin-top: 10px; font-size: 14px; color: #8e3aad; display: none; align-items: center; gap: 8px; }
+#ai-status { margin-top: 10px; font-size: 14px; color: #000; display: none; align-items: center; gap: 8px; }
 #ai-status .status-spinner { width: 14px; height: 14px; border: 2px solid rgba(142,58,173,0.3);
     border-top-color: #8e3aad; border-radius: 50%; animation: spin .7s linear infinite; }
 
@@ -772,7 +840,11 @@ body.dark .kwmat-options div:hover{ background:#262031; }
 .modal-content p{ font-size:.95rem; line-height:1.6; color:#444; margin-bottom:8px; }
 .close-btn{ position:absolute; top:14px; right:18px; width:34px; height:34px; display:flex; align-items:center; justify-content:center; font-size:20px; cursor:pointer; color:#aaa; border-radius:50%; transition:.3s; }
 .close-btn:hover{ color:#e74c3c; background:#ffeaea; border:2px solid #e74c3c; transform:rotate(90deg); }
-
+.modal-content li em{
+    display:block; margin-top:4px;
+    font-size:.88rem; line-height:1.55; color:#6b5a70;
+}
+body.dark .modal-content li em{ color:#b9b2c8; }
 #font-settings { margin-top: 20px; display: none; }
 
 /* ===== Select-եր՝ դասարան/առարկայի ոճով ===== */
@@ -912,7 +984,7 @@ body.dark .btn-ai, body.dark .form-section > button[type="submit"] { color:#fff;
 body.dark .fs-options div.active,
 body.dark .hint-type-options div.active,
 body.dark .kwmat-options div.active { color:#e7bff0; }
-body.dark #ai-status { color:#cba6e0; }
+body.dark #ai-status { color: #fff; }
 body.dark .keyword-material-section p { color:#cba6e0; }
 body.dark textarea, body.dark select,
 body.dark input[type="text"], body.dark input[type="url"], body.dark input[type="number"]{
@@ -1013,7 +1085,6 @@ body.dark .ai-bulk-clear-btn, body.dark .ai-del-this { background:#3a1f1f; borde
     .app-main{ margin-left:var(--sidebar-collapsed-width); width:calc(100% - var(--sidebar-collapsed-width)); padding:1rem; }
     .app-footer{ margin-left:var(--sidebar-collapsed-width); }
     .app-topbar-right{ gap:6px; }
-    .sidebar-collapse-btn{ display:none; }
     .sidebar-label,
     .sidebar-chevron{ opacity:0; width:0; overflow:hidden; }
     .sidebar-logo{ display:none; }
@@ -1038,11 +1109,31 @@ body.dark .ai-bulk-clear-btn, body.dark .ai-del-this { background:#3a1f1f; borde
 
     h3 { font-size: 1.05rem; }
 
-    .qa-row { flex-wrap: wrap; gap: 8px; }
-    .qa-row textarea { flex-basis: calc(100% - 90px); margin-bottom: 0; }
-    .qa-row label { margin: 0; }
-    .delete-btn { width: 34px; height: 34px; min-width: 34px; margin: 0; }
-    .delete-btn svg { width: 22px; height: 22px; }
+    .qa-row {
+    position: relative;
+    flex-direction: column;   /* հարց/պատասխան՝ իրար տակ */
+    gap: 8px;
+    padding-left: 26px;       /* տեղ՝ համարի համար */
+    padding-right: 40px;      /* տեղ՝ ջնջելու կոճակի համար */
+}
+.qa-row label {
+    position: absolute;
+    left: 0; top: 14px;
+    width: auto; min-width: 0;
+    margin: 0;
+}
+.qa-row textarea {
+    width: 100%;
+    flex: none;               /* չեղարկում է flex:1-ը */
+    flex-basis: auto;
+    margin-bottom: 0;
+}
+.qa-row .delete-btn {
+    position: absolute;
+    top: 6px; right: 0;
+    width: 34px; height: 34px; min-width: 34px; margin: 0;
+}
+.qa-row .delete-btn svg { width: 22px; height: 22px; }
 
     .form-section > button[type="submit"] { width: 100%; margin: 24px 0 0; }
 
@@ -1061,7 +1152,9 @@ body.dark .ai-bulk-clear-btn, body.dark .ai-del-this { background:#3a1f1f; borde
     #fixed-size-inputs input[type="range"] { max-width: 100%; height: 8px; }
     #fixed-size-inputs input[type="range"]::-webkit-slider-thumb { width: 22px; height: 22px; margin-top: -7px; }
     #fixed-size-inputs input[type="range"]::-moz-range-thumb { width: 22px; height: 22px; }
-
+     #qa-container > div .qa-media-row {
+        margin-left: 26px;
+    }
     .size-mode-selector { gap: 8px; }
     .mode-label { padding: 9px 16px; font-size: 12.5px; }
 
@@ -1075,11 +1168,35 @@ body.dark .ai-bulk-clear-btn, body.dark .ai-del-this { background:#3a1f1f; borde
     .confirm-box { padding: 22px 18px; }
     .confirm-actions button { flex: 1; }
 
-    .app-footer { flex-direction: column; align-items: center; padding: 8px 14px; gap: 8px; }
-    .footer-col, .footer-col.right { text-align: left; align-items: flex-start; }
-    .app-footer p { font-size: 12px; text-align: left; }
+       .app-footer {
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        gap: 4px;
+        padding: 16px 14px;
+        text-align: center;
+    }
+    .footer-col,
+    .footer-col.right {
+        gap: 4px;
+        align-items: center;
+        text-align: center;
+        width: 100%;
+    }
+    .app-footer p {
+        font-size: 12px;
+        line-height: 1.5;
+        text-align: center;
+    }
 }
-
+.qa-media-name {
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
 @media (max-width:640px){ .cd-grid{ grid-template-columns:1fr; } }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1092,32 +1209,175 @@ input, textarea, select,
     scroll-margin-top: 90px;
     scroll-margin-bottom: 90px;
 }
-.title-field {
-    height: 52px !important;
-    min-height: 52px;
-    max-height: 52px;
-    white-space: normal !important;   /* տեքստը փաթաթվում է */
-    overflow-x: hidden !important;
-    overflow-y: auto !important;      /* ուղղահայաց սողնակ */
-    resize: none !important;
-    line-height: 22px;
+.title-field{
+    min-height:52px;
+    max-height:180px;
+    resize:vertical;
+    overflow-y:hidden;
+    overflow-wrap:anywhere;
+    line-height:22px;
 }
-/* Բարակ, ձևավորված ուղղահայաց սողնակ */
-.title-field::-webkit-scrollbar { width: 6px; }
-.title-field::-webkit-scrollbar-thumb {
-    background: var(--accent-soft);
-    border-radius: 999px;
+.title-field::-webkit-scrollbar{ width:6px; }
+.title-field::-webkit-scrollbar-thumb{ background:var(--accent-soft); border-radius:999px; }
+.title-field::-webkit-scrollbar-thumb:hover{ background:var(--accent); }
+.title-field{ scrollbar-width:thin; }
+
+/* Նույն overflow-ի ուղղումը մասնագիտական տվյալների համար */
+.cd-head-left{ min-width:0; flex:1 1 auto; }
+.cd-title{ min-width:0; overflow-wrap:anywhere; }
+.cd-grid{ grid-template-columns:repeat(2, minmax(0,1fr)); }
+.cd-option, .cd-label{ min-width:0; overflow-wrap:anywhere; }
+@media (max-width:760px){ .cd-grid{ grid-template-columns:minmax(0,1fr); } }
+        /* ===== Հուշման / բանալի բառի նյութի նախադիտում ===== */
+.media-preview{
+    display:none; margin-top:12px; padding:12px;
+    background:#fff; border:1px solid var(--banner-border);
+    border-radius:12px; text-align:center;
 }
-.title-field::-webkit-scrollbar-thumb:hover { background: var(--accent); }
-.title-field { scrollbar-width: thin; }   /* Firefox */
+.media-preview .mp-img{
+    max-width:220px; max-height:160px; object-fit:contain;
+    border-radius:8px; display:block; margin:0 auto; cursor:zoom-in;
+    transition:transform .15s;
+}
+.media-preview .mp-img:hover{ transform:scale(1.03); }
+.media-preview .mp-audio{ width:100%; max-width:360px; }
+.media-preview .mp-video{ width:100%; max-width:360px; border-radius:8px; display:block; margin:0 auto; }
+.media-preview .mp-yt{ width:100%; max-width:360px; aspect-ratio:16/9; border:0; border-radius:8px; display:block; margin:0 auto; }
+.media-preview .mp-link{
+    display:inline-flex; align-items:center; gap:6px;
+    color:var(--accent); font-weight:600; text-decoration:none; word-break:break-all;
+}
+.media-preview .mp-link:hover{ text-decoration:underline; }
+.media-preview .mp-bad{ color:var(--danger); font-size:13px; }
+body.dark .media-preview{ background:#1c1925; border-color:#4a2d57; }
+/* ===== ԱԲ բաժին — տեքստը չդուրս գա սահմաններից ===== */
+.ai-section, #ai-results, .ai-result-card { min-width: 0; max-width: 100%; }
+
+.ai-result-card .ai-q,
+.ai-result-card .ai-a {
+    max-width: 100%;
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+#ai-status { flex-wrap: wrap; }
+#ai-status-text { min-width: 0; overflow-wrap: anywhere; }
+
+@media (max-width: 760px) {
+    .ai-section { padding: 14px 12px; }
+
+    /* «Ավելացնել բոլորը» / «Ջնջել բոլորը»՝ իրար տակ */
+    .ai-results-actions { flex-direction: column; }
+    .ai-bulk-add-btn, .ai-bulk-clear-btn { width: 100%; }
+
+    /* Քարտի կոճակները՝ ամբողջ լայնքով */
+    .ai-card-actions { align-self: stretch; }
+    .ai-card-actions button { flex: 1; padding: 8px 10px; }
+
+    .ai-result-card { padding: 10px 12px; }
+    .ai-result-card .ai-a { letter-spacing: 0; }
+}
+        /* ===== «+» պատկերակ՝ բոլոր սարքերում նույն գույնով ===== */
+.plus-ic{
+    display:inline-block;
+    width:14px; height:14px;
+    flex-shrink:0;
+    vertical-align:-2px;
+    background:currentColor;
+    -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 4v16M4 12h16' stroke='black' stroke-width='3.5' stroke-linecap='round'/%3E%3C/svg%3E") center / contain no-repeat;
+            mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 4v16M4 12h16' stroke='black' stroke-width='3.5' stroke-linecap='round'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.add-btn .plus-ic{ width:15px; height:15px; }
+/* ===== «Կցել նկար կամ աուդիո»՝ տեքստը կոճակի կենտրոնում ===== */
+.qa-media-label{
+    justify-content:center;
+    text-align:center;
+}
+@media (max-width:760px){
+    #qa-container > div .qa-media-row .qa-media-label{
+        display:block;
+        width:100%;
+        box-sizing:border-box;
+        text-align:center;
+        white-space:normal;
+        overflow-wrap:anywhere;
+        line-height:1.35;
+        padding:8px 14px;
+    }
+    #qa-container > div .qa-media-row .qa-media-label .plus-ic{
+        margin-right:6px;
+        vertical-align:-2px;
+    }
+}
+#hint-file-name, #keyword-file-name{
+    flex:0 1 auto;          /* միայն անվան չափով, որ այքոնը մնա կողքին */
+    min-width:0;
+    max-width:100%;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+}
+@media (max-width:760px){
+    .hint-section .upload-label,
+    .keyword-material-section .upload-label{
+        flex:0 0 100%;
+        text-align:center;
+    }
+        /* հեռախոսում՝ աղբարկղը անվան կողքին */
+    #hint-file-name, #keyword-file-name{ flex:0 1 auto; }
+    #hint-file-clear, #keyword-file-clear{ margin-left:-4px; }
+}
+        /* ===== Բոլոր ծանուցումները՝ այքոնն ու «Հասկացա»-ն կենտրոնում ===== */
+.ai-notice-body{
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 14px;
+}
+.ai-notice-text{ width: 100%; }
+.ai-notice-actions{ justify-content: center; }
+/* ===== «Ուղեցույց» վերնագիր՝ բոլոր էջերում նույնը ===== */
+.guide-title{
+    font-family:'Noto Sans Armenian', sans-serif !important;
+    font-size:1.4rem !important;
+    font-weight:700 !important;
+    color:#3b1f7a !important;
+    text-align:center !important;
+    line-height:1.3 !important;
+    margin:0 0 16px !important;
+}
+body.dark .guide-title{ color:#b99cff !important; }
+/* ===== «Ավելացնել նոր հարց/պատասխան»՝ մոբայլում «+»-ը տեքստի կողքին ===== */
+/* ===== «Ավելացնել նոր հարց/պատասխան»՝ մոբայլում «+»-ը տեքստին կպած ===== */
+@media (max-width:760px){
+    .add-btn{
+        display:block;
+        text-align:center;
+        line-height:1.35;
+        white-space:normal;
+        padding:12px 14px;
+    }
+    .add-btn .add-btn-text{
+        display:inline;
+        overflow-wrap:anywhere;
+    }
+    .add-btn .plus-ic{
+        display:inline-block;
+        margin-right:6px;
+        vertical-align:-2px;
+    }
+}
     </style>
 </head>
+
 <body>
 
     <!-- ===== ՁԱԽ SIDEBAR ===== -->
     <aside class="sidebar" id="sidebar">
         <div class="sidebar-header">
-            <a class="sidebar-logo" href="https://mainlogin.dshh.am:15107/Tools" target="_blank">
+            <a class="sidebar-logo" href="{{ GATEWAY_PUBLIC }}/Tools" target="_blank">
                 <img src="{{ url_for('static', filename='dshh.png') }}" alt="ԴՇՀ">
             </a>
             <button class="sidebar-collapse-btn" type="button" onclick="toggleSidebar()" title="Փակել">
@@ -1143,18 +1403,18 @@ input, textarea, select,
                 </button>
                 <div class="sidebar-flyout">
                     <div class="sidebar-flyout-title">Կրթական գործիքներ</div>
-                    <a href="https://gatewayapi.dshh.am:15106/ibook/" class="sidebar-flyout-link">Թղթապանակ</a>
+                    <a href="{{ GATEWAY_PUBLIC }}/ibook/" class="sidebar-flyout-link">Թղթապանակ</a>
                     <a href="{{ url_for('choose_keyword_mode') }}" class="sidebar-flyout-link active">Խաչբառ</a>
-                    <a href="https://gatewayapi.dshh.am:15106/ibook/digital-book" class="sidebar-flyout-link">Նյութերի թվայնացում</a>
-                    <a href="https://gatewayapi.dshh.am:15106/pairmatch" class="sidebar-flyout-link">Գտիր զույգը</a>
-                    <a href="https://gatewayapi.dshh.am:15106/learn/" class="sidebar-flyout-link">ՀարցԱԲան</a>
+                    <a href="{{ GATEWAY_PUBLIC }}/ibook/digital-book" class="sidebar-flyout-link">Նյութերի թվայնացում</a>
+                    <a href="{{ GATEWAY_PUBLIC }}/pairmatch" class="sidebar-flyout-link">Գտիր զույգը</a>
+                    <a href="{{ GATEWAY_PUBLIC }}/learn/" class="sidebar-flyout-link">ՀարցԱԲան</a>
                 </div>
                 <div class="sidebar-group-items open" id="group-tools">
-                    <a href="https://gatewayapi.dshh.am:15106/ibook/" class="sidebar-link sidebar-sub"><span class="sidebar-label">Թղթապանակ</span></a>
+                    <a href="{{ GATEWAY_PUBLIC }}/ibook/" class="sidebar-link sidebar-sub"><span class="sidebar-label">Թղթապանակ</span></a>
                     <a href="{{ url_for('choose_keyword_mode') }}" class="sidebar-link sidebar-sub active"><span class="sidebar-label">Խաչբառ</span></a>
-                    <a href="https://gatewayapi.dshh.am:15106/ibook/digital-book" class="sidebar-link sidebar-sub"><span class="sidebar-label">Նյութերի թվայնացում</span></a>
-                    <a href="https://gatewayapi.dshh.am:15106/pairmatch" class="sidebar-link sidebar-sub"><span class="sidebar-label">Գտիր զույգը</span></a>
-                    <a href="https://gatewayapi.dshh.am:15106/learn/" class="sidebar-link sidebar-sub"><span class="sidebar-label">ՀարցԱԲան</span></a>
+                    <a href="{{ GATEWAY_PUBLIC }}/ibook/digital-book" class="sidebar-link sidebar-sub"><span class="sidebar-label">Նյութերի թվայնացում</span></a>
+                    <a href="{{ GATEWAY_PUBLIC }}/pairmatch" class="sidebar-link sidebar-sub"><span class="sidebar-label">Գտիր զույգը</span></a>
+                    <a href="{{ GATEWAY_PUBLIC }}/learn/" class="sidebar-link sidebar-sub"><span class="sidebar-label">ՀարցԱԲան</span></a>
                 </div>
             </div>
 
@@ -1171,22 +1431,22 @@ input, textarea, select,
                 </button>
                 <div class="sidebar-flyout">
                     <div class="sidebar-flyout-title">Իմ ստեղծած նյութերը</div>
-                    <a href="https://gatewayapi.dshh.am:15106/ibook/" class="sidebar-flyout-link">Թղթապանակներ</a>
-                    <a href="https://mainlogin.dshh.am:15107/Materials/Crosswords" class="sidebar-flyout-link">Խաչբառներ</a>
-                    <a href="https://mainlogin.dshh.am:15107/Materials/Digitized" class="sidebar-flyout-link">Թվայնացված նյութեր</a>
-                    <a href="https://mainlogin.dshh.am:15107/Materials/PairsGame" class="sidebar-flyout-link">«Գտիր զույգը» խաղեր</a>
+                    <a href="{{ MAINLOGIN_PUBLIC }}/Materials/Folders" class="sidebar-flyout-link">Թղթապանակներ</a>
+                    <a href="{{ MAINLOGIN_PUBLIC }}/Materials/Crosswords" class="sidebar-flyout-link">Խաչբառներ</a>
+                    <a href="{{ MAINLOGIN_PUBLIC }}/Materials/Digitized" class="sidebar-flyout-link">Թվայնացված նյութեր</a>
+                    <a href="{{ MAINLOGIN_PUBLIC }}/Materials/PairsGame" class="sidebar-flyout-link">«Գտիր զույգը» խաղեր</a>
                 </div>
                 <div class="sidebar-group-items" id="group-mine">
-                    <a href="https://gatewayapi.dshh.am:15106/ibook/" class="sidebar-link sidebar-sub"><span class="sidebar-label">Թղթապանակներ</span></a>
-                    <a href="https://mainlogin.dshh.am:15107/Materials/Crosswords" class="sidebar-link sidebar-sub"><span class="sidebar-label">Խաչբառներ</span></a>
-                    <a href="https://mainlogin.dshh.am:15107/Materials/Digitized" class="sidebar-link sidebar-sub"><span class="sidebar-label">Թվայնացված նյութեր</span></a>
-                    <a href="https://mainlogin.dshh.am:15107/Materials/PairsGame" class="sidebar-link sidebar-sub"><span class="sidebar-label">«Գտիր զույգը» խաղեր</span></a>
+                    <a href="{{ MAINLOGIN_PUBLIC }}/Materials/Folders" class="sidebar-link sidebar-sub"><span class="sidebar-label">Թղթապանակներ</span></a>
+                    <a href="{{ MAINLOGIN_PUBLIC }}/Materials/Crosswords" class="sidebar-link sidebar-sub"><span class="sidebar-label">Խաչբառներ</span></a>
+                    <a href="{{ MAINLOGIN_PUBLIC }}/Materials/Digitized" class="sidebar-link sidebar-sub"><span class="sidebar-label">Թվայնացված նյութեր</span></a>
+                    <a href="{{ MAINLOGIN_PUBLIC }}/Materials/PairsGame" class="sidebar-link sidebar-sub"><span class="sidebar-label">«Գտիր զույգը» խաղեր</span></a>
                 </div>
             </div>
 
             <div class="sidebar-divider"></div>
 
-            <a href="https://mainlogin.dshh.am:15107/Profiles/UserStatistics" class="sidebar-link">
+            <a href="{{ MAINLOGIN_PUBLIC }}/Profiles/UserStatistics" class="sidebar-link">
                 <span class="sidebar-icon">
                     <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M.9.9V15.3c0 .48.19.93.53 1.27.34.34.79.53 1.27.53H17.1"/>
@@ -1195,7 +1455,7 @@ input, textarea, select,
                 </span>
                 <span class="sidebar-label">Վիճակագրություն</span>
             </a>
-            <a class="sidebar-link" href="https://mainlogin.dshh.am:15107/Settings" title="Կարգավորումներ">
+            <a class="sidebar-link" href="{{ MAINLOGIN_PUBLIC }}/Settings" title="Կարգավորումներ">
             <span class="sidebar-icon">
                     <svg width="19" height="20" viewBox="0 0 19 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M9.21185 0.899902H8.81592C8.33861 0.899902 7.88085 1.08951 7.54334 1.42702C7.20583 1.76453 7.01622 2.22229 7.01622 2.6996V2.86158C7.0159 3.17718 6.93258 3.48714 6.77464 3.76038C6.6167 4.03362 6.38969 4.26052 6.11637 4.41832L5.72943 4.64328C5.45584 4.80124 5.1455 4.88439 4.82958 4.88439C4.51367 4.88439 4.20332 4.80124 3.92973 4.64328L3.79475 4.57129C3.38178 4.33307 2.89116 4.26844 2.43058 4.3916C1.97001 4.51476 1.57712 4.81563 1.33816 5.22818L1.1402 5.57013C0.901972 5.9831 0.837346 6.47372 0.960503 6.9343C1.08366 7.39487 1.38454 7.78776 1.79709 8.02672L1.93206 8.1167C2.20407 8.27374 2.43024 8.49922 2.5881 8.77074C2.74596 9.04227 2.83002 9.35037 2.83191 9.66445V10.1234C2.83317 10.4405 2.75061 10.7523 2.59259 11.0273C2.43457 11.3022 2.20671 11.5305 1.93206 11.6891L1.79709 11.7701C1.38454 12.0091 1.08366 12.4019 0.960503 12.8625C0.837346 13.3231 0.901972 13.8137 1.1402 14.2267L1.33816 14.5686C1.57712 14.9812 1.97001 15.2821 2.43058 15.4052C2.89116 15.5284 3.38178 15.4637 3.79475 15.2255L3.92973 15.1535C4.20332 14.9956 4.51367 14.9124 4.82958 14.9124C5.1455 14.9124 5.45584 14.9956 5.72943 15.1535L6.11637 15.3785C6.38969 15.5363 6.6167 15.7632 6.77464 16.0364C6.93258 16.3097 7.0159 16.6196 7.01622 16.9352V17.0972C7.01622 17.5745 7.20583 18.0323 7.54334 18.3698C7.88085 18.7073 8.33861 18.8969 8.81592 18.8969H9.21185C9.68917 18.8969 10.1469 18.7073 10.4844 18.3698C10.8219 18.0323 11.0116 17.5745 11.0116 17.0972V16.9352C11.0119 16.6196 11.0952 16.3097 11.2531 16.0364C11.4111 15.7632 11.6381 15.5363 11.9114 15.3785L12.2983 15.1535C12.5719 14.9956 12.8823 14.9124 13.1982 14.9124C13.5141 14.9124 13.8245 14.9956 14.098 15.1535L14.233 15.2255C14.646 15.4637 15.1366 15.5284 15.5972 15.4052C16.0578 15.2821 16.4507 14.9812 16.6896 14.5686L16.8876 14.2177C17.1258 13.8047 17.1904 13.3141 17.0673 12.8535C16.9441 12.3929 16.6432 12.0001 16.2307 11.7611L16.0957 11.6891C15.8211 11.5305 15.5932 11.3022 15.4352 11.0273C15.2772 10.7523 15.1946 10.4405 15.1959 10.1234V9.67344C15.1946 9.35632 15.2772 9.04449 15.4352 8.76954C15.5932 8.49458 15.8211 8.26627 16.0957 8.1077L16.2307 8.02672C16.6432 7.78776 16.9441 7.39487 17.0673 6.9343C17.1904 6.47372 17.1258 5.9831 16.8876 5.57013L16.6896 5.22818C16.4507 4.81563 16.0578 4.51476 15.5972 4.3916C15.1366 4.26844 14.646 4.33307 14.233 4.57129L14.098 4.64328C13.8245 4.80124 13.5141 4.88439 13.1982 4.88439C12.8823 4.88439 12.5719 4.80124 12.2983 4.64328L11.9114 4.41832C11.6381 4.26052 11.4111 4.03362 11.2531 3.76038C11.0952 3.48714 11.0119 3.17718 11.0116 2.86158V2.6996C11.0116 2.22229 10.8219 1.76453 10.4844 1.42702C10.1469 1.08951 9.68917 0.899902 9.21185 0.899902Z" stroke="currentColor" stroke-width="1.7997" stroke-linecap="round" stroke-linejoin="round"/>
@@ -1204,7 +1464,7 @@ input, textarea, select,
                 </span>
                 <span class="sidebar-label">Կարգավորումներ</span>
             </a>
-            <a class="sidebar-link" href="https://mainlogin.dshh.am:15107/Profiles/UserProfile" title="Անձնական էջ">
+            <a class="sidebar-link" href="{{ MAINLOGIN_PUBLIC }}/Profiles/UserProfile" title="Անձնական էջ">
                 <span class="sidebar-icon">
                     <svg width="15" height="18" viewBox="0 0 15 18" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M13.4973 17.0964V15.2967C13.4973 14.342 13.1181 13.4265 12.4431 12.7515C11.7681 12.0765 10.8525 11.6973 9.89792 11.6973H4.49882C3.5442 11.6973 2.62867 12.0765 1.95365 12.7515C1.27864 13.4265 0.899414 14.342 0.899414 15.2967V17.0964" stroke="currentColor" stroke-width="1.7997" stroke-linecap="round" stroke-linejoin="round"/>
@@ -1258,16 +1518,16 @@ input, textarea, select,
                         <div class="avatar-dropdown-email" id="userMail">{{ (user or {}).get('email', '') }}</div>
                     </div>
                     <div class="avatar-dropdown-links">
-                        <a class="avatar-dropdown-link" href="https://mainlogin.dshh.am:15107/Profiles/UserProfile">
+                        <a class="avatar-dropdown-link" href="{{ MAINLOGIN_PUBLIC }}/Profiles/UserProfile">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                             Անձնական Էջ
                         </a>
-                        <a class="avatar-dropdown-link" href="https://mainlogin.dshh.am:15107/Settings">
+                        <a class="avatar-dropdown-link" href="{{ MAINLOGIN_PUBLIC }}/Settings">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
                             Կարգավորումներ
                         </a>
                         <div class="avatar-dropdown-divider"></div>
-                        <a class="avatar-dropdown-link danger" href="https://mainlogin.dshh.am:15107/Login/Logout">
+                        <a class="avatar-dropdown-link danger" href="{{ MAINLOGIN_PUBLIC }}/Login/Logout">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
                             Դուրս գալ
                         </a>
@@ -1283,7 +1543,7 @@ input, textarea, select,
     <!-- ===== ՀԻՄՆԱԿԱՆ ՄԱՍ (ՁԵՎ) ===== -->
     <main class="app-main">
 
-        <form method="post" enctype="multipart/form-data" class="form-section" novalidate onsubmit="return validateForm()">
+                <form method="post" enctype="multipart/form-data" class="form-section" novalidate onsubmit="handleCreateSubmit(event)">
 
             <!-- ═══════════ ՄԱՍՆԱԳԻՏԱԿԱՆ ՏՎՅԱԼՆԵՐ ═══════════ -->
             {% if is_teacher %}
@@ -1462,7 +1722,7 @@ input, textarea, select,
 
             {% if use_keyword == 'yes' %}
             <div id="keyword-order-hint" style="margin:14px 0 20px; padding:14px 18px; background:var(--section-pink-bg); border:1px solid var(--banner-border); border-radius:14px; font-size:14px; color:#8e3aad; line-height:1.6;">
-                <span style="display:inline-flex; vertical-align:-4px; margin-right:6px;"><svg width="17" height="21" viewBox="0 0 17 21" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12.3751 20.0648C12.3751 20.214 12.3159 20.3571 12.2104 20.4626C12.1049 20.5681 11.9618 20.6273 11.8126 20.6273H4.31263C4.16344 20.6273 4.02037 20.5681 3.91488 20.4626C3.80939 20.3571 3.75013 20.214 3.75013 20.0648C3.75013 19.9157 3.80939 19.7726 3.91488 19.6671C4.02037 19.5616 4.16344 19.5023 4.31263 19.5023H11.8126C11.9618 19.5023 12.1049 19.5616 12.2104 19.6671C12.3159 19.7726 12.3751 19.9157 12.3751 20.0648ZM16.1251 8.06484C16.1283 9.28679 15.8522 10.4933 15.318 11.5923C14.7838 12.6913 14.0055 13.6537 13.0426 14.4061C12.8361 14.5648 12.6687 14.7686 12.553 15.0019C12.4373 15.2352 12.3765 15.4919 12.3751 15.7523V16.3148C12.3751 16.6629 12.2368 16.9968 11.9907 17.2429C11.7446 17.4891 11.4107 17.6273 11.0626 17.6273H5.06263C4.71453 17.6273 4.38069 17.4891 4.13455 17.2429C3.88841 16.9968 3.75013 16.6629 3.75013 16.3148V15.7523C3.74987 15.4946 3.69059 15.2404 3.57684 15.0091C3.46308 14.7779 3.29787 14.5758 3.09388 14.4183C2.13396 13.6707 1.35661 12.7146 0.820627 11.6224C0.284648 10.5301 0.00407275 9.33026 0.000125489 8.11359C-0.0242495 3.7439 3.50544 0.107336 7.86856 0.00233602C8.94356 -0.0235465 10.0129 0.165874 11.0136 0.559448C12.0143 0.953023 12.9261 1.5428 13.6955 2.29406C14.4648 3.04533 15.0761 3.9429 15.4934 4.93396C15.9106 5.92501 16.1254 6.98952 16.1251 8.06484ZM15.0001 8.06484C15.0004 7.1395 14.8155 6.22345 14.4565 5.37063C14.0974 4.5178 13.5713 3.74543 12.9092 3.09899C12.2471 2.45254 11.4624 1.94507 10.6012 1.60647C9.74008 1.26786 8.81988 1.10495 7.89481 1.12734C4.14106 1.22109 1.1045 4.34671 1.12513 8.10421C1.12868 9.15118 1.37021 10.1836 1.83147 11.1235C2.29273 12.0634 2.96164 12.8862 3.78763 13.5295C4.1268 13.7922 4.40121 14.1292 4.58974 14.5145C4.77828 14.8999 4.87591 15.3233 4.87513 15.7523V16.3148C4.87513 16.3646 4.89488 16.4123 4.93004 16.4474C4.96521 16.4826 5.0129 16.5023 5.06263 16.5023H7.50013V12.0483L4.66513 9.21234C4.56577 9.1057 4.51167 8.96467 4.51424 8.81894C4.51682 8.67322 4.57585 8.53418 4.67891 8.43112C4.78197 8.32806 4.92101 8.26903 5.06673 8.26645C5.21246 8.26388 5.35349 8.31798 5.46013 8.41734L8.06263 11.0198L10.6651 8.41734C10.7718 8.31798 10.9128 8.26388 11.0585 8.26645C11.2042 8.26903 11.3433 8.32806 11.4463 8.43112C11.5494 8.53418 11.6084 8.67322 11.611 8.81894C11.6136 8.96467 11.5595 9.1057 11.4601 9.21234L8.62513 12.0483V16.5023H11.0626C11.1124 16.5023 11.16 16.4826 11.1952 16.4474C11.2304 16.4123 11.2501 16.3646 11.2501 16.3148V15.7523C11.2513 15.3218 11.3507 14.8971 11.5408 14.5108C11.7308 14.1245 12.0066 13.7866 12.347 13.523C13.1761 12.8756 13.8461 12.0473 14.3059 11.1013C14.7658 10.1553 15.0032 9.11667 15.0001 8.06484Z" fill="currentColor"/></svg></span><strong>Ուշադրություն՝</strong> հարցերի հերթականությունը կարևոր է։ Բանալի բառը ձևավորվում է հարցերի հերթականությամբ՝ առաջին հարցի պատասխանը տալիս է բանալի բառի 1-ին տառը, երկրորդ հարցինը՝ 2-րդ տառը և այսպես շարունակ։ Եթե հարցերը գրեք այլ հերթականությամբ, բանալի բառը ճիշտ չի կազմվի, և խաչբառը կարող է կտրվել։ Ուստի դասավորեք ստորև հարցերն այնպես, որ պատասխանների համապատասխան տառերը հաջորդաբար կազմեն <span id="keyword-target-word">բանալի բառը</span>։
+                <span style="display:inline-flex; vertical-align:-4px; margin-right:6px;"><svg width="17" height="21" viewBox="0 0 17 21" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12.3751 20.0648C12.3751 20.214 12.3159 20.3571 12.2104 20.4626C12.1049 20.5681 11.9618 20.6273 11.8126 20.6273H4.31263C4.16344 20.6273 4.02037 20.5681 3.91488 20.4626C3.80939 20.3571 3.75013 20.214 3.75013 20.0648C3.75013 19.9157 3.80939 19.7726 3.91488 19.6671C4.02037 19.5616 4.16344 19.5023 4.31263 19.5023H11.8126C11.9618 19.5023 12.1049 19.5616 12.2104 19.6671C12.3159 19.7726 12.3751 19.9157 12.3751 20.0648ZM16.1251 8.06484C16.1283 9.28679 15.8522 10.4933 15.318 11.5923C14.7838 12.6913 14.0055 13.6537 13.0426 14.4061C12.8361 14.5648 12.6687 14.7686 12.553 15.0019C12.4373 15.2352 12.3765 15.4919 12.3751 15.7523V16.3148C12.3751 16.6629 12.2368 16.9968 11.9907 17.2429C11.7446 17.4891 11.4107 17.6273 11.0626 17.6273H5.06263C4.71453 17.6273 4.38069 17.4891 4.13455 17.2429C3.88841 16.9968 3.75013 16.6629 3.75013 16.3148V15.7523C3.74987 15.4946 3.69059 15.2404 3.57684 15.0091C3.46308 14.7779 3.29787 14.5758 3.09388 14.4183C2.13396 13.6707 1.35661 12.7146 0.820627 11.6224C0.284648 10.5301 0.00407275 9.33026 0.000125489 8.11359C-0.0242495 3.7439 3.50544 0.107336 7.86856 0.00233602C8.94356 -0.0235465 10.0129 0.165874 11.0136 0.559448C12.0143 0.953023 12.9261 1.5428 13.6955 2.29406C14.4648 3.04533 15.0761 3.9429 15.4934 4.93396C15.9106 5.92501 16.1254 6.98952 16.1251 8.06484ZM15.0001 8.06484C15.0004 7.1395 14.8155 6.22345 14.4565 5.37063C14.0974 4.5178 13.5713 3.74543 12.9092 3.09899C12.2471 2.45254 11.4624 1.94507 10.6012 1.60647C9.74008 1.26786 8.81988 1.10495 7.89481 1.12734C4.14106 1.22109 1.1045 4.34671 1.12513 8.10421C1.12868 9.15118 1.37021 10.1836 1.83147 11.1235C2.29273 12.0634 2.96164 12.8862 3.78763 13.5295C4.1268 13.7922 4.40121 14.1292 4.58974 14.5145C4.77828 14.8999 4.87591 15.3233 4.87513 15.7523V16.3148C4.87513 16.3646 4.89488 16.4123 4.93004 16.4474C4.96521 16.4826 5.0129 16.5023 5.06263 16.5023H7.50013V12.0483L4.66513 9.21234C4.56577 9.1057 4.51167 8.96467 4.51424 8.81894C4.51682 8.67322 4.57585 8.53418 4.67891 8.43112C4.78197 8.32806 4.92101 8.26903 5.06673 8.26645C5.21246 8.26388 5.35349 8.31798 5.46013 8.41734L8.06263 11.0198L10.6651 8.41734C10.7718 8.31798 10.9128 8.26388 11.0585 8.26645C11.2042 8.26903 11.3433 8.32806 11.4463 8.43112C11.5494 8.53418 11.6084 8.67322 11.611 8.81894C11.6136 8.96467 11.5595 9.1057 11.4601 9.21234L8.62513 12.0483V16.5023H11.0626C11.1124 16.5023 11.16 16.4826 11.1952 16.4474C11.2304 16.4123 11.2501 16.3646 11.2501 16.3148V15.7523C11.2513 15.3218 11.3507 14.8971 11.5408 14.5108C11.7308 14.1245 12.0066 13.7866 12.347 13.523C13.1761 12.8756 13.8461 12.0473 14.3059 11.1013C14.7658 10.1553 15.0032 9.11667 15.0001 8.06484Z" fill="currentColor"/></svg></span><strong>Ուշադրություն՝</strong> հարցերի հերթականությունը պետք է համապատասխանի բանալի բառի տառերի հերթականությանը․  բանալի բառի 1-ին տառը վերցվում է 1-ին հարցի պատասխանից, 2-րդ տառը՝ 2-րդ հարցի պատասխանից և այդպես շարունակ։ Եթե հարցերը գրեք այլ հերթականությամբ, բանալի բառը ճիշտ չի կազմվի, և խաչբառի տողերը կարող են հատում չունենալ։
             </div>
             {% endif %}
 
@@ -1483,7 +1743,7 @@ input, textarea, select,
         </button>
         </div>
         <div class="qa-media-row">
-            <label class="qa-media-label" for="q_media_1">📎 Կցել նկար կամ աուդիո</label>
+            <label class="qa-media-label" for="q_media_1"><span class="plus-ic"></span>Կցել նկար կամ աուդիո</label>
             <input type="file" id="q_media_1" name="q_media_1" accept="image/*,audio/*" style="display:none;" onchange="showQMediaName(this)">
             <span class="qa-media-name"></span>
             <button type="button" class="qa-media-clear" onclick="clearQMedia(this)" style="display:none;">✕</button>
@@ -1493,12 +1753,12 @@ input, textarea, select,
     </div>
 </div>
 
-            <button type="button" class="add-btn" onclick="addField()">➕ Ավելացնել նոր հարց/պատասխան</button>
+            <button type="button" class="add-btn" onclick="addField()"><span class="plus-ic"></span><span class="add-btn-text">Ավելացնել նոր հարց/պատասխան</span></button>
 
             {% if use_keyword != 'yes' %}
             <div class="ai-section">
     <label for="ai_topic"> ԱԲ-ի միջոցով հարցեր ավելացնել</label>
-    <input type="text" id="ai_topic" placeholder="Մուտքագրիր թեման (օրինակ՝ Հայ գրականություն, Գուրգեն Մահարի)">
+    <textarea id="ai_topic" rows="1" class="title-field" placeholder="Մուտքագրիր թեման (օրինակ՝ Հայ գրականություն, Գուրգեն Մահարի)"></textarea>
     <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
         <label for="ai_count" style="margin:0;">Հարցերի քանակ՝</label>
         <input type="number" id="ai_count" value="3" min="1" max="40" style="width:70px; margin:0;">
@@ -1594,7 +1854,7 @@ input, textarea, select,
                 <input type="hidden" name="hint_type" id="hint_type" value="text">
 
                 <div id="text_hint_input" style="margin-top:10px;">
-                    <textarea name="global_hint_text" rows="3" placeholder="Մուտքագրեք հուշումը..." style="width:100%;"></textarea>
+                    <textarea name="global_hint_text" rows="3" placeholder="Մուտքագրեք հուշումը․․․" style="width:100%;"></textarea>
                 </div>
 
                 <div id="file_hint_input" style="margin-top:10px; display:none;">
@@ -1612,6 +1872,7 @@ input, textarea, select,
                         <span class="format-list" id="format-info"></span>
                         <span class="error-message" id="media-error"></span>
                     </div>
+                    <div class="media-preview" id="hint-preview"></div>
                 </div>
             </div>
 
@@ -1619,7 +1880,7 @@ input, textarea, select,
             <div class="keyword-input-section">
                 <svg width="18" height="18" viewBox="0 0 21 21" fill="none" xmlns="http://www.w3.org/2000/svg" style="color:var(--text); flex-shrink:0;"><path d="M14.25 3.75C15.9069 3.75 17.25 5.09315 17.25 6.75M20.25 6.75C20.25 10.0637 17.5637 12.75 14.25 12.75C13.8993 12.75 13.5555 12.7199 13.2213 12.6622C12.6583 12.5649 12.062 12.688 11.658 13.092L9 15.75H6.75V18H4.5V20.25H0.75V17.432C0.75 16.8352 0.98705 16.2629 1.40901 15.841L7.908 9.342C8.31202 8.938 8.43512 8.34172 8.33785 7.7787C8.2801 7.44446 8.25 7.10074 8.25 6.75C8.25 3.43629 10.9363 0.75 14.25 0.75C17.5637 0.75 20.25 3.43629 20.25 6.75Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 <label>Բանալի բառ <span class="req-star">*</span></label>
-                <input type="text" name="keyword" oninput="this.value = this.value.toUpperCase().replace(/[^Ա-ՖA-Z]/g, '')">
+                <input type="text" name="keyword">
                 <span class="error-message"></span>
             </div>
             {% endif %}
@@ -1661,18 +1922,15 @@ input, textarea, select,
                         </button>
                     </div>
                     <span class="format-list" id="keyword-format-info">Աջակցվող ֆորմատներ՝ JPG, JPEG, PNG, GIF, BMP, MP4, MOV, WEBM, MKV</span>
+                <div class="media-preview" id="km-preview"></div>
                 </div>
-                <div id="keyword_link_input" style="margin-top:10px; display:none;">
-                    <input type="url" name="keyword_material_link" placeholder="https://example.com" style="width:100%;">
+                                <div id="keyword_link_input" style="margin-top:10px; display:none;">
+                    <input type="url" name="keyword_material_link" placeholder="https://example.com" style="width:100%;"
+                           oninput="renderLinkPreview('km-link-preview', this.value)">
+                    <div class="media-preview" id="km-link-preview"></div>
                 </div>
             </div>
             {% endif %}
-            <button type="button" onclick="saveDraftManual()" style="
-                margin:30px 12px 0 auto; padding:11px 28px; border-radius:20px;
-                font-size:15px; font-weight:700; border:1.5px solid var(--accent-soft);
-                background:var(--add-bg); color:var(--text); cursor:pointer;">
-                Պահպանել որպես սևագիր
-            </button>
 
             <button type="submit" style="
     display:flex; align-items:center; justify-content:center;
@@ -1729,43 +1987,45 @@ input, textarea, select,
 </div>
 
 
-    <!-- ===== Ուղեցույց մոդալ ===== -->
+        <!-- ===== Ուղեցույց մոդալ ===== -->
     <div id="guideModal" class="modal">
         <div class="modal-content">
             <span class="close-btn" onclick="closeGuide()">✕</span>
+            <h2 class="guide-title">Ուղեցույց</h2>
             {% if use_keyword == 'yes' %}
-            <h2>📖 Ուղեցույց</h2>
             <ol>
                 <li>Ընտրե՛ք, թե Ձեր անձնական էջում լրացված որ մասնագիտական տվյալները կարող են տեսանելի լինել խաչբառը լրացնողներին։</li>
                 <li>Ընտրե՛ք այն դասարանն ու առարկան, որոնց համար նախատեսված է խաչբառը։ Կարող եք ընտրել մեկից ավելի դասարան ու առարկա։</li>
                 <li>Դասարանն ընտրելուց հետո կերևան տեքստի տառաչափն ու տառատեսակն ընտրելու դաշտերը։ Ծրագրում կանխադրված են չափորոշիչներին համապատասխանող տարբերակներ, որոնք կարող եք փոխել։</li>
                 <li>Մուտքագրե՛ք խաչբառի վերնագիրը և «Խաչբառի նկարագրություն» դաշտում հակիրճ ներկայացրե՛ք խաչբառի բովանդակությունը։</li>
-                <li>Մուտքագրե՛ք հարց/պատասխան զույգերը։<br>Հիշե՛ք․ պատրաստի խաչբառում «ՈՒ» և «ԵՎ» տառերը գրվում են երկու վանդակում։</li>
-                <li>Սեղմե՛ք «Ավելացնել նոր հարց/պատասխան» կոճակը՝ նոր զույգ ավելացնելու համար։ Կարող եք ավելացնել առավելագույնը 40 զույգ։<br>Յուրաքանչյուր հարց/պատասխան զույգի կողքին գտնվող «❌» կոճակով կարող եք ջնջել մուտքագրված տվյալները։</li>
+                <li>Մուտքագրե՛ք հարց/պատասխան զույգերը։
+                    <em>Պատասխանի դաշտում տառերն ավտոմատ գրվում են մեծատառով։ Քանի որ «ու» և «և» տառերի մեծատառերը («ՈՒ», «ԵՎ») պատրաստի խաչբառում զբաղեցնում են երկուական վանդակ, պատասխանի դաշտում մուտքագրե՛ք դրանք երկու նշանով՝ Ո+Ւ և Ե+Վ։</em></li>
+                <li>Սեղմե՛ք «Ավելացնել նոր հարց/պատասխան» կոճակը՝ նոր զույգ ավելացնելու համար։<br>Յուրաքանչյուր հարց/պատասխան զույգի կողքին գտնվող «❌» կոճակով կարող եք ջնջել մուտքագրված տվյալները։</li>
                 <li>Ընտրե՛ք ֆոնային պատկերն առաջարկվող նկարներից կամ վերբեռնե՛ք Ձեր սարքից։</li>
-                <li>Կարգավորե՛ք ֆոնային պատկերի չափսերը՝ ընտրելով «Ֆիքսված չափսեր» կամ «Ամբողջական էկրան» տարբերակներից մեկը, կամ սահմանեք պատկերի չափսերը՝ օգտագործելով լայնության ու բարձրության սղնակները։<br>Սխալի դեպքում ջնջե՛ք պատկերը «❌» կոճակով և ընտրե՛ք նորը։</li>
-                <li>Ընտրե՛ք խաչբառը լրացնողի համար նախատեսված հուշման տեսակը, այնուհետև մուտքագրե՛ք կամ կցե՛ք հուշումը։</li>
-                <li>Մուտքագրե՛ք բանալի բառը։<br>Հիշե՛ք, որ հարցերի հերթականությունը պետք է համապատասխանի բանալի բառի տառերի հերթականությանը․ առաջին հարցի պատասխանը տալիս է բանալի բառի առաջին տառը, երկրորդինը՝ երկրորդ տառը, և այդպես շարունակ։ Եթե հարցերը գրեք այլ հերթականությամբ, բանալի բառը ճիշտ չի կազմվի, և խաչբառը կարող է կտրվել։</li>
-                <li>Ընտրե՛ք այն նյութի տեսակը, որը կցուցադրվի խաչբառը ճիշտ լուծելուց և բանալի բառը հաջողությամբ գտնելուց հետո, այնուհետև մուտքագրե՛ք կամ կցե՛ք նյութը։</li>
+                <li>Կարգավորե՛ք ֆոնային պատկերի չափսերը՝ ընտրելով «Ֆիքսված չափսեր» կամ «Ամբողջական էկրան» տարբերակներից մեկը, կամ սահմանե՛ք պատկերի չափսերը՝ օգտագործելով լայնության ու բարձրության սղնակները։</li>
+                <li>Ցանկության դեպքում ավելացրե՛ք խաչբառը լրացնողի համար նախատեսված հուշում. ընտրե՛ք հուշման ձևաչափը, ապա մուտքագրե՛ք կամ կցե՛ք համապատասխան նյութը։</li>
+                <li>Մուտքագրե՛ք բանալի բառը։
+                    <em>Հարցերի հերթականությունը պետք է համապատասխանի բանալի բառի տառերի հերթականությանը. բանալի բառի առաջին տառը վերցվում է առաջին հարցի պատասխանից, երկրորդ տառը՝ երկրորդ հարցի պատասխանից և այդպես շարունակ։ Եթե հարցերը գրեք այլ հերթականությամբ, բանալի բառը ճիշտ չի կազմվի, և խաչբառի տողերը կարող են հատում չունենալ։</em></li>
+                <li>Ցանկության դեպքում ավելացրե՛ք խաչբառը ճիշտ լուծելուց և բանալի բառը հաջողությամբ գտնելուց հետո ցուցադրվող նյութ։ Ընտրե՛ք նյութի ձևաչափը, ապա մուտքագրե՛ք կամ կցե՛ք համապատասխան նյութը։</li>
                 <li>Աշխատանքն ավարտելու համար սեղմե՛ք «Ստեղծել» կոճակը։</li>
-                <li>Խաչբառը պատրաստ է։ </li>
-            <ol>
+                <li>Անավարտ խաչբառն ավտոմատ կպահպանվի որպես սևագիր։ Կարող եք հետագայում խմբագրել և ավարտել այն։</li>
+            </ol>
             {% else %}
-            <h2>📖 Ուղեցույց</h2>
             <ol>
                 <li>Ընտրե՛ք, թե Ձեր անձնական էջում լրացված որ մասնագիտական տվյալները կարող են տեսանելի լինել խաչբառը լրացնողներին։</li>
                 <li>Ընտրե՛ք այն դասարանն ու առարկան, որոնց համար նախատեսված է խաչբառը։ Կարող եք ընտրել մեկից ավելի դասարան ու առարկա։</li>
                 <li>Դասարանն ընտրելուց հետո կերևան տեքստի տառաչափն ու տառատեսակն ընտրելու դաշտերը։ Ծրագրում կանխադրված են չափորոշիչներին համապատասխանող տարբերակներ, որոնք կարող եք փոխել։</li>
                 <li>Մուտքագրե՛ք խաչբառի վերնագիրը և «Խաչբառի նկարագրություն» դաշտում հակիրճ ներկայացրե՛ք խաչբառի բովանդակությունը։</li>
-                <li>Մուտքագրե՛ք հարց/պատասխան զույգերը։<br>Հիշե՛ք․ պատրաստի խաչբառում «ՈՒ» և «ԵՎ» տառերը գրվում են երկու վանդակում։</li>
-                <li>Սեղմե՛ք «Ավելացնել նոր հարց/պատասխան» կոճակը՝ նոր զույգ ավելացնելու համար։ Կարող եք ավելացնել առավելագույնը 40 զույգ։<br>Յուրաքանչյուր հարց/պատասխան զույգի կողքին գտնվող «❌» կոճակով կարող եք ջնջել մուտքագրված տվյալները։</li>
-                <li>Ավելացրե՛ք նոր հարց/պատասխան զույգեր ԱԲ-ի օգնությամբ։ Մուտքագրե՛ք թեման, ընտրե՛ք հարցերի քանակը և սեղմե՛ք «Ավելացնել» կոճակը։</li>
+                <li>Մուտքագրե՛ք հարց/պատասխան զույգերը։
+                    <em>Պատասխանի դաշտում տառերն ավտոմատ գրվում են մեծատառով։ Քանի որ «ու» և «և» տառերի մեծատառերը («ՈՒ», «ԵՎ») պատրաստի խաչբառում զբաղեցնում են երկուական վանդակ, պատասխանի դաշտում մուտքագրե՛ք դրանք երկու նշանով՝ Ո+Ւ և Ե+Վ։</em></li>
+                <li>Սեղմե՛ք «Ավելացնել նոր հարց/պատասխան» կոճակը՝ նոր զույգ ավելացնելու համար։<br>Յուրաքանչյուր հարց/պատասխան զույգի կողքին գտնվող «❌» կոճակով կարող եք ջնջել մուտքագրված տվյալները։</li>
+                <li>Ավելացրե՛ք նոր հարց/պատասխան զույգեր ԱԲ-ի օգնությամբ։ Մուտքագրե՛ք թեման, ընտրե՛ք հարցերի քանակը և սեղմե՛ք «Ստեղծել» կոճակը։ Ծանոթացե՛ք ԱԲ-ի առաջարկած հարցերին ու պատասխաններին, ապա ավելացրե՛ք դրանք խաչբառին կամ ջնջե՛ք ոչ համապատասխան տարբերակները։</li>
                 <li>Ընտրե՛ք ֆոնային պատկերն առաջարկվող նկարներից կամ վերբեռնե՛ք Ձեր սարքից։</li>
-                <li>Կարգավորե՛ք ֆոնային պատկերի չափսերը՝ ընտրելով «Ֆիքսված չափսեր» կամ «Ամբողջական էկրան» տարբերակներից մեկը, կամ սահմանեք պատկերի չափսերը՝ օգտագործելով լայնության ու բարձրության սղնակները։<br>Սխալի դեպքում ջնջե՛ք պատկերը «❌» կոճակով և ընտրե՛ք նորը։</li>
-                <li>Ընտրե՛ք խաչբառը լրացնողի համար նախատեսված հուշման տեսակը, այնուհետև մուտքագրե՛ք կամ կցե՛ք հուշումը։</li>
+                <li>Կարգավորե՛ք ֆոնային պատկերի չափսերը՝ ընտրելով «Ֆիքսված չափսեր» կամ «Ամբողջական էկրան» տարբերակներից մեկը, կամ սահմանե՛ք պատկերի չափսերը՝ օգտագործելով լայնության ու բարձրության սղնակները։</li>
+                <li>Ցանկության դեպքում ավելացրե՛ք խաչբառը լրացնողի համար նախատեսված հուշում. ընտրե՛ք հուշման ձևաչափը, ապա մուտքագրե՛ք կամ կցե՛ք համապատասխան նյութը։</li>
                 <li>Աշխատանքն ավարտելու համար սեղմե՛ք «Ստեղծել» կոճակը։</li>
-                <li>Խաչբառը պատրաստ է։ </li>
-            <ol>
+                <li>Անավարտ խաչբառն ավտոմատ կպահպանվի որպես սևագիր։ Կարող եք հետագայում խմբագրել և ավարտել այն։</li>
+            </ol>
             {% endif %}
         </div>
     </div>
@@ -1796,7 +2056,13 @@ input, textarea, select,
             </div>
         </div>
     </div>
+         <!-- ===== Նկարի մեծացում ===== -->
+    <div class="img-lightbox" id="imgLightbox" onclick="closeImgLightbox(event)">
+        <button type="button" class="img-lightbox-close" onclick="closeImgLightbox(event, true)" aria-label="Փակել">✕</button>
+        <img id="imgLightboxImg" src="" alt="">
+    </div>
 
+    <!-- ===== Google Translate ===== -->
     <!-- ===== Google Translate ===== -->
     <script type="text/javascript">
         function googleTranslateElementInit() {
@@ -1961,12 +2227,39 @@ input, textarea, select,
         const heightSlider = document.getElementById('height-slider');
         if (widthSlider && heightSlider) { updateSliderFill(widthSlider); updateSliderFill(heightSlider); }
         document.addEventListener('DOMContentLoaded', syncModeLabels);
-
+                // Թույլատրված տառեր՝ հայերեն, լատիներեն, ռուսերեն
+        const NOT_LETTER_RE = /[^Ա-ՖA-ZА-ЯЁ]/g;
         const SUPPORTED_FORMATS = {
             image: { extensions: ['jpg', 'jpeg', 'png', 'bmp', 'gif'], mimeTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/bmp'] },
             video: { extensions: ['mp4', 'mpeg4', 'mov', 'webm', 'mkv'], mimeTypes: ['video/mp4', 'video/mpeg', 'video/quicktime', 'video/webm', 'video/x-matroska'] },
             audio: { extensions: ['mp3', 'aac', 'flac', 'wav'], mimeTypes: ['audio/mpeg', 'audio/wav', 'audio/aac', 'audio/flac'] }
         };
+
+                // Վերբեռնման սահմանաչափը՝ սերվերի MAX_CONTENT_LENGTH-ից (եթե նշված չէ՝ 50 ՄԲ)
+        const MAX_UPLOAD_BYTES = {{ config.get('MAX_CONTENT_LENGTH') or (50 * 1024 * 1024) }};
+        const MAX_UPLOAD_MB = Math.floor(MAX_UPLOAD_BYTES / 1024 / 1024);
+
+        function toMB(bytes) { return (bytes / 1024 / 1024).toFixed(1); }
+
+        function tooBigMsg(file) {
+            return 'Ֆայլը չափազանց մեծ է (' + toMB(file.size) + ' ՄԲ)։ ' +
+                   'Թույլատրելի առավելագույն չափը՝ ' + MAX_UPLOAD_MB + ' ՄԲ։ ' +
+                   'Ընտրե՛ք ավելի փոքր ֆայլ կամ սեղմե՛ք տեսանյութը։';
+        }
+
+        // Ձևի բոլոր կցված ֆայլերի ընդհանուր չափը
+        function totalUploadBytes(form) {
+            let sum = 0;
+            form.querySelectorAll('input[type="file"]').forEach(function (inp) {
+                Array.from(inp.files || []).forEach(function (f) { sum += f.size; });
+            });
+            return sum;
+        }
+
+        function totalTooBigMsg(bytes) {
+            return 'Կցված ֆայլերի ընդհանուր չափը (' + toMB(bytes) + ' ՄԲ) գերազանցում է ' +
+                   'թույլատրելի ' + MAX_UPLOAD_MB + ' ՄԲ-ը։ Հեռացրեք կամ փոխարինեք մեծ ֆայլերը։';
+        }
 
         let qaCount = document.querySelectorAll('#qa-container .qa-row').length + 1;
         function syncModeLabels() {
@@ -2061,18 +2354,10 @@ input, textarea, select,
                 document.querySelectorAll('.bg-option').forEach(o => o.classList.remove('selected'));
                 document.querySelectorAll('.bg-option input').forEach(i => i.checked = false);
                 document.getElementById("file-name").textContent = input.files[0].name;
-            } else {
+            }  else {
                 document.getElementById('bg-preview-container').style.display = 'none';
                 document.getElementById('remove-bg-btn').style.display = 'none';
-                document.getElementById('remove_background').value = '0';
-        const reader = new FileReader();
-        reader.onload = e => { preview.src = e.target.result; previewContainer.style.display = 'block'; };
-        reader.readAsDataURL(file);
-        document.querySelectorAll('.bg-option').forEach(o => { o.classList.remove('selected'); o.querySelector('input').checked = false; });
-        document.getElementById('remove-bg-btn').style.display = 'inline-flex';
-        document.querySelector('input[name="bg_size_mode"][value="cover"]').checked = true;
-        toggleSizeInputs(true);
-    }
+            }
         }
 
         function addField() {
@@ -2095,7 +2380,7 @@ input, textarea, select,
             </button>
         </div>
         <div class="qa-media-row">
-            <label class="qa-media-label" for="q_media_${qaCount}">📎 Կցել նկար կամ աուդիո</label>
+            <label class="qa-media-label" for="q_media_${qaCount}"><span class="plus-ic"></span>Կցել նկար կամ աուդիո</label>
             <input type="file" id="q_media_${qaCount}" name="q_media_${qaCount}" accept="image/*,audio/*" style="display:none;" onchange="showQMediaName(this)">
             <span class="qa-media-name"></span>
             <button type="button" class="qa-media-clear" onclick="clearQMedia(this)" style="display:none;">✕</button>
@@ -2147,6 +2432,7 @@ input, textarea, select,
             const mediaInput = document.getElementById('global_hint_media');
             const formatInfo = document.getElementById('format-info');
             mediaInput.value = '';
+            clearMediaPreview('hint-preview');
             document.getElementById('media-error').textContent = '';
             if (type === 'text') {
                 textInput.style.display = 'block';
@@ -2179,47 +2465,60 @@ input, textarea, select,
         }
 
         function validateMedia(input) {
-            const file = input.files[0];
-            const errorSpan = document.getElementById('media-error');
-            const fileNameSpan = document.getElementById('hint-file-name');
-            const clearBtn = document.getElementById('hint-file-clear');
-            errorSpan.textContent = '';
-            if (!file) { fileNameSpan.textContent = ""; clearBtn.classList.remove('visible'); return; }
-            else { fileNameSpan.textContent = file.name; clearBtn.classList.add('visible'); }
-            const maxDuration = 30;
-            const hintType = document.getElementById('hint_type').value;
-            const allowedMimeTypes = SUPPORTED_FORMATS[hintType].mimeTypes;
-            const allowedExtensions = SUPPORTED_FORMATS[hintType].extensions;
-            const fileExtension = file.name.split('.').pop().toLowerCase();
-            const isTypeAllowed = allowedMimeTypes.includes(file.type) || allowedExtensions.includes(fileExtension);
-            if (!isTypeAllowed) {
-                errorSpan.textContent = `Ֆայլի ֆորմատը (${fileExtension.toUpperCase()}) թույլատրված չէ։ Աջակցվում է՝ ${allowedExtensions.map(e => e.toUpperCase()).join(', ')}`;
-                input.value = ""; fileNameSpan.textContent = ""; clearBtn.classList.remove('visible'); return;
-            }
-            if (hintType === 'audio' || hintType === 'video') {
-                const url = URL.createObjectURL(file);
-                let media = hintType === 'audio' ? new Audio(url) : document.createElement('video');
-                media.src = url;
-                media.addEventListener('loadedmetadata', function() {
-                    if (media.duration > maxDuration) {
-                        errorSpan.textContent = `Ֆայլը պետք է լինի մինչև ${maxDuration} վայրկյան։`;
-                        input.value = ""; fileNameSpan.textContent = ""; clearBtn.classList.remove('visible');
-                    }
-                    URL.revokeObjectURL(url);
-                });
-                media.addEventListener('error', function() {
-                    errorSpan.textContent = "Ֆայլի բեռնման սխալ կամ անվավեր ֆորմատ։";
-                    input.value = ""; fileNameSpan.textContent = ""; clearBtn.classList.remove('visible');
-                });
-            }
-        }
+    const file = input.files[0];
+    const errorSpan = document.getElementById('media-error');
+    const fileNameSpan = document.getElementById('hint-file-name');
+    const clearBtn = document.getElementById('hint-file-clear');
+    errorSpan.textContent = '';
+    clearMediaPreview('hint-preview');
+    if (!file) { fileNameSpan.textContent = ""; clearBtn.classList.remove('visible'); return; }
+        if (file.size > MAX_UPLOAD_BYTES) {
+        errorSpan.textContent = tooBigMsg(file);
+        showAiLimitNotice(tooBigMsg(file));
+        input.value = ""; fileNameSpan.textContent = ""; clearBtn.classList.remove('visible');
+        return;
+    }
+    fileNameSpan.textContent = file.name; clearBtn.classList.add('visible');
 
+    const maxDuration = 30;
+    const hintType = document.getElementById('hint_type').value;
+    const allowedMimeTypes = SUPPORTED_FORMATS[hintType].mimeTypes;
+    const allowedExtensions = SUPPORTED_FORMATS[hintType].extensions;
+    const fileExtension = file.name.split('.').pop().toLowerCase();
+    const isTypeAllowed = allowedMimeTypes.includes(file.type) || allowedExtensions.includes(fileExtension);
+    if (!isTypeAllowed) {
+        errorSpan.textContent = `Ֆայլի ֆորմատը (${fileExtension.toUpperCase()}) թույլատրված չէ։ Աջակցվում է՝ ${allowedExtensions.map(e => e.toUpperCase()).join(', ')}`;
+        input.value = ""; fileNameSpan.textContent = ""; clearBtn.classList.remove('visible'); return;
+    }
+
+    renderMediaPreview('hint-preview', URL.createObjectURL(file), hintType);
+
+    if (hintType === 'audio' || hintType === 'video') {
+        const url = URL.createObjectURL(file);
+        const media = hintType === 'audio' ? new Audio() : document.createElement('video');
+        media.src = url;
+        media.addEventListener('loadedmetadata', function () {
+            if (media.duration > maxDuration) {
+                errorSpan.textContent = `Ֆայլը պետք է լինի մինչև ${maxDuration} վայրկյան։`;
+                input.value = ""; fileNameSpan.textContent = ""; clearBtn.classList.remove('visible');
+                clearMediaPreview('hint-preview');
+            }
+            URL.revokeObjectURL(url);
+        });
+        media.addEventListener('error', function () {
+            errorSpan.textContent = "Ֆայլի բեռնման սխալ կամ անվավեր ֆորմատ։";
+            input.value = ""; fileNameSpan.textContent = ""; clearBtn.classList.remove('visible');
+            clearMediaPreview('hint-preview');
+        });
+    }
+}
         function clearHintFile() {
             const input = document.getElementById('global_hint_media');
             input.value = "";
             document.getElementById('hint-file-name').textContent = "";
             document.getElementById('media-error').textContent = "";
             document.getElementById('hint-file-clear').classList.remove('visible');
+            clearMediaPreview('hint-preview');
         }
 
         let pendingDeleteBtn = null;
@@ -2239,6 +2538,8 @@ input, textarea, select,
             if (allRows.length === 1 || wrapper.querySelector("label").textContent.trim() === "1.") {
                 wrapper.querySelector(`[name^="question_"]`).value = "";
                 wrapper.querySelector(`[name^="answer_"]`).value = "";
+                const clr = wrapper.parentNode.querySelector('.qa-media-clear');
+                if (clr) clearQMedia(clr);
             } else {
                 wrapper.parentNode.remove();
                 updateLabels();
@@ -2257,6 +2558,8 @@ input, textarea, select,
         row.querySelector('label').textContent = `${qaCount}.`;
         row.querySelector(`[name^="question_"]`).name = `question_${qaCount}`;
         row.querySelector(`[name^="answer_"]`).name = `answer_${qaCount}`;
+        row.querySelector(`[name^="question_"]`).placeholder = `Հարց ${qaCount}`;
+        row.querySelector(`[name^="answer_"]`).placeholder = `Պատասխան ${qaCount}`;
         const media = wrapper.querySelector(`[name^="q_media_"]`);
         if (media) { media.name = `q_media_${qaCount}`; media.id = `q_media_${qaCount}`; }
         const lbl = wrapper.querySelector('.qa-media-label');
@@ -2395,15 +2698,24 @@ input, textarea, select,
                 }
             });
 
-            /* ---- Հարց / Պատասխան ---- */
+                        /* ---- Հարց / Պատասխան ---- */
+            /* Հարցը կարող է լինել տեքստ ԿԱՄ կցված նկար/աուդիո, պատասխանը՝ պարտադիր */
             document.querySelectorAll('#qa-container .qa-row').forEach(function (row) {
+                var wrapper = row.parentNode;
                 var q = row.querySelector('[name^="question_"]');
                 var a = row.querySelector('[name^="answer_"]');
-                var errorSpan = row.parentNode.querySelector('.error-message');
-                if (!q.value.trim() || !a.value.trim()) {
+                var media = wrapper.querySelector('input[type="file"][name^="q_media_"]');
+                var hasMedia = !!(media && media.files && media.files.length);
+                var errorSpan = wrapper.querySelector('.error-message');
+
+                if (!q.value.trim() && !hasMedia) {
+                    if (errorSpan) errorSpan.textContent = "Գրեք հարցը կամ կցեք նկար/աուդիո";
+                    valid = false;
+                    if (!firstBad) firstBad = q;
+                } else if (!a.value.trim()) {
                     if (errorSpan) errorSpan.textContent = REQUIRED_MSG;
                     valid = false;
-                    if (!firstBad) firstBad = !q.value.trim() ? q : a;
+                    if (!firstBad) firstBad = a;
                 }
             });
 
@@ -2429,6 +2741,147 @@ input, textarea, select,
             if (!valid) scrollToError(firstBad);
             return valid;
         }
+        let creatingCrossword = false;
+
+async function handleCreateSubmit(e) {
+    e.preventDefault();                     // միշտ կանգնեցնում ենք, ինքներս ենք ուղարկելու
+        if (creatingCrossword) return;
+    if (!validateForm()) return;
+
+    const totalBytes = totalUploadBytes(cwForm);
+    if (totalBytes > MAX_UPLOAD_BYTES) {
+        showAiLimitNotice(totalTooBigMsg(totalBytes));
+        return;                              // ձևը չենք ուղարկում
+    }
+
+    const rows = Array.from(document.querySelectorAll('#qa-container .qa-row'));
+    const questions = rows.map(row => ({
+        q: row.querySelector('[name^="question_"]').value.trim(),
+        a: row.querySelector('[name^="answer_"]').value.trim().toUpperCase()
+    }));
+        const kwInput = document.querySelector('input[name="keyword"]');
+    const keyword = kwInput ? kwInput.value.trim() : '';
+
+    // Բանալի բառով խաչբառ → նախ ստուգում ենք, որ պատասխանները պարունակեն բանալի բառի տառերը
+    if (keyword) {
+        const mismatches = findKeywordMismatches(questions, keyword);
+        if (mismatches.length) {
+            showKeywordMismatch(rows, mismatches, keyword);
+            return;                              // ձևը չենք ուղարկում, ոչինչ չենք դատարկում
+        }
+    }
+
+    creatingCrossword = true;
+    let skipped = [];
+    try {
+        const res = await fetch("{{ url_for('check_crossword') }}", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ questions: questions, keyword: keyword })
+        });
+        if (res.ok) {
+            const data = await res.json();
+            skipped = data.skipped || [];
+        }
+    } catch (err) {
+        console.error('check_crossword failed', err);   // ստուգումը չստացվեց → ուղարկում ենք սովորական ձևով
+    }
+
+    if (skipped.length) {
+        creatingCrossword = false;
+        clearSkippedRows(rows, skipped);
+        return;
+    }
+
+    leaving = true;
+    cwForm.submit();                        // .submit()-ը onsubmit-ը նորից չի կանչում
+}
+
+function clearSkippedRows(rows, skipped) {
+    let firstRow = null;
+    const lines = skipped.map(s => {
+        const row = rows[s.idx];
+        if (row) {
+            const wrapper = row.parentNode;
+            row.querySelector('[name^="question_"]').value = '';
+            row.querySelector('[name^="answer_"]').value = '';
+            const clr = wrapper.querySelector('.qa-media-clear');
+            if (clr) clearQMedia(clr);
+            const err = wrapper.querySelector('.error-message');
+            if (err) err.textContent = 'Այս պատասխանը չէր հատվում մյուս բառերի հետ։ Գրեք նոր հարց/պատասխան։';
+            if (!firstRow) firstRow = row;
+        }
+        const qText = s.q ? escapeHtml(s.q) : '(նկար/աուդիո)';
+        return '<li>' + qText + ' — <strong>' + escapeHtml(s.a) + '</strong></li>';
+    });
+
+    formDirty = true;
+    showAiLimitNotice(
+    '<p>Հետևյալ հարցերը չեն կարող ներառվել խաչբառում, քանի որ դրանց պատասխանները ' +
+    'ընդհանուր տառ չունեն մյուս բառերի հետ․  </p>' +
+    '<ul>' + lines.join('') + '</ul>' +
+    '<p>Այդ տողերը դատարկվել են. լրացրե՛ք նոր հարց/պատասխան և նորից սեղմե՛ք «Ստեղծել»։</p>',
+    true
+);
+
+    if (firstRow) {
+        const q = firstRow.querySelector('[name^="question_"]');
+        setTimeout(() => scrollToError(q), 300);
+    }
+}
+
+/* ───────── Բանալի բառի տառերի ստուգում ─────────
+   N-րդ պատասխանը պետք է պարունակի բանալի բառի N-րդ տառը */
+function findKeywordMismatches(questions, keyword) {
+    const letters = Array.from((keyword || '').toUpperCase());
+    const result = [];
+    questions.forEach((item, i) => {
+        const letter = letters[i];
+        if (!letter) return;
+        if (!(item.a || '').includes(letter)) {
+            result.push({ idx: i, q: item.q, a: item.a, letter: letter });
+        }
+    });
+    return result;
+}
+
+function showKeywordMismatch(rows, mismatches, keyword) {
+    let firstBad = null;
+
+    // Կարմիր տեքստ՝ համապատասխան տողերի տակ (տողերը ՉԵՆՔ դատարկում)
+        mismatches.forEach(m => {
+        const row = rows[m.idx];
+        if (!row) return;
+        const err = row.parentNode.querySelector('.error-message');
+        if (err) err.textContent = 'Այս պատասխանում չկա բանալի բառի «' + m.letter + '» տառը։';
+        if (!firstBad) firstBad = row.querySelector('[name^="answer_"]');
+    });
+
+        // Կարմիր տեքստ՝ բանալի բառի դաշտի տակ
+    const kwInput = document.querySelector('input[name="keyword"]');
+    const kwErr = kwInput ? kwInput.nextElementSibling : null;
+    if (kwErr && kwErr.classList.contains('error-message')) {
+        kwErr.innerHTML = buildKeywordInlineError(keyword, mismatches);
+    }
+
+    showAiLimitNotice(buildKeywordMismatchHtml(keyword, mismatches, 'Ստեղծել'), true);
+
+    setTimeout(() => scrollToError(kwInput || firstBad), 300);
+}
+
+// Բանալի բառը կամ պատասխանը փոխելիս կարմիր տեքստը մաքրվում է
+document.addEventListener('input', function (e) {
+    const t = e.target;
+    if (t.name === 'keyword') {
+        const err = t.nextElementSibling;
+        if (err && err.classList.contains('error-message')) err.textContent = '';
+    } else if (t.name && t.name.indexOf('answer_') === 0) {
+        const wrap = t.closest('.qa-row') && t.closest('.qa-row').parentNode;
+        const err = wrap ? wrap.querySelector(':scope > .error-message') : null;
+        if (err) err.textContent = '';
+    }
+});
 
         document.getElementById("bg_upload").addEventListener("change", function() {
             const fileNameSpan = document.getElementById("file-name");
@@ -2440,11 +2893,14 @@ input, textarea, select,
             }
         });
 
-function showAiLimitNotice(msg){
-            const box = document.querySelector('#ai-notice-overlay .ai-notice-text');
-            if (box) box.innerHTML = '<p>' + msg + '</p>';
-            document.getElementById('ai-notice-overlay').classList.add('active');
-        }
+function showAiLimitNotice(msg, wide){
+    const box  = document.querySelector('#ai-notice-overlay .ai-notice-box');
+    const text = document.querySelector('#ai-notice-overlay .ai-notice-text');
+    if (box) box.classList.toggle('wide', !!wide);
+    // <ul>-ը <p>-ի մեջ չի կարող լինել, դրա համար div ենք օգտագործում
+    if (text) text.innerHTML = '<div>' + msg + '</div>';
+    document.getElementById('ai-notice-overlay').classList.add('active');
+}
         function closeAiNotice(){
             document.getElementById('ai-notice-overlay').classList.remove('active');
         }
@@ -2456,12 +2912,27 @@ function showAiLimitNotice(msg){
         function escapeHtml(str) {
     return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
+function autoGrow(t){
+    const max = t.classList.contains('title-field') ? 180 : Infinity;
+    t.style.height = 'auto';
+    const full = t.scrollHeight + (t.offsetHeight - t.clientHeight);
+    t.style.height = Math.min(full, max) + 'px';
+    if (max !== Infinity) t.style.overflowY = full > max ? 'auto' : 'hidden';
+}
 
 async function generateAIQuestions() {
     const topic = document.getElementById('ai_topic').value.trim();
     const countRaw = parseInt(document.getElementById('ai_count').value);
-    if (!topic) { alert('Խնդրում ենք մուտքագրել թեման։'); return; }
-    if (!countRaw || countRaw < 1) { alert('Խնդրում ենք նշել հարցերի թիվը։'); return; }
+        if (!topic) {
+        showAiLimitNotice('Խնդրում ենք մուտքագրել թեման։');
+        document.getElementById('ai_topic').focus();
+        return;
+    }
+    if (!countRaw || countRaw < 1) {
+        showAiLimitNotice('Խնդրում ենք նշել հարցերի թիվը։');
+        document.getElementById('ai_count').focus();
+        return;
+    }
 
     const existing = document.querySelectorAll('#qa-container .qa-row').length;
     const remaining = 40 - existing;
@@ -2485,23 +2956,32 @@ async function generateAIQuestions() {
     spinner.style.display = "block";
     btnText.textContent = "Ստեղծվում է...";
     statusBox.style.display = "flex";
-    statusBox.style.color = "#8e3aad";
+    statusBox.style.color = "#000";
     statusText.textContent = countRaw + " հարց ստեղծվում է «" + topic + "» թեմայով...";
     try {
         const res = await fetch("{{ url_for('ai_questions_for_edit') }}", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ topic: topic, count: countRaw })
+                        body: JSON.stringify({
+                topic: topic,
+                count: countRaw,
+                existing: Array.from(document.querySelectorAll('#qa-container [name^="answer_"]'))
+                    .map(el => ({ answer: el.value.trim().toUpperCase() }))
+                    .filter(x => x.answer)
+            })
         });
         if (!res.ok) { const errText = await res.text(); throw new Error(`HTTP ${res.status}: ${errText}`); }
         const data = await res.json();
-        if (data.error) { alert(data.error); statusBox.style.display = "none"; return; }
+        if (data.error) { showAiLimitNotice(escapeHtml(data.error)); statusBox.style.display = "none"; return; }
         if (!data.pairs || !data.pairs.length) { throw new Error('Հարց-պատասխան զույգ չստացվեց'); }
-        renderAiResults(data.pairs);
+                renderAiResults(data.pairs);
+        if (data.pairs.length < countRaw) {
+            showAiLimitNotice(`Ստեղծվեց ${data.pairs.length} հարց ${countRaw}-ի փոխարեն. մնացածը կրկնվում էին կամ անվավեր էին։ Կարող եք նորից սեղմել «Ստեղծել»։`);
+        }
         statusBox.style.display = "none";
     } catch (err) {
         console.error(err);
-        alert("Սխալ AI հարցեր ստեղծելիս: " + (err.message || err));
+        showAiLimitNotice('Սխալ ԱԲ հարցեր ստեղծելիս։ Խնդրում ենք փորձել կրկին։');
         statusBox.style.display = "none";
     } finally {
         btn.disabled = false;
@@ -2513,54 +2993,110 @@ async function generateAIQuestions() {
 function renderAiResults(pairs) {
     const container = document.getElementById('ai-results');
     container.innerHTML = '';
-    if (pairs.length > 1) {
-        const row = document.createElement('div');
-        row.className = 'ai-results-actions';
-        const addAll = document.createElement('button');
-        addAll.type = 'button'; addAll.className = 'ai-bulk-add-btn';
-        addAll.textContent = `Ավելացնել բոլորը (${pairs.length})`;
-        addAll.onclick = () => {
-            pairs.forEach(p => {
-                if (document.querySelectorAll('#qa-container .qa-row').length >= 40) return;
-                addSingleAiQuestion(p.question, p.answer);
-            });
-            container.innerHTML = '';
-        };
-        const clr = document.createElement('button');
-        clr.type = 'button'; clr.className = 'ai-bulk-clear-btn';
-        clr.textContent = 'Ջնջել բոլորը';
-        clr.onclick = () => { container.innerHTML = ''; };
-        row.appendChild(addAll); row.appendChild(clr); container.appendChild(row);
-    }
+
+    // ── Վերևի կոճակներ (Ավելացնել բոլորը / Ջնջել բոլորը) ──
+    const actions = document.createElement('div');
+    actions.className = 'ai-results-actions';
+
+    const addAll = document.createElement('button');
+    addAll.type = 'button';
+    addAll.className = 'ai-bulk-add-btn';
+    addAll.onclick = () => {
+        // Միայն այն քարտերը, որոնք դեռ էկրանին են
+        const cards = Array.from(container.querySelectorAll('.ai-result-card'));
+        for (const card of cards) {
+            if (document.querySelectorAll('#qa-container .qa-row').length >= 40) {
+                showAiLimitNotice('Հասել եք 40 հարցի սահմանաչափին։ Մնացած հարցերը չավելացվեցին։');
+                break;
+            }
+            addSingleAiQuestion(card._pair.question, card._pair.answer);
+            card.remove();
+        }
+        formDirty = true;
+        refreshAiActions();
+    };
+
+    const clearAll = document.createElement('button');
+    clearAll.type = 'button';
+    clearAll.className = 'ai-bulk-clear-btn';
+    clearAll.textContent = 'Ջնջել բոլորը';
+    clearAll.onclick = () => { container.innerHTML = ''; };
+
+    actions.appendChild(addAll);
+    actions.appendChild(clearAll);
+    container.appendChild(actions);
+
+    // ── Քարտերը ──
     pairs.forEach(pair => {
         const card = document.createElement('div');
         card.className = 'ai-result-card';
+        card._pair = { question: pair.question, answer: pair.answer };   // զույգը պահում ենք քարտի վրա
         card.innerHTML = `<div class="ai-q">${escapeHtml(pair.question)}</div><div class="ai-a">${escapeHtml(pair.answer)}</div>`;
+
         const btnRow = document.createElement('div');
         btnRow.className = 'ai-card-actions';
+
         const addBtn = document.createElement('button');
-        addBtn.type = 'button'; addBtn.className = 'ai-add-this'; addBtn.textContent = 'Ավելացնել';
+        addBtn.type = 'button';
+        addBtn.className = 'ai-add-this';
+        addBtn.textContent = 'Ավելացնել';
         addBtn.onclick = () => {
             if (document.querySelectorAll('#qa-container .qa-row').length >= 40) {
                 showAiLimitNotice('Հասել եք 40 հարցի սահմանաչափին։');
                 return;
             }
-            addSingleAiQuestion(pair.question, pair.answer);
-            card.style.opacity = '0';
-            setTimeout(() => card.remove(), 200);
+            addSingleAiQuestion(card._pair.question, card._pair.answer);
+            formDirty = true;
+            removeAiCard(card);
         };
+
         const delBtn = document.createElement('button');
-        delBtn.type = 'button'; delBtn.className = 'ai-del-this'; delBtn.textContent = 'Ջնջել';
-        delBtn.onclick = () => card.remove();
-        btnRow.appendChild(addBtn); btnRow.appendChild(delBtn); card.appendChild(btnRow);
+        delBtn.type = 'button';
+        delBtn.className = 'ai-del-this';
+        delBtn.textContent = 'Ջնջել';
+        delBtn.onclick = () => removeAiCard(card);
+
+        btnRow.appendChild(addBtn);
+        btnRow.appendChild(delBtn);
+        card.appendChild(btnRow);
         container.appendChild(card);
     });
+
+    refreshAiActions();
+}
+
+// Քարտը հեռացնում է անիմացիայով և թարմացնում վերևի կոճակները
+function removeAiCard(card) {
+    card.style.opacity = '0';
+    card.style.pointerEvents = 'none';           // կրկնակի սեղմումից պաշտպանություն
+    setTimeout(() => {
+        card.remove();
+        refreshAiActions();
+    }, 200);
+}
+
+// Թարմացնում է «Ավելացնել բոլորը (N)»-ը, իսկ քարտ չմնալու դեպքում մաքրում ամբողջ բաժինը
+function refreshAiActions() {
+    const container = document.getElementById('ai-results');
+    if (!container) return;
+    const left = container.querySelectorAll('.ai-result-card').length;
+    const actions = container.querySelector('.ai-results-actions');
+
+    if (left === 0) {
+        container.innerHTML = '';                // հարց չմնաց → կոճակներն էլ անհետանում են
+        return;
+    }
+    if (actions) {
+        actions.style.display = left > 1 ? 'flex' : 'none';   // 1 քարտի դեպքում խմբային կոճակներ պետք չեն
+        const addAll = actions.querySelector('.ai-bulk-add-btn');
+        if (addAll) addAll.textContent = `Ավելացնել բոլորը (${left})`;
+    }
 }
 
 function addSingleAiQuestion(question, answer) {
     const container = document.getElementById("qa-container");
     const q = (question || '').trim();
-    const a = (answer || '').trim().toUpperCase().replace(/[^Ա-ՖA-Z]/g, '');
+    const a = (answer || '').trim().toUpperCase().replace(NOT_LETTER_RE, '');
     if (!q || !a) return;
     const div = document.createElement("div");
     div.innerHTML = `
@@ -2573,50 +3109,19 @@ function addSingleAiQuestion(question, answer) {
         </button>
     </div>
     <div class="qa-media-row">
-        <label class="qa-media-label" for="q_media_${qaCount}">📎 Կցել նկար կամ աուդիո</label>
+        <label class="qa-media-label" for="q_media_${qaCount}"><span class="plus-ic"></span>Կցել նկար կամ աուդիո</label>
         <input type="file" id="q_media_${qaCount}" name="q_media_${qaCount}" accept="image/*,audio/*" style="display:none;" onchange="showQMediaName(this)">
         <span class="qa-media-name"></span>
         <button type="button" class="qa-media-clear" onclick="clearQMedia(this)" style="display:none;">✕</button>
         <div class="qa-media-preview"></div>
     </div>
     <span class="error-message"></span>`;
-    container.appendChild(div);
+        container.appendChild(div);
+    div.querySelectorAll('textarea').forEach(autoGrow);   // ← ՆՈՐ
     qaCount++;
 }
 
-        function addQuestionsToForm(pairs) {
-            const container = document.getElementById("qa-container");
-            pairs.forEach(pair => {
-                if (document.querySelectorAll('#qa-container .qa-row').length >= 40) { return; }
-                if (!pair.question || !pair.answer) { console.warn("Բաց թողնված հարց կամ պատասխան", pair); return; }
-                const questionText = pair.question.trim();
-                const answerText = pair.answer.trim();
-                if (questionText === "" || answerText === "") { console.warn("Դատարկ արժեք AI-ից", pair); return; }
-                const div = document.createElement("div");
-                div.innerHTML = `
-    <div class="qa-row">
-        <label>${qaCount}.</label>
-        <textarea name="question_${qaCount}" required>${questionText}</textarea>
-        <textarea name="answer_${qaCount}" required>${answerText}</textarea>
-                <button type="button" class="delete-btn" onclick="removeField(this)">
-            <svg width="39" height="39" viewBox="0 0 39 39" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M19.7533 17.0624L26.1858 10.6298L28.8442 13.2882L22.4116 19.7207L29.0083 26.3174L26.3171 29.0086L19.7204 22.4119L13.2879 28.8445L10.6295 26.1861L17.0621 19.7536L10.4326 13.1241L13.1238 10.4329L19.7533 17.0624Z" fill="#FF4343"/>
-            </svg>
-        </button>
-    </div>
-    <div class="qa-media-row">
-        <label class="qa-media-label" for="q_media_${qaCount}">📎 Կցել նկար կամ աուդիո</label>
-        <input type="file" id="q_media_${qaCount}" name="q_media_${qaCount}" accept="image/*,audio/*" style="display:none;" onchange="showQMediaName(this)">
-        <span class="qa-media-name"></span>
-        <button type="button" class="qa-media-clear" onclick="clearQMedia(this)" style="display:none;">✕</button>
-        <div class="qa-media-preview"></div>
-    </div>
-    <span class="error-message"></span>
-`;
-                container.appendChild(div);
-                qaCount++;
-            });
-        }
+
 
         function renderQMediaPreview(preview, file) {
     if (!preview) return;
@@ -2630,13 +3135,31 @@ function addSingleAiQuestion(question, answer) {
         const audio = document.createElement('audio');
         audio.controls = true; audio.src = url; audio.className = 'qa-media-audio';
         preview.appendChild(audio);
-    } else {
-        const img = document.createElement('img');
-        img.src = url; img.className = 'qa-media-thumb'; img.alt = '';
-        preview.appendChild(img);
+    }
+    else {
+    const img = document.createElement('img');
+    img.src = url; img.className = 'qa-media-thumb'; img.alt = '';
+    img.title = 'Սեղմեք՝ մեծացնելու համար';
+    img.addEventListener('click', () => openImgLightbox(url));
+    preview.appendChild(img);
+}
+}
+function openImgLightbox(src) {
+    document.getElementById('imgLightboxImg').src = src;
+    document.getElementById('imgLightbox').classList.add('active');
+}
+function closeImgLightbox(e, force) {
+    // Փակվի միայն ֆոնի կամ ✕ կոճակի վրա սեղմելիս, ոչ թե նկարի
+    if (force || e.target.id === 'imgLightbox') {
+        document.getElementById('imgLightbox').classList.remove('active');
+        document.getElementById('imgLightboxImg').src = '';
     }
 }
-
+document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') {
+        document.getElementById('imgLightbox').classList.remove('active');
+    }
+});
         function showQMediaName(input) {
     const row = input.closest('.qa-media-row');
     const nameSpan = row.querySelector('.qa-media-name');
@@ -2665,6 +3188,9 @@ function clearQMedia(btn) {
 
         function toggleKeywordMaterialInput() {
             const type = document.getElementById('keyword_material_type').value;
+            clearKeywordFile();   // տեսակը փոխելիս հին ֆայլն ու նախադիտումը մաքրվում են
+                const linkInp = document.querySelector('input[name="keyword_material_link"]');
+                renderLinkPreview('km-link-preview', type === 'link' && linkInp ? linkInp.value : '');
             document.getElementById('keyword_text_input').style.display  = type === 'text'  ? 'block' : 'none';
             document.getElementById('keyword_media_input').style.display = (type === 'image' || type === 'video') ? 'block' : 'none';
             document.getElementById('keyword_link_input').style.display  = type === 'link'  ? 'block' : 'none';
@@ -2683,18 +3209,30 @@ function clearQMedia(btn) {
         }
 
         function updateKeywordFileName() {
-            const input = document.getElementById('keyword_material_file');
-            const hasFile = input.files.length > 0;
-            const fileName = hasFile ? input.files[0].name : "";
-            document.getElementById('keyword-file-name').textContent = fileName;
-            document.getElementById('keyword-file-clear').classList.toggle('visible', hasFile);
-        }
+    const input = document.getElementById('keyword_material_file');
+    const f = input.files[0];
+    if (f && f.size > MAX_UPLOAD_BYTES) {
+        showAiLimitNotice(tooBigMsg(f));
+        clearKeywordFile();                 // մերժում ենք կցումը
+        return;
+    }
+    const hasFile = input.files.length > 0;
+    document.getElementById('keyword-file-name').textContent = hasFile ? input.files[0].name : "";
+    document.getElementById('keyword-file-clear').classList.toggle('visible', hasFile);
+    if (hasFile) {
+        const type = document.getElementById('keyword_material_type').value;
+        renderMediaPreview('km-preview', URL.createObjectURL(input.files[0]), type === 'video' ? 'video' : 'image');
+    } else {
+        clearMediaPreview('km-preview');
+    }
+}
 
         function clearKeywordFile() {
             const input = document.getElementById('keyword_material_file');
             input.value = "";
             document.getElementById('keyword-file-name').textContent = "";
             document.getElementById('keyword-file-clear').classList.remove('visible');
+                clearMediaPreview('km-preview');
         }
          /* ===== Select-երի սլաքի պտույտ ===== */
         /* ===== Տառաչափ / Տառատեսակ dropdown ===== */
@@ -2731,17 +3269,36 @@ function clearQMedia(btn) {
         });
 
         function enforceUppercaseLettersOnly(element) {
-            element.value = element.value.toUpperCase().replace(/[^Ա-ՖA-Z]/g, '');
+            element.value = element.value.toUpperCase().replace(NOT_LETTER_RE, '');
         }
 
-        document.addEventListener("input", function(e) {
+            document.addEventListener("input", function(e) {
             if (e.target.name && e.target.name.startsWith("answer_")) { enforceUppercaseLettersOnly(e.target); }
             if (e.target.name === "keyword") { enforceUppercaseLettersOnly(e.target); }
-            if (e.target.tagName === "TEXTAREA" && e.target.name !== "title") {
-                e.target.style.height = "auto";
-                e.target.style.height = (e.target.scrollHeight) + "px";
+            if (e.target.tagName === "TEXTAREA") {
+                autoGrow(e.target);
             }
         });
+
+                // Վերնագիր և ԱԲ թեմա՝ մեկ տողանի իմաստով դաշտեր
+        document.querySelectorAll('.title-field').forEach(function (t) {
+            t.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    // ԱԲ թեմայի դաշտում Enter → միանգամից «Ստեղծել»
+                    if (t.id === 'ai_topic') generateAIQuestions();
+                }
+            });
+            // Տեղադրված (paste) տեքստի տողադարձերը դարձնում ենք բացատ
+            t.addEventListener('paste', function () {
+                setTimeout(function () {
+                    t.value = t.value.replace(/\s*\n\s*/g, ' ');
+                    autoGrow(t);
+                }, 0);
+            });
+            autoGrow(t);
+        });
+
         document.addEventListener('keydown', function (e) {
     const t = e.target;
     if (t.tagName !== 'TEXTAREA' || !t.name) return;
@@ -2774,7 +3331,7 @@ function clearQMedia(btn) {
             event.persisted ||
             (navEntries.length && navEntries[0].type === 'back_forward');
         if (isBackForward) {
-            window.location.replace('https://mainlogin.dshh.am:15107/Materials/Crosswords');
+            window.location.replace('{{ MAINLOGIN_PUBLIC }}/Materials/Crosswords');
         }
     });
     })();
@@ -2789,7 +3346,7 @@ let draftBusy = false;          // ← ՆՈՐ: կողպում է ամբողջ ը
 const cwForm = document.querySelector('.form-section');
 
 cwForm.addEventListener('input', () => { formDirty = true; });
-cwForm.addEventListener('submit', () => { leaving = true; });
+cwForm.addEventListener('submit', (e) => { if (!e.defaultPrevented) leaving = true; });
 
 let draftIdInput = document.createElement('input');
 draftIdInput.type = 'hidden';
@@ -2798,8 +3355,26 @@ cwForm.appendChild(draftIdInput);
 
 async function saveDraft(then) {
     if (savingDraft) return false;   // արդեն ընթացքի մեջ է
+        if (creatingCrossword && !then) return false;   // վերջնական ստեղծումն ընթացքի մեջ է
+
     savingDraft = true;
-    const fd = new FormData(cwForm);
+
+    // Զգուշացնում ենք միայն այն դեպքում, երբ օգտատերն ինքն է պահպանում,
+    // ոչ թե ֆոնային ավտո-պահման ժամանակ
+    const notify = (msg) => { if (then || draftBusy) showAiLimitNotice(msg); };
+
+        const fd = new FormData(cwForm);
+    // save_draft-ը այս ֆայլերը չի պահում → իզուր չենք ուղարկում
+    fd.delete('global_hint_media');
+    fd.delete('keyword_material_file');
+
+    let draftBytes = 0;
+    fd.forEach(v => { if (v instanceof File) draftBytes += v.size; });
+    if (draftBytes > MAX_UPLOAD_BYTES) {
+        notify(totalTooBigMsg(draftBytes));   // ֆոնային պահման ժամանակ լուռ է
+        savingDraft = false;
+        return false;
+    }
     try {
         const res = await fetch("{{ url_for('save_draft') }}", {
             method: 'POST',
@@ -2807,9 +3382,8 @@ async function saveDraft(then) {
             credentials: 'same-origin'
         });
         if (!res.ok) {
-            const t = await res.text();
-            console.error('save_draft HTTP', res.status, t);
-            alert('Չհաջողվեց պահպանել սևագիրը (կոդ՝ ' + res.status + ')');
+            console.error('save_draft HTTP', res.status, await res.text());
+            notify('Չհաջողվեց պահպանել սևագիրը (կոդ՝ ' + res.status + ')։');
             return false;
         }
         const data = await res.json();
@@ -2820,11 +3394,11 @@ async function saveDraft(then) {
             if (then) { leaving = true; window.location.href = then; }
             return true;
         }
-        alert('Սխալ՝ ' + (data.error || 'անհայտ'));
+        notify('Սխալ սևագիրը պահպանելիս՝ ' + escapeHtml(data.error || 'անհայտ'));
         return false;
     } catch (e) {
         console.error('draft save failed', e);
-        alert('Ցանցային սխալ սևագիրը պահպանելիս');
+        notify('Ցանցային սխալ սևագիրը պահպանելիս։ Ստուգեք կապը և փորձեք կրկին։');
         return false;
     } finally {
         savingDraft = false;
@@ -2838,18 +3412,17 @@ async function saveDraftManual() {
     leaving = true;                 // ← auto-save-ը այլևս չմիանա
     const ok = await saveDraft();
     if (ok) {
-        window.location.href = 'https://mainlogin.dshh.am:15107/Materials/Crosswords';
+        window.location.href = '{{ MAINLOGIN_PUBLIC }}/Materials/Crosswords';
     } else {
         draftBusy = false;          // սխալ եղավ → թույլ ենք տալիս նորից փորձել
         leaving = false;
     }
 }
 
-// ⏱ Ավտո-պահում՝ ամեն 10 վրկ, միայն եթե բան է փոխվել ԵՎ ոչ մի պահում ընթացքի մեջ չէ
 setInterval(() => {
-    if (formDirty && !leaving && !savingDraft && !draftBusy) saveDraft();
+    // «Ստեղծել»-ի ընթացքում (creatingCrossword) ավտոպահում չենք անում
+    if (formDirty && !leaving && !savingDraft && !draftBusy && !creatingCrossword) saveDraft();
 }, 10000);
-
 // Ներքին հղումների վրա սեղմելիս՝ հարցնում ենք
 document.querySelectorAll('a[href]').forEach(a => {
     a.addEventListener('click', function (e) {
@@ -2868,6 +3441,93 @@ window.addEventListener('beforeunload', function (e) {
 function draftYes()    { document.getElementById('draft-overlay').classList.remove('active'); saveDraft(pendingHref); }
 function draftNo()     { leaving = true; document.getElementById('draft-overlay').classList.remove('active'); window.location.href = pendingHref; }
 function draftCancel() { pendingHref = null; document.getElementById('draft-overlay').classList.remove('active'); }
+
+/* ───────── Բանալի բառի դաշտի տակի կարմիր տեքստը ───────── */
+function buildKeywordInlineError(keyword, items) {
+    const many = items.length > 1;
+    return 'Բանալի բառը չի հատվում ' + (many ? 'պատասխանների' : 'պատասխանի') + ' հետ։';
+}
+  /* ───────── Բանալի բառի անհամապատասխանության ծանուցում ───────── */
+function buildKeywordMismatchHtml(keyword, items, btnName) {
+    const many = items.length > 1;
+    const head = many
+        ? 'չի հատվում հետևյալ հարցերի պատասխանների հետ․  '
+        : 'չի հատվում հետևյալ հարցի պատասխանի հետ․  ';
+
+        const lines = items.map(m =>
+        '<li>' + (m.idx + 1) + '. <strong>' + escapeHtml(m.a) + '</strong> ' +
+        '(պատասխանը պետք է պարունակի «<strong>' + escapeHtml(m.letter) + '</strong>» տառը)</li>'
+    ).join('');
+
+    return '<p>Բանալի բառը՝ <strong>' + escapeHtml(keyword) + '</strong>, ' + head + '</p>' +
+           '<ul>' + lines + '</ul>' +
+           '<p>Բանալի բառի տառերի հերթականությունը համապատասխանում է հարցերի հերթականությանը․  ' +
+           '1-ին տառը վերցվում է 1-ին հարցի պատասխանից, 2-րդ տառը՝ 2-րդ հարցի պատասխանից և այդպես շարունակ։</p>' +
+           '<p>Փոխե՛ք բանալի բառը, ' +
+           (many ? 'համապատասխան հարցերի պատասխանները' : 'համապատասխան հարցի պատասխանը') +
+           ' կամ հարցերի հերթականությունը, ապա կրկին սեղմե՛ք «' + btnName + '» կոճակը։</p>';
+}
+/* ───────── Նախադիտում՝ նկար / աուդիո / վիդեո / հղում ───────── */
+function renderMediaPreview(boxId, src, kind) {
+    const box = document.getElementById(boxId);
+    if (!box) return;
+    box.innerHTML = '';
+    if (!src) { box.style.display = 'none'; return; }
+
+    let el;
+    if (kind === 'image') {
+        el = document.createElement('img');
+        el.src = src; el.className = 'mp-img'; el.alt = '';
+        el.title = 'Սեղմեք՝ մեծացնելու համար';
+        el.addEventListener('click', () => openImgLightbox(src));
+    } else if (kind === 'audio') {
+        el = document.createElement('audio');
+        el.controls = true; el.src = src; el.className = 'mp-audio';
+    } else if (kind === 'video' || kind === 'animation') {
+        el = document.createElement('video');
+        el.controls = true; el.preload = 'metadata'; el.src = src; el.className = 'mp-video';
+    } else {
+        box.style.display = 'none'; return;
+    }
+    box.appendChild(el);
+    box.style.display = 'block';
+}
+
+function clearMediaPreview(boxId) { renderMediaPreview(boxId, null); }
+
+function renderLinkPreview(boxId, url) {
+    const box = document.getElementById(boxId);
+    if (!box) return;
+    box.innerHTML = '';
+    url = (url || '').trim();
+    if (!url) { box.style.display = 'none'; return; }
+
+    let parsed = null;
+    try { parsed = new URL(url); } catch (e) {}
+    if (!parsed || !/^https?:$/.test(parsed.protocol)) {
+        box.innerHTML = '<span class="mp-bad">Հղումը պետք է սկսվի http:// կամ https://</span>';
+        box.style.display = 'block';
+        return;
+    }
+
+    // YouTube → ներկառուցված տեսանյութ
+    const yt = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([\w-]{11})/);
+    if (yt) {
+        const ifr = document.createElement('iframe');
+        ifr.src = 'https://www.youtube.com/embed/' + yt[1];
+        ifr.className = 'mp-yt';
+        ifr.allowFullscreen = true;
+        box.appendChild(ifr);
+    }
+
+    const a = document.createElement('a');
+    a.href = parsed.href; a.target = '_blank'; a.rel = 'noopener';
+    a.className = 'mp-link';
+    a.textContent = '🔗 ' + parsed.href;
+    if (yt) a.style.marginTop = '8px';
+    box.appendChild(a);
+    box.style.display = 'block';
+}
     </script>
 </body>
 </html>
