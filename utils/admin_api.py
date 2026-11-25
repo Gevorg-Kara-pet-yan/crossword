@@ -1241,7 +1241,8 @@ from flask import Blueprint, g, jsonify, request
 from auth import introspect
 import hashlib
 from logging_config import LOG_DIR
-from utils.admin_query import QueryError, apply_request, has_query, page_slice
+from utils.admin_query import (BOOL, DATE, LIST, NUM, Field, QueryError,
+                               apply_request, register, sql_query)
 
 AM_TZ = timezone(timedelta(hours=4))
 
@@ -1494,6 +1495,44 @@ _CW_SELECT = """
     LEFT JOIN crossword_stats s ON s.crossword_id = c.id
 """
 
+# ?sort / ?filter fields of GET /crosswords (utils/admin_query.py): every
+# field of _cw_row as SQL over _CW_SELECT, so the database filters and pages.
+_CW_DATA = "COALESCE(NULLIF(c.data, ''), '{}')"
+_CW_FIELDS = {
+    "id": Field("c.id", NUM),
+    "title": Field("c.title"),
+    "keyword": Field("c.keyword"),
+    "subject": Field("c.subject"),
+    "grade": Field("c.grade"),
+    "description": Field("c.description"),
+    "creatorName": Field("c.creator_name"),
+    "creatorId": Field("CAST(c.user_id AS TEXT)"),
+    "creatorBlocked": Field("EXISTS (SELECT 1 FROM admin_blocked_users b "
+                            "WHERE b.user_id = CAST(c.user_id AS TEXT))", BOOL),
+    "status": Field("CASE WHEN COALESCE(c.hidden, 0) <> 0 THEN 'Hidden' ELSE 'Visible' END"),
+    "isHidden": Field("COALESCE(c.hidden, 0) <> 0", BOOL),
+    "hiddenReason": Field("c.hidden_reason"),
+    "isAiGenerated": Field("COALESCE(c.is_ai_generated, 0) <> 0", BOOL),
+    "isDraft": Field("COALESCE(c.is_draft, 0) <> 0", BOOL),
+    "createdAt": Field("c.created_at", DATE),
+    # Same count as _cw_row: placed entries with a question other than the keyword.
+    "questionCount": Field(
+        f"CASE WHEN json_valid({_CW_DATA}) THEN "
+        f"(SELECT COUNT(*) FROM json_each({_CW_DATA}, '$.placed') pl "
+        "  WHERE COALESCE(json_extract(pl.value, '$.question'), '') NOT IN ('', 'Բանալի բառ')) "
+        "ELSE (SELECT COUNT(*) FROM questions q WHERE q.crossword_id = c.id) END", NUM),
+    "participantCount": Field("(SELECT COUNT(*) FROM participants p WHERE p.crossword_id = c.id)", NUM),
+    "completedCount": Field("(SELECT COUNT(*) FROM results r WHERE r.crossword_id = c.id "
+                            "AND r.is_completed = 1)", NUM),
+    "viewCount": Field("COALESCE(s.view_count, 0)", NUM),
+    "likeCount": Field("COALESCE(s.like_count, 0)", NUM),
+    "dislikeCount": Field("COALESCE(s.dislike_count, 0)", NUM),
+    "shareCount": Field("COALESCE(s.share_count, 0)", NUM),
+    "downloadCount": Field("COALESCE(s.download_count, 0)", NUM),
+    "printCount": Field("COALESCE(s.print_count, 0)", NUM),
+    "commentCount": Field("(SELECT COUNT(*) FROM comments m WHERE m.crossword_id = c.id)", NUM),
+}
+
 
 # =====================================================
 # 🔹 DASHBOARD
@@ -1671,28 +1710,29 @@ def list_crosswords():
         where.append("c.hidden = 1")
     elif status == "visible":
         where.append("COALESCE(c.hidden, 0) = 0")
+
+    # ?sort / ?filter (utils/admin_query.py) become part of this SQL.
+    sq = sql_query(request.args, _CW_FIELDS)
+    if sq:
+        where += sq.where
+        params += sq.params
     clause = (" WHERE " + " AND ".join(where)) if where else ""
+    order = sq.order_by("c.id DESC") if sq else "c.id DESC"
 
     conn = _conn()
     try:
-        if has_query(request.args):
-            # Sort/filter over the whole (already q/subject/grade/status-filtered)
-            # set, then page — see utils/admin_query.py.
-            blocked = _blocked_ids(conn)
-            rows = conn.execute(f"{_CW_SELECT}{clause} ORDER BY c.id DESC", params).fetchall()
-            items = apply_request([_cw_row(r, blocked) for r in rows], request.args)
-            return jsonify({
-                "totalCount": len(items),
-                "page": page,
-                "pageSize": count,
-                "items": page_slice(items, page, count),
-            })
-
-        total = conn.execute(
-            f"SELECT COUNT(*) FROM crosswords c{clause}", params
-        ).fetchone()[0]
+        if sq:
+            register(conn)
+            # Filters may use the stats join, so count over the list's own SELECT.
+            total = conn.execute(
+                f"SELECT COUNT(*) FROM ({_CW_SELECT}{clause})", params
+            ).fetchone()[0]
+        else:
+            total = conn.execute(
+                f"SELECT COUNT(*) FROM crosswords c{clause}", params
+            ).fetchone()[0]
         rows = conn.execute(
-            f"{_CW_SELECT}{clause} ORDER BY c.id DESC LIMIT ? OFFSET ?",
+            f"{_CW_SELECT}{clause} ORDER BY {order} LIMIT ? OFFSET ?",
             params + [count, (page - 1) * count],
         ).fetchall()
         blocked = _blocked_ids(conn)
@@ -1906,6 +1946,7 @@ def crossword_results(cw_id):
                 "isCompleted": bool(r["is_completed"]),
             })
 
+        # ?sort/?filter: one crossword's participants, already read in full above.
         items = apply_request(items, request.args)
         return jsonify({
             "crosswordId": str(cw["id"]),
@@ -1969,6 +2010,7 @@ def list_users():
                 "blockedAt": (b["blocked_at"] if b else "") or "",
             })
 
+        # ?sort/?filter: one row per creator, aggregated in full above.
         items = apply_request(items, request.args)
         return jsonify({"totalCount": len(items), "items": items})
     finally:
@@ -2048,43 +2090,48 @@ def list_comments():
     if q:
         where.append("(m.comment_text LIKE ? OR m.name LIKE ? OR c.title LIKE ?)")
         params += [f"%{q}%"] * 3
+
+    # ?sort / ?filter (utils/admin_query.py) become part of this SQL.
+    sq = sql_query(request.args, {
+        "id": Field("m.id", NUM),
+        "crosswordId": Field("m.crossword_id", NUM),
+        "crosswordTitle": Field("c.title"),
+        "author": Field("m.name"),
+        "text": Field("m.comment_text"),
+        "createdAt": Field("m.created_at", DATE),
+    })
+    if sq:
+        where += sq.where
+        params += sq.params
     clause = (" WHERE " + " AND ".join(where)) if where else ""
-
-    select = ("SELECT m.id, m.crossword_id, m.name, m.comment_text, m.created_at, c.title "
-              f"FROM comments m LEFT JOIN crosswords c ON c.id = m.crossword_id{clause} "
-              "ORDER BY m.id DESC")
-
-    def item(r):
-        return {
-            "id": str(r["id"]),
-            "crosswordId": str(r["crossword_id"]),
-            "crosswordTitle": r["title"] or "",
-            "author": r["name"] or "",
-            "text": r["comment_text"] or "",
-            "createdAt": r["created_at"] or "",
-        }
+    order = sq.order_by("m.id DESC") if sq else "m.id DESC"
 
     conn = _conn()
     try:
-        if has_query(request.args):
-            items = apply_request([item(r) for r in conn.execute(select, params).fetchall()],
-                                  request.args)
-            return jsonify({"totalCount": len(items), "page": page, "pageSize": count,
-                            "items": page_slice(items, page, count)})
-
+        if sq:
+            register(conn)
         total = conn.execute(
             "SELECT COUNT(*) FROM comments m "
             f"LEFT JOIN crosswords c ON c.id = m.crossword_id{clause}", params
         ).fetchone()[0]
         rows = conn.execute(
-            select + " LIMIT ? OFFSET ?",
+            "SELECT m.id, m.crossword_id, m.name, m.comment_text, m.created_at, c.title "
+            f"FROM comments m LEFT JOIN crosswords c ON c.id = m.crossword_id{clause} "
+            f"ORDER BY {order} LIMIT ? OFFSET ?",
             params + [count, (page - 1) * count],
         ).fetchall()
         return jsonify({
             "totalCount": total,
             "page": page,
             "pageSize": count,
-            "items": [item(r) for r in rows],
+            "items": [{
+                "id": str(r["id"]),
+                "crosswordId": str(r["crossword_id"]),
+                "crosswordTitle": r["title"] or "",
+                "author": r["name"] or "",
+                "text": r["comment_text"] or "",
+                "createdAt": r["created_at"] or "",
+            } for r in rows],
         })
     finally:
         conn.close()
@@ -2127,52 +2174,65 @@ def list_feedback():
     if vote in ("like", "dislike"):
         where.append("v.vote_type = ?")
         params.append(vote)
+
+    # ?sort / ?filter (utils/admin_query.py) become part of this SQL.
+    sq = sql_query(request.args, {
+        "id": Field("v.id", NUM),
+        "crosswordId": Field("v.crossword_id", NUM),
+        "crosswordTitle": Field("c.title"),
+        "voteType": Field("v.vote_type"),
+        "reasons": Field("v.reasons", LIST),
+        "otherText": Field("v.other_text"),
+        "message": Field("v.message"),
+        "createdAt": Field("v.created_at", DATE),
+    })
+    if sq:
+        where += sq.where
+        params += sq.params
     clause = (" WHERE " + " AND ".join(where)) if where else ""
-
-    select = ("SELECT v.*, c.title FROM vote_feedback v "
-              f"LEFT JOIN crosswords c ON c.id = v.crossword_id{clause} "
-              "ORDER BY v.id DESC")
-
-    def reasons(raw):
-        try:
-            parsed = json.loads(raw) if raw else []
-            return parsed if isinstance(parsed, list) else [str(parsed)]
-        except (ValueError, TypeError):
-            return [raw] if raw else []
-
-    def item(r):
-        return {
-            "id": str(r["id"]),
-            "crosswordId": str(r["crossword_id"]),
-            "crosswordTitle": r["title"] or "",
-            "voteType": r["vote_type"] or "",
-            "reasons": reasons(r["reasons"]),
-            "otherText": r["other_text"] or "",
-            "message": r["message"] or "",
-            "createdAt": r["created_at"] or "",
-        }
+    order = sq.order_by("v.id DESC") if sq else "v.id DESC"
 
     conn = _conn()
     try:
-        if has_query(request.args):
-            items = apply_request([item(r) for r in conn.execute(select, params).fetchall()],
-                                  request.args)
-            return jsonify({"totalCount": len(items), "page": page, "pageSize": count,
-                            "items": page_slice(items, page, count)})
-
-        total = conn.execute(
-            f"SELECT COUNT(*) FROM vote_feedback v{clause}", params
-        ).fetchone()[0]
+        if sq:
+            register(conn)
+            # Filters may use the crossword title, so count over the same join.
+            total = conn.execute(
+                "SELECT COUNT(*) FROM vote_feedback v "
+                f"LEFT JOIN crosswords c ON c.id = v.crossword_id{clause}", params
+            ).fetchone()[0]
+        else:
+            total = conn.execute(
+                f"SELECT COUNT(*) FROM vote_feedback v{clause}", params
+            ).fetchone()[0]
         rows = conn.execute(
-            select + " LIMIT ? OFFSET ?",
+            "SELECT v.*, c.title FROM vote_feedback v "
+            f"LEFT JOIN crosswords c ON c.id = v.crossword_id{clause} "
+            f"ORDER BY {order} LIMIT ? OFFSET ?",
             params + [count, (page - 1) * count],
         ).fetchall()
+
+        def reasons(raw):
+            try:
+                parsed = json.loads(raw) if raw else []
+                return parsed if isinstance(parsed, list) else [str(parsed)]
+            except (ValueError, TypeError):
+                return [raw] if raw else []
 
         return jsonify({
             "totalCount": total,
             "page": page,
             "pageSize": count,
-            "items": [item(r) for r in rows],
+            "items": [{
+                "id": str(r["id"]),
+                "crosswordId": str(r["crossword_id"]),
+                "crosswordTitle": r["title"] or "",
+                "voteType": r["vote_type"] or "",
+                "reasons": reasons(r["reasons"]),
+                "otherText": r["other_text"] or "",
+                "message": r["message"] or "",
+                "createdAt": r["created_at"] or "",
+            } for r in rows],
         })
     finally:
         conn.close()
@@ -2232,41 +2292,47 @@ def list_audit():
     if action:
         where.append("action LIKE ?")
         params.append(f"{action}%")
-    clause = (" WHERE " + " AND ".join(where)) if where else ""
 
-    def item(r):
-        return {
-            "id": str(r["id"]),
-            "actor": r["actor"] or "",
-            "action": r["action"] or "",
-            "entityType": r["entity_type"] or "",
-            "entityId": r["entity_id"] or "",
-            "detail": r["detail"] or "",
-            "createdAt": r["created_at"] or "",
-        }
+    # ?sort / ?filter (utils/admin_query.py) become part of this SQL.
+    sq = sql_query(request.args, {
+        "id": Field("id", NUM),
+        "actor": Field("actor"),
+        "action": Field("action"),
+        "entityType": Field("entity_type"),
+        "entityId": Field("entity_id"),
+        "detail": Field("detail"),
+        "createdAt": Field("created_at", DATE),
+    })
+    if sq:
+        where += sq.where
+        params += sq.params
+    clause = (" WHERE " + " AND ".join(where)) if where else ""
+    order = sq.order_by("id DESC") if sq else "id DESC"
 
     conn = _conn()
     try:
-        if has_query(request.args):
-            rows = conn.execute(
-                f"SELECT * FROM admin_audit_log{clause} ORDER BY id DESC", params
-            ).fetchall()
-            items = apply_request([item(r) for r in rows], request.args)
-            return jsonify({"totalCount": len(items), "page": page, "pageSize": count,
-                            "items": page_slice(items, page, count)})
-
+        if sq:
+            register(conn)
         total = conn.execute(
             f"SELECT COUNT(*) FROM admin_audit_log{clause}", params
         ).fetchone()[0]
         rows = conn.execute(
-            f"SELECT * FROM admin_audit_log{clause} ORDER BY id DESC LIMIT ? OFFSET ?",
+            f"SELECT * FROM admin_audit_log{clause} ORDER BY {order} LIMIT ? OFFSET ?",
             params + [count, (page - 1) * count],
         ).fetchall()
         return jsonify({
             "totalCount": total,
             "page": page,
             "pageSize": count,
-            "items": [item(r) for r in rows],
+            "items": [{
+                "id": str(r["id"]),
+                "actor": r["actor"] or "",
+                "action": r["action"] or "",
+                "entityType": r["entity_type"] or "",
+                "entityId": r["entity_id"] or "",
+                "detail": r["detail"] or "",
+                "createdAt": r["created_at"] or "",
+            } for r in rows],
         })
     finally:
         conn.close()
@@ -2442,6 +2508,7 @@ def list_error_logs():
             it = {**it, "traceback": ""}
         items.append(it)
 
+    # ?sort/?filter: these come from the log files, already read in full above.
     items = apply_request(items, request.args)
     start = (page - 1) * count
     return jsonify({
