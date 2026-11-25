@@ -128,8 +128,9 @@ class Field:
     """A JSON field of a list as a SQL expression over the endpoint's query.
 
     `sql` is written by the endpoint (never user input); `kind` is TEXT, NUM,
-    BOOL (an expression that is 0/1), DATE or LIST (a JSON array in a text
-    column, e.g. vote_feedback.reasons).
+    BOOL (an expression that is 0/1), DATE or LIST (on SQLite a JSON array in
+    a text column, e.g. vote_feedback.reasons; on SQL Server a comma-separated
+    column, e.g. AppUsers.Roles).
     """
     __slots__ = ("sql", "kind")
 
@@ -188,6 +189,9 @@ class _SQLite:
                f"ELSE json_array({e}) END")
         return f"json_each({arr}) AS j"
 
+    def list_text(self, e):
+        return f"(SELECT group_concat(j.value, ', ') FROM {self.list_items(e)})"
+
 
 class _MSSQL:
     """SQL Server: datetime columns; text compares with the column collation
@@ -218,7 +222,12 @@ class _MSSQL:
         return dt
 
     def list_items(self, e):
-        raise QueryError("list fields are not supported here")
+        # A comma-separated column (e.g. AppUsers.Roles "Teacher,Admin").
+        return (f"(SELECT LTRIM(RTRIM(value)) AS value "
+                f"FROM STRING_SPLIT(COALESCE({e}, N''), ',')) AS j")
+
+    def list_text(self, e):
+        return e
 
 
 _DIALECTS = {"sqlite": _SQLite(), "mssql": _MSSQL()}
@@ -316,11 +325,11 @@ def _list_cond(d, field, sql, op, raw):
     items = d.list_items(sql)
     value = d.fold("j.value")
     if op in ("eq", "ne"):
-        exists = f"EXISTS (SELECT 1 FROM {items} WHERE {value} = ?)"
+        exists = f"EXISTS (SELECT 1 FROM {items} WHERE j.value <> '' AND {value} = ?)"
         return (f"({exists})" if op == "eq" else f"(NOT {exists})"), [d.fold_value(raw)]
     if op in ("contains", "startswith"):
         test, params = getattr(d, op)(value, d.fold_value(raw))
-        return f"(EXISTS (SELECT 1 FROM {items} WHERE {test}))", params
+        return f"(EXISTS (SELECT 1 FROM {items} WHERE j.value <> '' AND {test}))", params
     raise QueryError(f"'{field}' is a list; use eq, ne, in, contains or startswith")
 
 
@@ -331,30 +340,50 @@ def _order(d, f, desc):
     if f.kind == DATE:
         return (f"CASE WHEN {d.date_empty(f.sql)} THEN 1 ELSE 0 END, "
                 f"{d.date_expr(f.sql)}{direction}")
-    sql = (f"(SELECT group_concat(j.value, ', ') FROM {d.list_items(f.sql)})"
-           if f.kind == LIST else f.sql)
+    sql = d.list_text(f.sql) if f.kind == LIST else f.sql
     e = f"COALESCE({sql}, '')"
     return f"CASE WHEN {e} = '' THEN 1 ELSE 0 END, {d.fold(e)}{direction}"
+
+
+def _bare(term):
+    """'(u.Id) DESC' -> 'u.id' — to spot the same column twice in ORDER BY."""
+    t = term.strip()
+    for suffix in (" desc", " asc"):
+        if t.lower().endswith(suffix):
+            t = t[: -len(suffix)]
+    while t.startswith("(") and t.endswith(")"):
+        t = t[1:-1].strip()
+    return t.lower()
 
 
 class SqlQuery:
     """What an endpoint adds to its own query: `where` (conditions, all
     AND-ed), `params` (for those conditions, in order) and `order_by()`."""
 
-    def __init__(self, where, params, order):
+    def __init__(self, where, params, order, sort_sql=None):
         self.where, self.params, self.order = where, params, order
+        self.sort_sql = sort_sql
 
     def order_by(self, default):
-        """ORDER BY text: the ?sort terms, then the endpoint's order as tie-break."""
-        return f"{self.order}, {default}" if self.order else default
+        """ORDER BY text: the ?sort terms, then the endpoint's order as
+        tie-break (minus the sorted column — SQL Server rejects it twice)."""
+        if not self.order:
+            return default
+        rest = [t for t in default.split(",") if _bare(t) != _bare(self.sort_sql or "")]
+        return ", ".join([self.order] + [t.strip() for t in rest])
 
 
-def sql_query(args, fields, dialect="sqlite"):
+def sql_query(args, fields, dialect="sqlite", ignore_sort=False):
     """None when the request has no sort/filter; otherwise a SqlQuery built
-    from `fields` ({json name: Field}). Raises QueryError (-> 400)."""
-    if not has_query(args):
-        return None
+    from `fields` ({json name: Field}). Raises QueryError (-> 400).
+
+    ignore_sort: the endpoint already uses ?sort for its own values (e.g.
+    Learn answers: dislikes|likes|recent), so only ?filter is applied."""
     sort, desc, filters = parse(args)
+    if ignore_sort:
+        sort = None
+    if not sort and not filters:
+        return None
     d = _DIALECTS[dialect]
 
     def field(name, what):
@@ -367,8 +396,10 @@ def sql_query(args, fields, dialect="sqlite"):
         sql, ps = _cond(d, name, field(name, "filter"), op, raw)
         where.append(sql)
         params += ps
-    order = _order(d, field(sort, "sort"), desc) if sort else None
-    return SqlQuery(where, params, order)
+    if not sort:
+        return SqlQuery(where, params, None)
+    f = field(sort, "sort")
+    return SqlQuery(where, params, _order(d, f, desc), f.sql)
 
 
 # ═════════════════════════════════════════════════════════════════════════════
